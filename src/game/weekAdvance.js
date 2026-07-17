@@ -1,13 +1,13 @@
 /**
- * weekAdvance.js — Custom hook that encapsulates the NEXT WEEK logic.
- * Prompt 4: updated for new production schema (budgetMult, phase, combo, platform),
- *           pushes entries to eventLog.
+ * weekAdvance.js — Custom hook: NEXT WEEK logic
+ * Prompt 5: passes castActors + chemValue to evaluateProduction,
+ *           handles awards dispatch and controversy modal.
  */
 import { useState } from 'react'
 import { useGame, A, pushToast, pushEventLog } from './state.jsx'
 import { tickProduction, calcRevenue, calcScore, popularityDeltaByPlatform } from './productions.js'
 import { weeklyActorRecovery, grantExp } from './actors.js'
-import { calcChemistryBonus, calcBondGrowth, applyBondDeltas } from './chemistry.js'
+import { calcChemistryBonus, calcBondGrowth, applyBondDeltas, getChem } from './chemistry.js'
 import { evaluateProduction } from './evaluators.js'
 import { rollWeeklyEvents } from './events.js'
 import { calcRank } from './ranking.js'
@@ -25,10 +25,10 @@ export function useWeekAdvance() {
 
     const week = state.week
 
-    // 1. Tick all active productions
-    const completedThisWeek  = []
-    const wrappedThisWeek    = []
-    const releasingThisWeek  = []
+    // ── 1. Tick productions ───────────────────────────────────────────────────
+    const completedThisWeek = []
+    const wrappedThisWeek   = []
+    const releasingThisWeek = []
 
     for (const prod of state.productions) {
       if (prod.status !== 'active') continue
@@ -44,14 +44,13 @@ export function useWeekAdvance() {
       }
     }
 
-    // 2. Handle wrap events (combo reveal)
+    // ── 2. Wrap events ────────────────────────────────────────────────────────
     for (const prod of wrappedThisWeek) {
       const combo = prod.comboResult
       if (combo) {
         pushEventLog(dispatch,
-          `"${prod.title}" wrapped filming! Combo: ${combo.emoji} ${combo.label} (×${combo.mult})`,
-          combo.mult >= 1.5 ? 'gold' : combo.mult < 1.0 ? 'red' : 'green',
-          week,
+          `"${prod.title}" filming wrapped! Combo: ${combo.emoji} ${combo.label} ×${combo.mult}`,
+          combo.mult >= 1.5 ? 'gold' : combo.mult < 1.0 ? 'red' : 'green', week,
         )
         dispatch({
           type: A.PUSH_MODAL,
@@ -59,48 +58,66 @@ export function useWeekAdvance() {
             type: 'generic',
             data: {
               title: `🎬 ${prod.title} — WRAP!`,
-              message: `Genre×Type Combo: ${combo.emoji} ${combo.label}\n\nScore multiplier: ×${combo.mult}. Episodes now releasing weekly.`,
+              message: `Genre×Type Combo: ${combo.emoji} ${combo.label}\n\nScore multiplier: ×${combo.mult}\nEpisodes now releasing weekly.`,
             },
           },
         })
       }
     }
 
-    // 3. Handle episode releases
+    // ── 3. Episode releases ───────────────────────────────────────────────────
     for (const prod of releasingThisWeek) {
       const ep  = prod.episodesReleased
       const rat = prod.episodeRatings?.[ep - 1]
       if (rat != null) {
         pushEventLog(dispatch,
           `"${prod.title}" Ep.${ep} aired — rating ${rat}/10`,
-          rat >= 8 ? 'pink' : rat >= 6 ? 'green' : rat >= 4 ? '' : 'red',
-          week,
+          rat >= 8 ? 'pink' : rat >= 5 ? 'green' : 'red', week,
         )
       }
     }
 
-    // 4. Evaluate fully completed productions
+    // ── 4. Evaluate completed productions ─────────────────────────────────────
     for (const prod of completedThisWeek) {
       const castActors = state.actors.filter(a => prod.castIds.includes(a.id))
+
+      // Chemistry between lead pair
+      const leads   = castActors.filter(a => (prod.leadIds ?? []).includes(a.id))
+      const chemValue = leads.length >= 2
+        ? getChem(leads[0], leads[1].id)
+        : castActors.length >= 2
+          ? getChem(castActors[0], castActors[1].id)
+          : 0
+
       const chemBonus  = calcChemistryBonus(castActors)
       const baseScore  = calcScore(prod, castActors, chemBonus)
       const comboMult  = prod.comboResult?.mult ?? 1.0
-      const score      = Math.round(Math.min(100, baseScore * comboMult))
+      const adjBase    = Math.round(Math.min(100, baseScore * comboMult))
 
       const revenue    = calcRevenue(
-        score, prod.budget ?? 1.0, prod.type,
-        state.reputation, prod.platform ?? 'tv', comboMult
+        adjBase, prod.budget ?? 1.0, prod.type,
+        state.reputation, prod.platform ?? 'tv', comboMult,
       )
-      const evalResult = evaluateProduction({ production: prod, score, revenue, reputation: state.reputation })
 
-      const popDelta = popularityDeltaByPlatform(score, prod.platform ?? 'tv', prod.rating ?? 'pg13')
+      // Four-critics evaluation
+      const evalResult = evaluateProduction({
+        production: prod,
+        score:      adjBase,
+        revenue,
+        reputation: state.reputation,
+        castActors,
+        chemValue,
+      })
 
+      const finalScore = evalResult.score
+
+      // Apply stat deltas
       dispatch({ type: A.ADD_MONEY,      amount: revenue })
       dispatch({ type: A.ADD_REPUTATION, amount: evalResult.repDelta })
-      dispatch({ type: A.SET_POPULARITY, value: state.popularity + popDelta })
+      dispatch({ type: A.SET_POPULARITY, value: state.popularity + evalResult.popDelta })
 
       // Chemistry + XP for cast
-      const chemDeltas = calcBondGrowth(castActors, score)
+      const chemDeltas = calcBondGrowth(castActors, finalScore)
       for (const actor of castActors) {
         const expPatch   = grantExp(actor, evalResult.xpPerActor)
         const newChemMap = applyBondDeltas(actor, chemDeltas)
@@ -116,19 +133,62 @@ export function useWeekAdvance() {
         })
       }
 
+      // Record completion
       dispatch({
         type: A.COMPLETE_PRODUCTION, id: prod.id,
         record: {
-          ...prod, score, revenue,
+          ...prod,
+          score:         finalScore,
+          revenue,
           grade:         evalResult.grade,
           weekCompleted: week,
-          castIds:       prod.castIds,
         },
       })
 
-      // Event log + modal
+      // ── Awards (avgStars ≥ 4.5) ───────────────────────────────────────────
+      if (evalResult.awarded) {
+        dispatch({ type: A.ADD_REPUTATION, amount: 10 })
+        dispatch({ type: A.SET_POPULARITY, value: state.popularity + evalResult.popDelta + 25000 })
+        dispatch({ type: A.ADD_MONEY, amount: 3000 })
+        dispatch({ type: A.ADD_AWARD })
+        for (const actor of castActors) {
+          dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch: { awards: (actor.awards ?? 0) + 1 } })
+        }
+        pushEventLog(dispatch,
+          `🏆 "${prod.title}" wins an industry award! +10 rep · +₩3,000`,
+          'gold', week,
+        )
+      }
+
+      // ── Controversy (social critic ≤ 2) ───────────────────────────────────
+      if (evalResult.controversy) {
+        dispatch({
+          type: A.PUSH_MODAL,
+          modal: {
+            type: 'event',
+            data: {
+              label: '⚠️ CONTROVERSY',
+              message: `The Social Critic's review of "${prod.title}" sparked backlash over LGBTQ+ representation. Your studio is under scrutiny.`,
+              choices: [
+                { label: '🤝 Issue apology (-3 rep)',   effect: (s, d) => d({ type: A.ADD_REPUTATION, amount: -3 }) },
+                { label: '🗣️ Stand firm (-6 rep)',      effect: (s, d) => d({ type: A.ADD_REPUTATION, amount: -6 }) },
+                { label: '💰 Donate & rebrand (-₩8000)', effect: (s, d) => {
+                  d({ type: A.ADD_MONEY, amount: -8000 })
+                  d({ type: A.ADD_REPUTATION, amount: 2 })
+                }},
+              ],
+            },
+          },
+        })
+        pushEventLog(dispatch,
+          `"${prod.title}" faces representation controversy. Choices matter.`,
+          'red', week,
+        )
+      }
+
+      // Event log + main result modal
       pushEventLog(dispatch,
-        `"${prod.title}" finished! Grade: ${evalResult.grade} — ${evalResult.label}. Revenue: ₩${revenue.toLocaleString()}`,
+        `"${prod.title}" critique: ${evalResult.grade} (${evalResult.avgStars}★). Revenue ₩${revenue.toLocaleString()}`,
         evalResult.grade === 'F' || evalResult.grade === 'D' ? 'red'
           : evalResult.grade === 'S+' || evalResult.grade === 'S' ? 'gold'
           : 'green',
@@ -137,11 +197,14 @@ export function useWeekAdvance() {
 
       dispatch({
         type: A.PUSH_MODAL,
-        modal: { type: 'productionResult', data: { prod, eval: evalResult, score, revenue } },
+        modal: {
+          type: 'productionResult',
+          data: { prod, eval: evalResult, score: finalScore, revenue },
+        },
       })
     }
 
-    // 5. Weekly actor tick (skip actors who just wrapped)
+    // ── 5. Weekly actor tick ──────────────────────────────────────────────────
     for (const actor of state.actors) {
       if (!actor.signed) continue
       if (completedThisWeek.find(p => p.castIds.includes(actor.id))) continue
@@ -149,7 +212,7 @@ export function useWeekAdvance() {
       dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch })
     }
 
-    // 6. Rank update
+    // ── 6. Rank update ────────────────────────────────────────────────────────
     const newRank = calcRank(state.reputation, state.popularity)
     if (newRank.id !== state.rank) {
       dispatch({ type: A.SET_RANK, rank: newRank.id })
@@ -157,14 +220,14 @@ export function useWeekAdvance() {
       dispatch({ type: A.PUSH_MODAL, modal: { type: 'rankUp', data: { rank: newRank } } })
     }
 
-    // 7. Random events
+    // ── 7. Random events ──────────────────────────────────────────────────────
     const events = rollWeeklyEvents(state)
     for (const ev of events) {
       pushEventLog(dispatch, `[EVENT] ${ev.label}: ${ev.message}`, 'pink', week)
       dispatch({ type: A.PUSH_MODAL, modal: { type: 'event', data: ev } })
     }
 
-    // 8. Advance week counter
+    // ── 8. Advance week ───────────────────────────────────────────────────────
     dispatch({ type: A.ADVANCE_WEEK })
     pushToast(dispatch, `Week ${state.week + 1} begins.`)
 
