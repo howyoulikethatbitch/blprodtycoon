@@ -1,0 +1,24 @@
+PROMPT 8: Audio, Polish & Final Integration
+
+AUDIO:
+- Tiny Web Audio synth (no external files)
+- Click: 660Hz square wave, 0.06s
+- Chime: 880→1174→1568Hz ascending, 0.12-0.22s
+- Alert: 220→180Hz sawtooth descending
+- Pop: 523→784Hz triangle
+- All triggered by ensureAudio() on first interaction
+
+POLISH:
+- Confetti burst on awards, high episode ratings, rivalry wins
+- Money count-up/down animation (600ms ease)
+- Modal queue system (events stack and play sequentially)
+- Pixel font: "Press Start 2P" from Google Fonts with monospace fallback
+- Responsive: sidebar stacks on mobile, grids collapse
+- Actor cards: hover lift effect, chemistry bars, mood emoji (😊😐😠😢)
+
+FINAL INTEGRATION:
+- App.jsx handles view switching (TitleScreen → Game)
+- Game state in React Context with useReducer or useState
+- All game logic in /game/ modules (pure functions, no React)
+- Components only handle rendering and user input
+- Build outputs to /dist for GitHub Pages

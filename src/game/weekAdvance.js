@@ -9,7 +9,7 @@ import { tickProduction, calcRevenue, calcScore, popularityDeltaByPlatform } fro
 import { weeklyActorRecovery, grantExp } from './actors.js'
 import { calcChemistryBonus, calcBondGrowth, applyBondDeltas, getChem } from './chemistry.js'
 import { evaluateProduction } from './evaluators.js'
-import { rollWeeklyEvents } from './events.js'
+import { rollWeeklyEvents, rollActorEvent, runChemPulse } from './events.js'
 import { calcRank } from './ranking.js'
 import { SFX, resumeAudio } from './audio.js'
 
@@ -220,11 +220,34 @@ export function useWeekAdvance() {
       dispatch({ type: A.PUSH_MODAL, modal: { type: 'rankUp', data: { rank: newRank } } })
     }
 
-    // ── 7. Random events ──────────────────────────────────────────────────────
-    const events = rollWeeklyEvents(state)
-    for (const ev of events) {
-      pushEventLog(dispatch, `[EVENT] ${ev.label}: ${ev.message}`, 'pink', week)
-      dispatch({ type: A.PUSH_MODAL, modal: { type: 'event', data: ev } })
+    // ── 7a. Chemistry pulse ───────────────────────────────────────────────────
+    const pulse = runChemPulse(state, week)
+    for (const action of pulse.actions) {
+      dispatch(action)
+    }
+    for (const modal of pulse.modals) {
+      const lbl = modal.data?.label ?? modal.data?.title ?? 'Chemistry Event'
+      pushEventLog(dispatch, `[CHEM] ${lbl}`, 'pink', week)
+      dispatch({ type: A.PUSH_MODAL, modal })
+    }
+
+    // ── 7b. Company event ─────────────────────────────────────────────────────
+    const companyEvents = rollWeeklyEvents(state)
+    if (companyEvents.length > 0) {
+      dispatch({ type: A.SET_FLAG, key: 'lastCompanyEvent', value: week })
+    }
+    for (const ev of companyEvents) {
+      const lbl = ev.data?.label ?? 'Company Event'
+      pushEventLog(dispatch, `[EVENT] ${lbl}`, 'pink', week)
+      dispatch({ type: A.PUSH_MODAL, modal: ev })
+    }
+
+    // ── 7c. Actor event ───────────────────────────────────────────────────────
+    const actorEvent = rollActorEvent(state)
+    if (actorEvent) {
+      const lbl = actorEvent.data?.label ?? 'Actor Event'
+      pushEventLog(dispatch, `[ACTOR] ${lbl}`, 'pink', week)
+      dispatch({ type: A.PUSH_MODAL, modal: actorEvent })
     }
 
     // ── 8. Advance week ───────────────────────────────────────────────────────

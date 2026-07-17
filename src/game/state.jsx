@@ -20,9 +20,10 @@ export const INITIAL_STATE = {
   productions:   [],
   history:       [],
   events:        [],
-  eventLog:      [],   // ← new: color-coded game log entries
+  eventLog:      [],   // color-coded game log entries
   modalQueue:    [],
   toasts:        [],
+  fixedCPs:      [],   // array of [actorIdA, actorIdB] pairs
   settings: {
     sfxOn:      true,
     scanlines:  true,
@@ -57,7 +58,9 @@ export const A = {
   DISMISS_TOAST:      'DISMISS_TOAST',
   PUSH_EVENT:         'PUSH_EVENT',
   RESOLVE_EVENT:      'RESOLVE_EVENT',
-  PUSH_EVENT_LOG:     'PUSH_EVENT_LOG',   // ← new
+  PUSH_EVENT_LOG:     'PUSH_EVENT_LOG',
+  ADD_FIXED_CP:       'ADD_FIXED_CP',
+  REMOVE_FIXED_CP:    'REMOVE_FIXED_CP',
   SET_COMPANY_NAME:   'SET_COMPANY_NAME',
   SET_SETTINGS:       'SET_SETTINGS',
   SET_FLAG:           'SET_FLAG',
@@ -181,6 +184,25 @@ function gameReducer(state, action) {
         ].slice(0, 80),   // keep last 80 entries
       }
 
+    case A.ADD_FIXED_CP: {
+      const [x, y] = action.pair
+      const already = (state.fixedCPs ?? []).some(([a, b]) => (
+        (a === x && b === y) || (a === y && b === x)
+      ))
+      if (already) return state
+      return { ...state, fixedCPs: [...(state.fixedCPs ?? []), [x, y]] }
+    }
+
+    case A.REMOVE_FIXED_CP: {
+      const [x, y] = action.pair
+      return {
+        ...state,
+        fixedCPs: (state.fixedCPs ?? []).filter(
+          ([a, b]) => !((a === x && b === y) || (a === y && b === x))
+        ),
+      }
+    }
+
     case A.SET_COMPANY_NAME:
       return { ...state, companyName: action.name }
 
@@ -193,8 +215,9 @@ function gameReducer(state, action) {
     case A.LOAD_SAVE:
       return {
         ...action.saveData,
-        started:  true,
-        eventLog: action.saveData.eventLog ?? [],
+        started:   true,
+        eventLog:  action.saveData.eventLog  ?? [],
+        fixedCPs:  action.saveData.fixedCPs  ?? [],
       }
 
     case A.MARK_SAVED:
