@@ -1,0 +1,2618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BL Production Manager</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
+<!-- Pixel font (graceful fallback to monospace if offline) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   BL PRODUCTION MANAGER — pixel-art management sim
+   Theme: dark purple #2D1B4E / hot pink #FF6B9D / gold #FFD700
+   Prompt 2: full 21-actor system with portrait images
+   ============================================================ */
+:root{
+  --bg:#2D1B4E; --bg-deep:#1F1338; --bg-panel:#241845; --bg-inset:#120A24;
+  --pink:#FF6B9D; --pink-dim:#C94F7C; --gold:#FFD700; --white:#FFFFFF;
+  --red:#FF5470; --green:#5CE1A0; --lav:#9B86C4; --blue:#6BC5FF;
+  --gray:#6E6390; --shadow:#120A24;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%;}
+body{
+  background:var(--bg);
+  color:var(--white);
+  font-family:'Press Start 2P', monospace;
+  font-size:10px;
+  line-height:1.7;
+  overflow-x:hidden;
+}
+/* subtle scanline vibe */
+body::after{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg, rgba(0,0,0,.10) 0 1px, transparent 1px 3px);
+  opacity:.35;
+}
+::-webkit-scrollbar{width:10px; height:10px;}
+::-webkit-scrollbar-track{background:var(--bg-inset);}
+::-webkit-scrollbar-thumb{background:var(--pink-dim); border:2px solid var(--bg-inset);}
+::-webkit-scrollbar-thumb:hover{background:var(--pink);}
+
+/* ---------------- Top bar ---------------- */
+#topbar{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  background:var(--bg-deep); border-bottom:3px solid var(--pink);
+  padding:10px 14px; position:sticky; top:0; z-index:50;
+}
+#tb-company{
+  color:var(--pink); cursor:pointer; font-size:11px;
+  border-bottom:2px dashed var(--pink-dim); padding-bottom:2px;
+}
+#tb-company:hover{color:var(--gold); border-color:var(--gold);}
+.tb-stat{display:flex; flex-direction:column; align-items:flex-start; min-width:70px;}
+.tb-stat .lbl{font-size:7px; color:var(--lav); letter-spacing:1px;}
+.tb-stat .val{font-size:12px;}
+#tb-money{color:var(--gold);} #tb-rep{color:var(--pink);} #tb-pop{color:var(--gold);} #tb-rank{color:var(--green);}
+.tb-spacer{flex:1;}
+#tb-saved{font-size:7px; color:var(--lav);}
+
+/* ---------------- Layout ---------------- */
+#layout{display:flex; min-height:calc(100vh - 62px);}
+#sidebar{
+  width:230px; flex-shrink:0; background:var(--bg-panel);
+  border-right:3px solid var(--shadow); padding:14px 12px;
+  display:flex; flex-direction:column; gap:10px;
+}
+#main{flex:1; padding:16px; min-width:0;}
+
+/* ---------------- Buttons ---------------- */
+button{
+  font-family:inherit; cursor:pointer; color:var(--white);
+  background:#3A2666; border:3px solid var(--shadow);
+  box-shadow:0 4px 0 var(--shadow);
+  padding:10px 12px; font-size:9px; text-align:left;
+  transition:transform .12s ease, box-shadow .12s ease, background .12s;
+}
+button:hover:not(:disabled){transform:translateY(-2px); box-shadow:0 6px 0 var(--shadow), 0 0 14px rgba(255,107,157,.55); background:#4A3180;}
+button:active:not(:disabled){transform:translateY(2px); box-shadow:0 1px 0 var(--shadow);}
+button:disabled{opacity:.4; cursor:not-allowed;}
+#btn-next{
+  background:var(--pink); color:var(--bg-inset); font-size:13px;
+  text-align:center; padding:18px 10px; border-color:#8A2B52; box-shadow:0 5px 0 #8A2B52;
+}
+#btn-next:hover{background:#FF85AC; box-shadow:0 7px 0 #8A2B52, 0 0 18px rgba(255,107,157,.8);}
+.nav-btn.active{background:var(--pink); color:var(--bg-inset); border-color:#8A2B52;}
+.nav-btn.active:hover{background:#FF85AC;}
+.small-btn{font-size:8px; padding:8px 10px;}
+.gold-btn{background:#8a6d00; border-color:#4d3d00; box-shadow:0 4px 0 #4d3d00;}
+.gold-btn:hover{background:#a8871a;}
+.danger-btn{background:#7A1F33; border-color:#3d0f1a; box-shadow:0 4px 0 #3d0f1a;}
+.danger-btn:hover{background:#99263f;}
+
+/* ---------------- Cards & panels ---------------- */
+.card{
+  background:var(--bg-panel); border:3px solid var(--shadow);
+  box-shadow:4px 4px 0 rgba(0,0,0,.35); padding:14px; margin-bottom:16px;
+}
+.card h2{font-size:11px; color:var(--pink); margin-bottom:12px; letter-spacing:1px;}
+.card h3{font-size:9px; color:var(--gold); margin-bottom:8px;}
+.muted{color:var(--lav); font-size:8px;}
+.gold{color:var(--gold);} .pink{color:var(--pink);} .red{color:var(--red);} .green{color:var(--green);}
+
+/* ---------------- Progress bars ---------------- */
+.progress{height:14px; background:var(--bg-inset); border:2px solid var(--shadow); position:relative; overflow:hidden;}
+.progress > i{
+  display:block; height:100%; width:0%;
+  background:linear-gradient(90deg, var(--pink), var(--gold));
+  transition:width .6s ease;
+}
+.progress.hp > i{background:linear-gradient(90deg,#FF5470,#FF6B9D);}
+.progress.loy > i{background:linear-gradient(90deg,#6BC5FF,#9B86C4);}
+.progress.tiny{height:8px;}
+
+/* ---------------- Dashboard ---------------- */
+#dashboard-grid{display:grid; grid-template-columns:1fr 320px; gap:16px; align-items:start;}
+.prod-card{border-left:5px solid var(--pink);}
+.prod-card .prod-head{display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px;}
+.prod-title{color:var(--gold); font-size:10px;}
+.phase-tag{font-size:7px; padding:3px 6px; border:2px solid var(--shadow);}
+.phase-filming{background:#3A2666; color:var(--lav);}
+.phase-releasing{background:var(--pink); color:var(--bg-inset);}
+.phase-done{background:#2c5b45; color:var(--green);}
+.prod-meta{font-size:8px; color:var(--lav); margin:6px 0;}
+.prod-leads{display:flex; gap:8px; align-items:center; margin:6px 0;}
+.mini-face{
+  width:34px; height:34px; border:2px solid var(--pink); border-radius:4px;
+  object-fit:cover; image-rendering:pixelated; background:var(--bg-inset); flex-shrink:0;
+}
+.combo-PERFECT{color:var(--gold); text-shadow:0 0 8px rgba(255,215,0,.7);}
+.combo-GOOD{color:var(--pink);}
+.combo-BAD{color:var(--red);}
+.ep-stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(90px,1fr)); gap:6px; margin-top:8px;}
+.ep-stat{background:var(--bg-inset); border:2px solid var(--shadow); padding:6px; text-align:center;}
+.ep-stat .n{font-size:11px; color:var(--gold);}
+.ep-stat .t{font-size:6px; color:var(--lav);}
+
+/* ---------------- Event log ---------------- */
+#event-log{max-height:520px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;}
+.log-item{
+  font-size:8px; padding:7px 9px; background:var(--bg-inset);
+  border-left:4px solid var(--lav); line-height:1.6;
+}
+.log-item .wk{color:var(--lav); font-size:7px; margin-right:6px;}
+.log-good{border-left-color:var(--green);}
+.log-bad{border-left-color:var(--red);}
+.log-money{border-left-color:var(--gold);}
+.log-pink{border-left-color:var(--pink);}
+
+/* ---------------- Forms ---------------- */
+.field{margin-bottom:14px;}
+.field label{display:block; font-size:8px; color:var(--lav); margin-bottom:6px; letter-spacing:1px;}
+input[type=text], select, textarea{
+  width:100%; font-family:inherit; font-size:9px; color:var(--white);
+  background:var(--bg-inset); border:2px solid var(--pink-dim); padding:9px;
+}
+input[type=text]:focus, select:focus, textarea:focus{outline:none; border-color:var(--gold);}
+input[type=range]{width:100%; accent-color:var(--pink);}
+.seg{display:flex; flex-wrap:wrap; gap:6px;}
+.seg button{flex:1 1 auto; text-align:center; padding:9px 6px; font-size:8px;}
+.seg button.sel{background:var(--pink); color:var(--bg-inset); border-color:#8A2B52;}
+.seg button:disabled{opacity:.35;}
+.cost-preview{
+  background:var(--bg-inset); border:2px dashed var(--gold);
+  padding:12px; font-size:9px; line-height:2; margin-top:6px;
+}
+.chem-preview{margin-top:6px; padding:10px; background:var(--bg-inset); border:2px solid var(--shadow); font-size:8px;}
+
+/* ---------------- Actors grid ---------------- */
+#actor-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px;}
+.actor-card{
+  background:var(--bg-panel); border:3px solid var(--shadow);
+  box-shadow:4px 4px 0 rgba(0,0,0,.35); padding:12px; cursor:pointer;
+  transition:transform .12s ease, box-shadow .12s ease;
+}
+.actor-card:hover{transform:translateY(-3px); box-shadow:6px 7px 0 rgba(0,0,0,.4), 0 0 16px rgba(255,107,157,.35);}
+.actor-top{display:flex; gap:10px; margin-bottom:10px;}
+
+/* Portraits: real images with colored-border status language */
+.portrait{
+  width:64px; height:64px; flex-shrink:0; border:3px solid var(--pink);
+  border-radius:4px; position:relative; background:var(--bg-inset); overflow:visible;
+}
+.portrait img{
+  width:100%; height:100%; object-fit:cover; border-radius:4px;
+  image-rendering:pixelated; display:block;
+}
+.portrait.big{width:128px; height:128px;}
+.portrait.ww{border-color:var(--gold); box-shadow:0 0 12px rgba(255,215,0,.45);}
+.portrait.unavail{border-color:var(--gray);}
+.portrait.locked{border-color:var(--gray);}
+.portrait.locked img{filter:brightness(0) opacity(.8);}      /* true silhouette */
+.portrait.locked span.tag{display:none;}                     /* identity stays secret */
+.portrait .fallback{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-size:20px; color:rgba(0,0,0,.55); border-radius:4px;
+}
+.portrait span.tag{
+  position:absolute; bottom:-3px; left:-3px; right:-3px; background:var(--bg-inset);
+  font-size:6px; color:var(--white); text-align:center; padding:2px 1px; z-index:2;
+  overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+}
+.actor-name{font-size:10px; color:var(--gold);}
+.actor-age{font-size:7px; color:var(--lav);}
+.mood{font-size:13px; line-height:1;}
+.rank-badge{font-size:6px; padding:2px 5px; border:2px solid var(--shadow); background:#3A2666; color:var(--lav); display:inline-block; margin-top:4px;}
+.rank-Rookie{color:var(--lav);} .rank-RisingStar{color:var(--blue);}
+.rank-Popular{color:var(--pink);} .rank-Worldwide{color:var(--gold);}
+.status-tag{font-size:6px; padding:2px 5px; border:2px solid var(--shadow); display:inline-block; margin-top:4px;}
+.st-Available{background:#2c5b45; color:var(--green);}
+.st-InProduction{background:#3A2666; color:var(--lav);}
+.st-Resting{background:#14505a; color:var(--blue);}
+.st-Injured{background:#5b2c2c; color:var(--red);}
+.chips{display:flex; flex-wrap:wrap; gap:4px; margin:8px 0;}
+.chip{font-size:6px; background:var(--bg-inset); border:1px solid var(--pink-dim); color:var(--pink); padding:2px 5px;}
+.skill-row{display:grid; grid-template-columns:58px 1fr 22px; gap:6px; align-items:center; font-size:7px; margin-bottom:3px;}
+.meter-row{display:grid; grid-template-columns:66px 1fr 24px; gap:6px; align-items:center; font-size:7px; margin-top:4px;}
+.chem-list{margin-top:8px; font-size:7px; color:var(--lav); line-height:2;}
+.chem-bar{display:inline-block; vertical-align:middle;}
+.locked-card{opacity:.75; cursor:default;}
+.locked-card:hover{transform:none; box-shadow:4px 4px 0 rgba(0,0,0,.35);}
+.locked-note{font-size:7px; color:var(--lav); margin-top:8px; line-height:1.8;}
+.pool-note{font-size:7px; color:var(--blue); margin-top:8px; line-height:1.8;}
+.section-sep{font-size:9px; color:var(--gold); margin:18px 0 10px; letter-spacing:1px; border-bottom:2px dashed var(--shadow); padding-bottom:6px;}
+
+/* ---------------- Modal ---------------- */
+#modal-overlay{
+  position:fixed; inset:0; background:rgba(10,4,24,.78); z-index:1000;
+  display:none; align-items:flex-start; justify-content:center; padding:6vh 12px 12px;
+}
+#modal-overlay.open{display:flex;}
+#modal{
+  width:min(640px, 94vw); max-height:86vh; overflow-y:auto;
+  background:var(--bg-panel); border:3px solid var(--pink);
+  box-shadow:0 0 40px rgba(255,107,157,.45), 6px 6px 0 rgba(0,0,0,.4);
+  padding:18px; animation:slideDown .32s ease;
+}
+@keyframes slideDown{from{transform:translateY(-70px); opacity:0;} to{transform:translateY(0); opacity:1;}}
+#m-title{font-size:13px; color:var(--pink); margin-bottom:14px; line-height:1.5;}
+#m-body{font-size:9px; line-height:2; margin-bottom:16px;}
+#m-choices{display:flex; flex-direction:column; gap:8px;}
+#m-choices button{text-align:center; font-size:9px; padding:12px;}
+.stars{color:var(--gold); font-size:14px; letter-spacing:3px; text-shadow:0 0 10px rgba(255,215,0,.6);}
+.stars .off{color:#4A3A6E; text-shadow:none;}
+.eval-block{border:2px solid var(--shadow); background:var(--bg-inset); padding:10px; margin-bottom:10px;}
+.eval-name{font-size:8px; color:var(--blue); margin-bottom:4px;}
+.eval-text{font-size:8px; color:var(--white); line-height:1.9; margin-top:6px;}
+.review{font-size:8px; color:var(--lav); border-left:3px solid var(--pink-dim); padding-left:8px; margin:6px 0;}
+.fan-post{font-size:8px; color:var(--white); background:var(--bg-inset); border:2px solid var(--shadow); padding:7px 9px; margin:6px 0;}
+.fan-post .handle{color:var(--blue);}
+.big-combo{font-size:22px; text-align:center; margin:10px 0; letter-spacing:2px;}
+
+/* ---------------- Actor profile (modal) ---------------- */
+.prof-head{display:flex; gap:14px; margin-bottom:12px; align-items:flex-start;}
+.prof-head .info{flex:1; min-width:0;}
+.tab-row{display:flex; gap:6px; margin:12px 0;}
+.tab-row button{flex:1; text-align:center; font-size:8px; padding:8px;}
+.tab-row button.sel{background:var(--pink); color:var(--bg-inset); border-color:#8A2B52;}
+.chem-chart-row{display:grid; grid-template-columns:70px 1fr 30px; gap:8px; align-items:center; font-size:7px; margin-bottom:5px;}
+.train-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-top:8px;}
+.train-grid button{font-size:7px; text-align:center; padding:8px 4px;}
+.aud-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:12px 0;}
+.aud-card{background:var(--bg-inset); border:2px solid var(--shadow); padding:8px; text-align:center;}
+.aud-card .portrait{margin:0 auto 8px;}
+.aud-card .nm{font-size:8px; color:var(--gold); margin-bottom:4px;}
+.aud-card .muted{font-size:6px;}
+
+/* ---------------- Confetti ---------------- */
+#confetti-root{position:fixed; inset:0; pointer-events:none; z-index:2000; overflow:hidden;}
+.confetti{position:absolute; width:8px; height:8px; top:38%; left:50%; animation:confettiFly 1.1s ease-out forwards;}
+@keyframes confettiFly{
+  0%{transform:translate(0,0) rotate(0deg); opacity:1;}
+  100%{transform:translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity:0;}
+}
+
+/* ---------------- Status tables ---------------- */
+.stat-table{width:100%; font-size:8px; border-collapse:collapse;}
+.stat-table td{padding:7px 6px; border-bottom:2px solid var(--shadow);}
+.stat-table td:first-child{color:var(--lav);}
+.rank-bar-wrap{margin-top:8px;}
+
+/* ---------------- Responsive ---------------- */
+@media (max-width: 960px){
+  #dashboard-grid{grid-template-columns:1fr;}
+}
+@media (max-width: 760px){
+  body{font-size:9px;}
+  #layout{flex-direction:column;}
+  #sidebar{width:100%; flex-direction:row; flex-wrap:wrap; border-right:none; border-bottom:3px solid var(--shadow);}
+  #sidebar button{flex:1 1 44%; font-size:8px; padding:10px 6px; text-align:center;}
+  #btn-next{flex:1 1 100%; font-size:11px; padding:14px 8px;}
+  #main{padding:10px;}
+  .tb-stat{min-width:58px;}
+  .tb-stat .val{font-size:10px;}
+  #tb-company{font-size:9px; width:100%;}
+  .aud-grid{grid-template-columns:1fr;}
+  .train-grid{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ TOP BAR: company identity + core stats ============ -->
+<header id="topbar">
+  <span id="tb-company" title="Click to rename company">PEACH STUDIOS ✎</span>
+  <div class="tb-stat"><span class="lbl">WEEK</span><span class="val" id="tb-week">1</span></div>
+  <div class="tb-stat"><span class="lbl">MONEY</span><span class="val" id="tb-money">$10,000</span></div>
+  <div class="tb-stat"><span class="lbl">REPUTATION</span><span class="val" id="tb-rep">♦ 50</span></div>
+  <div class="tb-stat"><span class="lbl">POPULARITY</span><span class="val" id="tb-pop">★ 0</span></div>
+  <div class="tb-stat"><span class="lbl">RANK</span><span class="val" id="tb-rank">#50</span></div>
+  <div class="tb-spacer"></div>
+  <span id="tb-saved">Last saved: Week 1</span>
+</header>
+
+<div id="layout">
+  <!-- ============ SIDEBAR: core loop actions ============ -->
+  <nav id="sidebar">
+    <button id="btn-next">▶ NEXT WEEK</button>
+    <button class="nav-btn" id="btn-home" data-view="dashboard">🏠 DASHBOARD</button>
+    <button class="nav-btn" id="btn-prod" data-view="production">🎬 NEW PRODUCTION</button>
+    <button class="nav-btn" id="btn-actors" data-view="actors">🌟 ACTORS</button>
+    <button class="nav-btn" id="btn-status" data-view="status">📊 COMPANY STATUS</button>
+    <button class="small-btn gold-btn" id="btn-export">💾 EXPORT SAVE</button>
+    <button class="small-btn gold-btn" id="btn-import">📥 IMPORT SAVE</button>
+  </nav>
+
+  <!-- ============ MAIN VIEW AREA ============ -->
+  <main id="main">
+
+    <!-- Dashboard: active productions + event log -->
+    <section id="view-dashboard">
+      <div id="dashboard-grid">
+        <div>
+          <div class="card">
+            <h2>🎬 ACTIVE PRODUCTIONS</h2>
+            <div id="active-prods"></div>
+          </div>
+          <div class="card">
+            <h2>🏆 COMPLETED</h2>
+            <div id="completed-prods"></div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>📰 EVENT LOG</h2>
+          <div id="event-log"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- New Production form -->
+    <section id="view-production" style="display:none">
+      <div class="card">
+        <h2>🎬 NEW PRODUCTION</h2>
+        <div class="field">
+          <label>PRODUCTION TITLE</label>
+          <input type="text" id="f-title" maxlength="48">
+        </div>
+        <div class="field">
+          <label>LEAD ACTOR 1 <span class="muted">(available actors only)</span></label>
+          <select id="f-lead1"></select>
+        </div>
+        <div class="field">
+          <label>LEAD ACTOR 2 <span class="muted">(predicted chemistry shown per option)</span></label>
+          <select id="f-lead2"></select>
+        </div>
+        <div class="field">
+          <label>CP (COUPLE) NAME</label>
+          <input type="text" id="f-cpname" maxlength="24">
+        </div>
+        <div id="f-chem-preview" class="chem-preview" style="display:none"></div>
+        <div class="field">
+          <label>GENRE</label>
+          <div class="seg" id="f-genre"></div>
+        </div>
+        <div class="field">
+          <label>TYPE</label>
+          <div class="seg" id="f-type"></div>
+        </div>
+        <div class="field">
+          <label>STORY</label>
+          <div class="seg" id="f-story"></div>
+        </div>
+        <div class="field">
+          <label>SCHEDULE <span class="muted">(longer = quality + cost + risk)</span></label>
+          <div class="seg" id="f-schedule"></div>
+        </div>
+        <div class="field">
+          <label>PLATFORM <span class="muted">(TV: censored/wide reach · Streaming: uncensored/niche/more money)</span></label>
+          <div class="seg" id="f-platform"></div>
+        </div>
+        <div class="field">
+          <label>RATING <span class="muted">(TV blocks R)</span></label>
+          <div class="seg" id="f-rating"></div>
+        </div>
+        <div class="field">
+          <label>BUDGET</label>
+          <div class="seg" id="f-budget"></div>
+          <div id="f-budget-custom" style="display:none; margin-top:10px;">
+            <input type="range" id="f-budget-slider" min="0.5" max="2.5" step="0.1" value="1.0">
+            <div class="muted" style="margin-top:4px;">Custom multiplier: <span class="gold" id="f-budget-val">x1.0</span></div>
+          </div>
+        </div>
+        <div class="cost-preview" id="f-cost-preview"></div>
+        <button id="f-start" style="width:100%; text-align:center; margin-top:12px; font-size:11px;">🎥 START PRODUCTION</button>
+      </div>
+    </section>
+
+    <!-- Actors roster -->
+    <section id="view-actors" style="display:none">
+      <div class="card">
+        <h2>🌟 YOUR ACTORS <span class="muted" id="roster-count"></span></h2>
+        <div class="muted" style="margin-bottom:10px;">Click any actor for their full profile — rest, training, chemistry chart.</div>
+        <div id="actor-grid"></div>
+        <div class="section-sep">🔭 TALENT POOL — SCOUTED (SIGN VIA AUDITION WEEKS)</div>
+        <div id="pool-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px;"></div>
+        <div class="section-sep">🔒 LOCKED TALENT</div>
+        <div id="locked-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px;"></div>
+      </div>
+    </section>
+
+    <!-- Company status -->
+    <section id="view-status" style="display:none">
+      <div class="card">
+        <h2>📊 COMPANY STATUS</h2>
+        <div class="field" style="max-width:340px;">
+          <label>COMPANY NAME</label>
+          <input type="text" id="s-company" maxlength="24">
+        </div>
+        <div class="field" style="max-width:340px;">
+          <label>FANDOM NAME</label>
+          <input type="text" id="s-fandom" maxlength="24">
+        </div>
+        <table class="stat-table" id="s-stats"></table>
+        <h3 style="margin-top:14px;">RANK PROGRESS</h3>
+        <div class="muted" id="s-rank-note"></div>
+        <div class="progress rank-bar-wrap"><i id="s-rank-bar"></i></div>
+      </div>
+      <div class="card">
+        <h2>💾 SAVE DATA</h2>
+        <div class="muted" style="margin-bottom:10px;" id="s-save-note"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="small-btn gold-btn" id="s-export">EXPORT SAVE (COPY JSON)</button>
+          <button class="small-btn gold-btn" id="s-import">IMPORT SAVE (PASTE JSON)</button>
+          <button class="small-btn danger-btn" id="s-reset">RESET GAME</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ============ MODAL (pop-ups: events, critiques, results, profiles) ============ -->
+<div id="modal-overlay">
+  <div id="modal">
+    <div id="m-title"></div>
+    <div id="m-body"></div>
+    <div id="m-choices"></div>
+  </div>
+</div>
+
+<!-- Confetti layer for episode celebrations -->
+<div id="confetti-root"></div>
+
+<script>
+"use strict";
+/* ================================================================
+   BL PRODUCTION MANAGER — Prompt 2: Full Actor System
+   Single-file management sim. Sections:
+   1. Data pools        2. Helpers + Audio     3. State + Save
+   4. Actors/Chemistry  5. Production creation 6. Weekly engine
+   7. Episodes          8. Evaluators          9. Events
+   10. Actor events     11. Ranking            12. Modals
+   13. Rendering        14. Save IO + Boot
+   ================================================================ */
+
+/* ==================== 1. DATA POOLS ==================== */
+
+// 29 possible characteristics (3 assigned per actor)
+const CHARACTERISTICS = ["Cute","Adorable","Innocent","Sweet","Playful","Charming","Handsome",
+  "Elegant","Gentleman","Mature","Sexy","Charismatic","Confident","Bold","Stylish","Cool",
+  "Cold","Serious","Quiet","Calm","Chic","Cheerful","Energetic","Sunshine","Friendly",
+  "Optimistic","Funny","Positive","Unique"];
+
+// An icon per characteristic (used on profile screen)
+const CHAR_ICONS = {
+  Cute:"🐣", Adorable:"🥰", Innocent:"😇", Sweet:"🍬", Playful:"🎾", Charming:"✨",
+  Handsome:"🤵", Elegant:"🦢", Gentleman:"🎩", Mature:"🍷", Sexy:"🔥", Charismatic:"🌟",
+  Confident:"💪", Bold:"⚡", Stylish:"🕶", Cool:"😎", Cold:"❄️", Serious:"🧐",
+  Quiet:"🤫", Calm:"🌊", Chic:"👔", Cheerful:"😄", Energetic:"🚀", Sunshine:"☀️",
+  Friendly:"🤝", Optimistic:"🌈", Funny:"🤡", Positive:"👍", Unique:"🦄"
+};
+
+// The 8 trainable skills, all 0-100
+const SKILL_KEYS = ["Acting","Singing","Dancing","Visual","Language","Comedy","Art","Fitness"];
+
+/* ---- THE 21 ACTORS: fixed identities, portraits actor_01..actor_21 ----
+   Tiers gate availability by company rank:
+   Rookie     actor_01-05  → from Rank #50 (game start)
+   Rising Star actor_06-10 → unlock at Rank #39
+   Popular    actor_11-17  → unlock at Rank #24
+   Worldwide  actor_18-21  → unlock at Rank #9                          */
+const ACTOR_ROSTER = [
+  { num: 1, name:"Aiden",  tier:"Rookie" },
+  { num: 2, name:"Kaito",  tier:"Rookie" },
+  { num: 3, name:"Ren",    tier:"Rookie" },
+  { num: 4, name:"Haru",   tier:"Rookie" },
+  { num: 5, name:"Jun",    tier:"Rookie" },
+  { num: 6, name:"Minho",  tier:"Rising Star" },
+  { num: 7, name:"Theo",   tier:"Rising Star" },
+  { num: 8, name:"Sora",   tier:"Rising Star" },
+  { num: 9, name:"Kai",    tier:"Rising Star" },
+  { num:10, name:"Luke",   tier:"Rising Star" },
+  { num:11, name:"Tian",   tier:"Popular" },
+  { num:12, name:"Yuki",   tier:"Popular" },
+  { num:13, name:"Jin",    tier:"Popular" },
+  { num:14, name:"Hiro",   tier:"Popular" },
+  { num:15, name:"Daiki",  tier:"Popular" },
+  { num:16, name:"Shin",   tier:"Popular" },
+  { num:17, name:"Renji",  tier:"Popular" },
+  { num:18, name:"Naoki",  tier:"Worldwide" },
+  { num:19, name:"Akira",  tier:"Worldwide" },
+  { num:20, name:"Jay",    tier:"Worldwide" },
+  { num:21, name:"River",  tier:"Worldwide" }
+];
+
+// Company rank you must REACH (rank <= X) before a tier joins the audition pool
+const TIER_UNLOCK_RANK = { "Rookie":50, "Rising Star":39, "Popular":24, "Worldwide":9 };
+const TIER_ORDER = ["Rookie","Rising Star","Popular","Worldwide"];
+
+// Quality tiers: skill roll range, signing fee range, training gain per session
+const TIER_STATS = {
+  "Rookie":      { skillMin:10, skillMax:30, signMin:100,  signMax:300,  trainGain:10 },
+  "Rising Star": { skillMin:30, skillMax:55, signMin:400,  signMax:800,  trainGain:7  },
+  "Popular":     { skillMin:55, skillMax:80, signMin:1000, signMax:2000, trainGain:5  },
+  "Worldwide":   { skillMin:80, skillMax:95, signMin:3000, signMax:5000, trainGain:3  }
+};
+
+const GENRES = ["Romance","Comedy","Slice of Life","School","Office"];
+
+// Production types: episode release length + base cost + base audience
+const TYPES = {
+  "Mini Series": { epWeeks: 3, baseCost: 1500, baseViewers: 42000 },
+  "Series":      { epWeeks: 4, baseCost: 3000, baseViewers: 60000 },
+  "Movie":       { epWeeks: 1, baseCost: 4200, baseViewers: 95000 }
+};
+const TYPE_LIST = Object.keys(TYPES);
+
+// Shooting schedules (in weeks). Longer = quality up, cost up, risk up.
+const SCHEDULES = {
+  "3 Months":  { weeks: 12, q: 0.8, cost: 1.0 },
+  "6 Months":  { weeks: 24, q: 1.0, cost: 1.8 },
+  "12 Months": { weeks: 48, q: 1.3, cost: 3.0 }
+};
+const SCHEDULE_LIST = Object.keys(SCHEDULES);
+
+const STORIES = ["Original", "Adaptation"];
+const PLATFORMS = ["TV", "Streaming"];
+const RATINGS = ["PG", "PG-13", "R"];
+
+// Platform modifiers from the design formula
+const PLATFORM_MOD = {
+  "TV":        { reach: 1.2, money: 0.8 },
+  "Streaming": { reach: 0.7, money: 1.5 }
+};
+// Rating modifiers from the design formula
+const RATING_MOD = {
+  "PG":    { money: 0.8, rep: 1.1, reach: 1.1 },
+  "PG-13": { money: 1.0, rep: 1.0, reach: 1.0 },
+  "R":     { money: 1.3, rep: 0.9, reach: 0.8 }
+};
+
+// Genre x Type combo table (revealed only after filming wraps)
+const COMBO_TABLE = {
+  "Romance":       { "Mini Series": "PERFECT", "Series": "GOOD",    "Movie": "GOOD"    },
+  "Comedy":        { "Mini Series": "GOOD",    "Series": "PERFECT", "Movie": "BAD"     },
+  "Slice of Life": { "Mini Series": "GOOD",    "Series": "PERFECT", "Movie": "GOOD"    },
+  "School":        { "Mini Series": "PERFECT", "Series": "GOOD",    "Movie": "BAD"     },
+  "Office":        { "Mini Series": "BAD",     "Series": "GOOD",    "Movie": "PERFECT" }
+};
+const COMBO_MOD = { PERFECT: 1.5, GOOD: 1.0, BAD: 0.6 };
+
+// Classic BL tropes — the Industry Critic grades their execution
+const TROPES = ["enemies-to-lovers","height difference","engineering students","childhood friends",
+  "fake dating","CEO × intern","amnesia","forced proximity","second chance romance","rival bands",
+  "grumpy × sunshine","secret identity"];
+
+// Auto-suggested production titles
+const TITLE_POOL = ["The Space Between Us","Seconds of Summer","Bloom After Rain","Signed, Your Rival",
+  "Love at Third Sight","My Accidental Boyfriend","The Engineering Faculty","Coffee & Confessions",
+  "Seven Days to Fall","His Quiet Heart","Office Hours After Dark","The Transfer Student",
+  "Rewrite Our Story","Cherry Tomato Hearts","The Dorm Next Door","Stolen Glances",
+  "A Contract With You","Meteor Shower Season","The President's Secret","Two Left Feet",
+  "Warm Front","Our Unscripted Kiss","Parallel Lines","The Last Train Home"];
+
+// Fallback portrait colors (only used if an image fails to load)
+const PORTRAIT_COLORS = ["#FF6B9D","#6BC5FF","#FFD700","#5CE1A0","#C792EA","#FF9F68",
+  "#7BE0D4","#F26D6D","#A8E063","#B28DFF","#FF85AC","#68C5FF","#E8C468","#6BFFB8",
+  "#FF6BD5","#8AB4FF","#FFC46B","#6BFFD4","#D58AFF","#9DFF6B","#FF8A5C"];
+
+// Fan review templates by sentiment. {A} {B} = leads, {T} = title, {CP} = CP name
+const REVIEWS = {
+  pos: ["{A} and {B} invented chemistry. I need oxygen after that episode.",
+    "The way {A} looks at {B}... this is CINEMA. {T} owns my whole heart.",
+    "I have rewatched the confession scene 14 times. FOURTEEN.",
+    "{CP} is the pairing of the decade and I will not be argued with.",
+    "Every episode of {T} heals something in me. 10/10 no notes."],
+  mid: ["Decent episode but the pacing wobbled a bit. Still seated for {CP}.",
+    "{A} carried that scene honestly. {B} needs to loosen up on camera.",
+    "Good vibes overall, the script just needs one more polish pass.",
+    "Not their strongest week but {T} still has my loyalty. For now.",
+    "Cute moments! I just wish the leads had more screen time together."],
+  neg: ["The chemistry between {A} and {B} is giving... siblings. I feel ill.",
+    "Who greenlit this script? {T} deserves better. WE deserve better.",
+    "I could feel the awkwardness through the screen. Painful watch.",
+    "{CP} shippers we are SO down bad this week. And not in the fun way.",
+    "Two handsome leads and ZERO tension. How is that even possible?"]
+};
+
+// Fake social-media chatter for release weeks
+const FAN_POSTS = {
+  pos: ["@{CP}nation: THE EYE CONTACT IN EP{N}??? I AM DECEASED 😭 #{CP}",
+    "@blwatcher: {A} really said 'I will act with my whole chest' today. Respect. #{T}",
+    "@dramageek: trending #1 worldwide and it's ONLY episode {N}. {T} is unstoppable.",
+    "@softboi: my weekly serotonin has arrived #{CP} #{T}",
+    "@criticcorner: whoever cast {A} and {B} together deserves a raise."],
+  mid: ["@blpolls: ep {N} was fine? not their best, not their worst #{T}",
+    "@dramageek: still watching for {B} but the plot is on thin ice #{T}",
+    "@quietfan: i'll give {T} one more week. the bones are good.",
+    "@shiptease: {CP} stans we eating... crumbs. but crumbs are food i guess"],
+  neg: ["@blwatcher: the second-hand embarrassment in ep {N} was ASTRONOMICAL #{T}",
+    "@{CP}nation: guys... are {A} and {B} okay? that scene felt SO forced 😬",
+    "@criticcorner: {T} fumbled the bag this week and the quotes are BRUTAL",
+    "@dramageek: the tension is tensioning in the wrong direction #{T}"]
+};
+
+/* ==================== 2. HELPERS + AUDIO ==================== */
+
+const $ = id => document.getElementById(id);
+const rnd = (min, max) => Math.random() * (max - min) + min;
+const rndInt = (min, max) => Math.floor(rnd(min, max + 1));
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+// n distinct items from a pool (no duplicate reviews/posts)
+const pickN = (arr, n) => { const c = [...arr], out = []; while (out.length < n && c.length) out.push(c.splice(rndInt(0, c.length - 1), 1)[0]); return out; };
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const round10 = v => Math.round(v / 10) * 10;
+const fmtMoney = v => (v < 0 ? "-$" : "$") + Math.abs(Math.round(v)).toLocaleString("en-US");
+const fmtNum = v => v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1e3 ? (v / 1e3).toFixed(1) + "K" : Math.round(v).toString();
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// Fill {A} {B} {T} {CP} {N} template slots
+function fill(tpl, ctx) {
+  return tpl.replace(/\{(A|B|T|CP|N)\}/g, (_, k) => ctx[k] !== undefined ? ctx[k] : "");
+}
+
+// --- Web Audio: tiny synth for clicks, chimes and alerts ---
+let audioCtx = null;
+function ensureAudio() {
+  if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { } }
+  if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+}
+function tone(freq, dur, type = "square", vol = 0.045, delay = 0) {
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime + delay;
+  const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+  osc.type = type; osc.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(g); g.connect(audioCtx.destination);
+  osc.start(t0); osc.stop(t0 + dur);
+}
+const sfxClick = () => { ensureAudio(); tone(660, 0.06); };
+const sfxChime = () => { ensureAudio(); tone(880, 0.12, "square", 0.05); tone(1174, 0.16, "square", 0.05, 0.1); tone(1568, 0.22, "square", 0.04, 0.2); };
+const sfxAlert = () => { ensureAudio(); tone(220, 0.22, "sawtooth", 0.06); tone(180, 0.25, "sawtooth", 0.05, 0.12); };
+const sfxPop = () => { ensureAudio(); tone(523, 0.08, "triangle", 0.06); tone(784, 0.1, "triangle", 0.05, 0.06); };
+// Global click beep on any button press
+document.addEventListener("click", e => { if (e.target.closest("button")) sfxClick(); });
+
+/* ==================== 3. STATE + SAVE SYSTEM ==================== */
+
+const SAVE_KEY = "bl_prod_manager_save_v2"; // v2: 21-actor roster + chemistry maps
+let state = null;            // the whole game lives here
+let displayedMoney = 10000;  // for the count-up/down animation
+
+function freshState() {
+  return {
+    version: 2,
+    companyName: "PEACH STUDIOS",
+    fandomName: "Peaches",
+    week: 1,
+    money: 10000,
+    reputation: 50,
+    popularity: 0,
+    rank: 50,
+    roster: [],             // all 21 actors (signed flag marks yours)
+    productions: [],        // active (filming or releasing)
+    completed: [],          // finished productions (history)
+    fixedCPs: [],           // pairs under Fixed CP contract [[id1,id2],...]
+    pairFilms: {},          // "idA|idB" -> # of completed productions together
+    log: [],                // event log entries {wk, txt, cls}
+    lastEventWeek: 0,
+    nextEventGap: rndInt(1, 3),
+    queuedControversy: null,
+    endorseCd: {},          // pairKey -> last week a CP endorsement fired (cooldown)
+    lowChemCd: {},          // pairKey -> last week a low-chemistry incident fired (cooldown)
+    unlockedTiers: ["Rookie"], // tiers whose audition pool has been unlocked
+    wonGame: false,
+    stats: { revenue: 0, awards: 0, hits: 0, flops: 0, rivalWins: 0, rivalLosses: 0, productionsDone: 0 },
+    rivals: []              // 49 simulated companies {score, growth}
+  };
+}
+
+// Build the 49 rival companies (rank #1 strongest ... #49 weakest)
+function initRivals() {
+  state.rivals = [];
+  for (let i = 0; i < 49; i++) {
+    // top rival ~ 950 pts, bottom ~ 130 pts, small random jitter
+    state.rivals.push({ score: 950 - i * 17 + rnd(-15, 15), growth: rnd(0.1, 0.6) });
+  }
+  state.rivals.sort((a, b) => b.score - a.score);
+}
+
+// Player's competitive score drives leaderboard position
+function playerScore() {
+  return state.reputation * 2 + state.popularity * 0.8 +
+    state.stats.awards * 20 + state.stats.revenue / 3000;
+}
+function computeRank() {
+  const ps = playerScore();
+  let rank = 1;
+  for (const r of state.rivals) if (r.score > ps) rank++;
+  return rank;
+}
+
+function saveGame() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    const note = "Last saved: Week " + state.week;
+    $("tb-saved").textContent = note;
+    $("s-save-note").textContent = note + " — auto-saves every time you advance a week.";
+  } catch (e) { /* private mode etc. — play on without saves */ }
+}
+function loadGame() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    if (!data || data.version !== 2 || typeof data.week !== "number" || !Array.isArray(data.roster)) return false;
+    state = data;
+    return true;
+  } catch (e) { return false; }
+}
+
+/* ==================== 4. ACTORS + CHEMISTRY ==================== */
+
+// Generate one of the 21 fixed actors. Skills/sign fee rolled inside tier ranges.
+function createActor(def) {
+  const ts = TIER_STATS[def.tier];
+  const chars = [...CHARACTERISTICS].sort(() => Math.random() - 0.5).slice(0, 3);
+  const skills = {};
+  for (const k of SKILL_KEYS) skills[k] = rndInt(ts.skillMin, ts.skillMax);
+  return {
+    id: "actor_" + String(def.num).padStart(2, "0"),
+    num: def.num,
+    name: def.name,
+    age: rndInt(18, 35),
+    image_path: "./images/" + "actor_" + String(def.num).padStart(2, "0") + ".png",
+    color: PORTRAIT_COLORS[(def.num - 1) % PORTRAIT_COLORS.length],
+    tier: def.tier,               // Rookie / Rising Star / Popular / Worldwide
+    signCost: rndInt(ts.signMin, ts.signMax),
+    signed: false,                // on YOUR roster?
+    characteristics: chars,
+    skills: skills,
+    fame: 0,
+    chemistry_map: {},            // actorId -> chemistry 0-100
+    happiness: rndInt(55, 85),    // hidden from the player (mood emoji only)
+    loyalty: rndInt(45, 85),      // hidden from the player
+    restWeeks: 0,                 // >0 => Resting
+    injuredWeeks: 0,              // >0 => Injured
+    idleWeeks: 0,
+    career: { productions: 0, awards: 0, scandals: 0, earned: 0 }
+  };
+}
+
+// Initial chemistry: random base (0-30) + 20 per shared characteristic
+function baseChemistry(a, b) {
+  const shared = a.characteristics.filter(c => b.characteristics.includes(c)).length;
+  return clamp(rndInt(0, 30) + shared * 20, 0, 95);
+}
+function linkChemistry(a, b) {
+  const c = baseChemistry(a, b);
+  a.chemistry_map[b.id] = c;
+  b.chemistry_map[a.id] = c;
+}
+function pairKey(id1, id2) { return [id1, id2].sort().join("|"); }
+
+// LIVE chemistry = stored base + shared-history bonus + happiness factor.
+function effChem(a, b) {
+  const base = a.chemistry_map[b.id] !== undefined ? a.chemistry_map[b.id] : 25;
+  const hist = (state.pairFilms[pairKey(a.id, b.id)] || 0) * 2;
+  const mood = ((a.happiness + b.happiness) / 2 - 60) * 0.15;
+  return clamp(Math.round(base + hist + mood), 0, 100);
+}
+function chemLabel(c) {
+  if (c >= 70) return { txt: "SPARKS FLYING", cls: "green" };
+  if (c >= 45) return { txt: "WARM", cls: "pink" };
+  if (c >= 25) return { txt: "NEUTRAL", cls: "muted" };
+  return { txt: "ICE COLD ⚠", cls: "red" };
+}
+function getActor(id) { return state.roster.find(a => a.id === id); }
+function myActors() { return state.roster.filter(a => a.signed); }
+
+// Chemistry moves both ways, clamped 0-100
+function growChemistry(a, b, amount) {
+  const cur = a.chemistry_map[b.id] !== undefined ? a.chemistry_map[b.id] : 25;
+  const nv = clamp(Math.round(cur + amount), 0, 100);
+  a.chemistry_map[b.id] = nv; b.chemistry_map[a.id] = nv;
+}
+
+// Portmanteau CP name: first half of name1 + second half of name2
+function makeCPName(n1, n2) {
+  const a = n1.slice(0, Math.ceil(n1.length / 2));
+  const b = n2.slice(Math.floor(n2.length / 2));
+  return (a + b).replace(/^\w/, c => c.toUpperCase());
+}
+
+/* ---- Availability / status helpers ---- */
+function tierUnlocked(tier) { return state.rank <= TIER_UNLOCK_RANK[tier]; }
+function actorUnlockRank(a) { return TIER_UNLOCK_RANK[a.tier]; }
+// Unsigned actors the player could meet at auditions right now
+function auditionPool() { return state.roster.filter(a => !a.signed && tierUnlocked(a.tier)); }
+// What is this actor doing right now?
+function actorStatus(a) {
+  if (a.injuredWeeks > 0) return "Injured";
+  if (a.restWeeks > 0) return "Resting";
+  if (state.productions.some(p => p.lead1 === a.id || p.lead2 === a.id)) return "In Production";
+  return "Available";
+}
+// Hidden happiness/loyalty surface as a mood emoji only
+function moodEmoji(a) {
+  const h = a.happiness;
+  if (h < 20) return "😢";
+  if (h < 40) return "😠";
+  if (h <= 70) return "😐";
+  return "😊";
+}
+function moodWord(a) {
+  const h = a.happiness;
+  if (h < 20) return "MISERABLE — quit risk!";
+  if (h < 40) return "UPSET";
+  if (h <= 70) return "CONTENT";
+  return "HAPPY";
+}
+// Portrait <img> with graceful fallback to a colored initial square
+function portraitHTML(a, extraCls) {
+  return "<div class='portrait " + (extraCls || "") + "'>" +
+    "<img src='" + a.image_path + "' alt='" + esc(a.name) + "' loading='lazy' " +
+    "onerror=\"this.style.display='none';this.nextElementSibling.style.display='flex';\">" +
+    "<div class='fallback' style='display:none; background:" + a.color + "'>" + esc(a.name[0]) + "</div>" +
+    "<span class='tag'>" + esc(a.name) + "</span></div>";
+}
+
+/* ==================== 5. PRODUCTION CREATION ==================== */
+
+// The player's in-progress choices on the New Production screen
+let draft = null;
+function castableActors() { return myActors().filter(a => actorStatus(a) === "Available"); }
+function freshDraft() {
+  const cast = castableActors();
+  draft = {
+    lead1: cast[0] ? cast[0].id : null,
+    lead2: cast[1] ? cast[1].id : null,
+    genre: "Romance", type: "Mini Series", story: "Original",
+    schedule: "3 Months", platform: "TV", rating: "PG-13",
+    budgetMode: "Min", budgetCustom: 1.0
+  };
+}
+function draftBudgetMult() {
+  if (draft.budgetMode === "Min") return 0.5;
+  if (draft.budgetMode === "Max") return 2.0;
+  return draft.budgetCustom;
+}
+function draftCost() {
+  return round10(TYPES[draft.type].baseCost * SCHEDULES[draft.schedule].cost * draftBudgetMult());
+}
+
+// Build one segmented-button row (genre/type/platform/...)
+function buildSeg(elId, options, get, set, disabledFn) {
+  const box = $(elId);
+  box.innerHTML = "";
+  for (const opt of options) {
+    const b = document.createElement("button");
+    b.textContent = opt;
+    if (get() === opt) b.classList.add("sel");
+    if (disabledFn && disabledFn(opt)) { b.disabled = true; b.title = "Not available with current choices"; }
+    b.onclick = () => { set(opt); renderProductionForm(); };
+    box.appendChild(b);
+  }
+}
+
+function renderProductionForm() {
+  if (!draft) freshDraft();
+
+  // Title + CP name auto-suggestions (stay editable)
+  if (!$("f-title").dataset.touched) $("f-title").value = pick(TITLE_POOL);
+  const cast = castableActors();
+  // If a drafted lead is no longer castable (resting/injured/signed off), fall back
+  if (!cast.some(a => a.id === draft.lead1)) draft.lead1 = cast[0] ? cast[0].id : null;
+  if (!cast.some(a => a.id === draft.lead2)) draft.lead2 = cast.find(a => a.id !== draft.lead1) ? cast.find(a => a.id !== draft.lead1).id : null;
+  const a1 = getActor(draft.lead1), a2 = getActor(draft.lead2);
+
+  // Lead dropdowns — lead 2 lists predicted chemistry with lead 1 in every option
+  for (const selId of ["f-lead1", "f-lead2"]) {
+    const sel = $(selId), cur = (selId === "f-lead1") ? draft.lead1 : draft.lead2;
+    const other = (selId === "f-lead1") ? a2 : a1;
+    sel.innerHTML = "";
+    if (!cast.length) {
+      const o = document.createElement("option");
+      o.textContent = "— no available actors —"; o.value = "";
+      sel.appendChild(o);
+      continue;
+    }
+    for (const a of cast) {
+      const o = document.createElement("option");
+      o.value = a.id;
+      let label = a.name + " (" + a.tier + " · Act " + a.skills.Acting + " / Vis " + a.skills.Visual + ")";
+      if (selId === "f-lead2" && a1 && a.id !== a1.id) {
+        const c = effChem(a1, a);
+        label += " — ♥ " + c;
+        o.title = "Predicted chemistry with " + a1.name + ": " + c + "/100 (" + chemLabel(c).txt + ")";
+      }
+      if (selId === "f-lead1" && a2 && a.id !== a2.id) {
+        const c = effChem(a, a2);
+        o.title = "Predicted chemistry with " + a2.name + ": " + c + "/100 (" + chemLabel(c).txt + ")";
+      }
+      o.textContent = label;
+      if (a.id === cur) o.selected = true;
+      sel.appendChild(o);
+    }
+  }
+
+  // CP name suggestion when both leads chosen
+  if (a1 && a2 && !$("f-cpname").dataset.touched) $("f-cpname").value = makeCPName(a1.name, a2.name);
+
+  // Live chemistry preview between the chosen leads
+  const cpBox = $("f-chem-preview");
+  if (a1 && a2 && a1.id !== a2.id) {
+    const c = effChem(a1, a2), lab = chemLabel(c);
+    const shared = a1.characteristics.filter(x => a2.characteristics.includes(x));
+    const unhappy = [a1, a2].filter(a => a.happiness < 30);
+    cpBox.style.display = "block";
+    cpBox.innerHTML =
+      "PREDICTED CHEMISTRY: <span class='" + lab.cls + "'>" + c + "/100 — " + lab.txt + "</span>" +
+      "<div class='progress tiny' style='margin:6px 0;'><i style='width:" + c + "%'></i></div>" +
+      (shared.length ? "Shared traits: <span class='pink'>" + shared.join(", ") + "</span> (+20 each baked in)<br>" : "<span class='muted'>No shared traits — chemistry must be built on set.</span><br>") +
+      (unhappy.length ? "<span class='red'>⚠ " + esc(unhappy.map(a => a.name).join(" & ")) + " seems unhappy — forcing them to work costs -20 chemistry at wrap.</span><br>" : "") +
+      (c >= 70 ? "<span class='green'>Bonus: great kiss scenes, natural acting, fan boosts, CP endorsement chances.</span>"
+        : c < 25 ? "<span class='red'>Risk: rumors, awkward interviews, acting penalties, fan disappointment.</span>"
+          : "<span class='muted'>No special effects — a blank canvas for the fans to project onto.</span>");
+  } else cpBox.style.display = "none";
+
+  // Option rows
+  buildSeg("f-genre", GENRES, () => draft.genre, v => draft.genre = v);
+  buildSeg("f-type", TYPE_LIST, () => draft.type, v => draft.type = v);
+  buildSeg("f-story", STORIES, () => draft.story, v => draft.story = v);
+  buildSeg("f-schedule", SCHEDULE_LIST, () => draft.schedule, v => draft.schedule = v);
+  buildSeg("f-platform", PLATFORMS, () => draft.platform, v => {
+    draft.platform = v;
+    if (v === "TV" && draft.rating === "R") draft.rating = "PG-13"; // TV blocks R
+  });
+  buildSeg("f-rating", RATINGS, () => draft.rating, v => draft.rating = v,
+    v => draft.platform === "TV" && v === "R");
+  buildSeg("f-budget", ["Min", "Max", "Custom"], () => draft.budgetMode, v => draft.budgetMode = v);
+  $("f-budget-custom").style.display = draft.budgetMode === "Custom" ? "block" : "none";
+  $("f-budget-slider").value = draft.budgetCustom;
+  $("f-budget-val").textContent = "x" + Number(draft.budgetCustom).toFixed(1);
+
+  updateCostBox();
+}
+
+// Refresh just the cost preview + start button (safe to call mid-slider-drag)
+function updateCostBox() {
+  const a1 = getActor(draft.lead1), a2 = getActor(draft.lead2);
+  const cost = draftCost();
+  const schedW = SCHEDULES[draft.schedule].weeks, epW = TYPES[draft.type].epWeeks;
+  $("f-cost-preview").innerHTML =
+    "PRODUCTION COST: <span class='gold'>" + fmtMoney(cost) + "</span> (paid upfront)<br>" +
+    "FILMING: <span class='pink'>" + schedW + " weeks</span> → RELEASE: <span class='pink'>" + epW + " week" + (epW > 1 ? "s" : "") + "</span><br>" +
+    "Combo (genre × type) stays secret until the wrap party...<br>" +
+    "TREASURY: " + fmtMoney(state.money) +
+    (castableActors().length < 2 ? "<br><span class='red'>⚠ You need 2 AVAILABLE actors. Sign more at Audition Weeks, or end Rest/Injury breaks.</span>" : "");
+  const ok = a1 && a2 && a1.id !== a2.id && state.money >= cost;
+  $("f-start").disabled = !ok;
+  $("f-start").textContent = !a1 || !a2 || a1.id === a2.id
+    ? "🎥 PICK TWO DIFFERENT LEADS"
+    : state.money < cost ? "🎥 NOT ENOUGH MONEY" : "🎥 START PRODUCTION";
+}
+
+// Greenlight! Deduct the budget and put the production into filming.
+function startProduction() {
+  const a1 = getActor(draft.lead1), a2 = getActor(draft.lead2);
+  const cost = draftCost();
+  const title = $("f-title").value.trim() || pick(TITLE_POOL);
+  const cpName = $("f-cpname").value.trim() || makeCPName(a1.name, a2.name);
+  state.money -= cost;
+  const prod = {
+    id: "p" + Date.now() + rndInt(10, 99),
+    title, cpName,
+    genre: draft.genre, type: draft.type, story: draft.story,
+    schedule: draft.schedule, platform: draft.platform, rating: draft.rating,
+    budgetMode: draft.budgetMode, budgetMult: draftBudgetMult(),
+    cost, lead1: a1.id, lead2: a2.id,
+    trope: pick(TROPES),
+    phase: "filming",
+    filmWeeks: 0, filmTotal: SCHEDULES[draft.schedule].weeks,
+    epWeek: 0, epTotal: TYPES[draft.type].epWeeks,
+    combo: null, quality: null, finalQuality: null,
+    momentum: 1.0, episodes: [], finalScore: null,
+    totalRevenue: 0, totalViewers: 0,
+    scandal: false,        // a scandal on set: -15 chemistry at wrap
+    qualityPenalty: 0      // e.g. language barrier gone wrong
+  };
+  state.productions.push(prod);
+  a1.idleWeeks = 0; a2.idleWeeks = 0;
+  if (a1.happiness < 30 || a2.happiness < 30)
+    addLog("⚠ An unhappy lead was cast in <b>" + esc(title) + "</b>. Forcing the work will cost chemistry (-20 at wrap).", "log-bad");
+  addLog("🎥 Cameras roll on <b>" + esc(title) + "</b> (" + prod.genre + " " + prod.type + ") starring " +
+    esc(a1.name) + " & " + esc(a2.name) + " as <span class='pink'>#" + esc(cpName) + "</span>. Cost: " + fmtMoney(cost) + ".", "log-pink");
+  showView("dashboard");
+  renderAll();
+}
+
+/* ==================== 6. WEEKLY ENGINE ==================== */
+
+// THE CORE LOOP: one click = one week of company life
+function nextWeek() {
+  state.week++;
+
+  // --- 1. Advance every active production ---
+  for (const p of [...state.productions]) {
+    ensureProductionLeads(p);
+    if (!state.productions.includes(p)) continue; // collapsed when no leads remained
+    if (p.phase === "filming") {
+      p.filmWeeks++;
+      const a1 = getActor(p.lead1), a2 = getActor(p.lead2);
+      if (a1 && a2) {
+        const locked = state.fixedCPs.some(cp => pairKey(cp[0], cp[1]) === pairKey(a1.id, a2.id));
+        growChemistry(a1, a2, locked ? 2.5 : 1.5); // fixed CPs bond faster
+      }
+      if (p.filmWeeks >= p.filmTotal) wrapProduction(p);
+    } else if (p.phase === "releasing") {
+      releaseEpisode(p);
+    }
+  }
+
+  // --- 2. Actor upkeep: rest, injuries, salaries, mood drift ---
+  for (const a of myActors()) {
+    const busy = state.productions.some(p => p.lead1 === a.id || p.lead2 === a.id);
+
+    if (a.restWeeks > 0) {
+      a.restWeeks--;
+      state.money -= 100; // rest stipend $100/week
+      a.happiness = clamp(a.happiness + 5, 0, 100); // real recovery, prevents burnout
+      if (a.restWeeks === 0) addLog("🛌 <b>" + esc(a.name) + "</b> is back from their break, refreshed. (-$400 total)", "log-good");
+    } else if (a.injuredWeeks > 0) {
+      a.injuredWeeks--;
+      a.happiness = clamp(a.happiness + 2, 0, 100);
+      if (a.injuredWeeks === 0) addLog("🩹 <b>" + esc(a.name) + "</b> has recovered and is available again.", "log-good");
+    } else if (busy) {
+      a.idleWeeks = 0;
+      a.happiness = clamp(a.happiness - 2, 0, 100); // filming is tiring — burnout creeps in
+    } else {
+      a.idleWeeks++;
+      if (a.idleWeeks >= 8) a.happiness = clamp(a.happiness - 1, 0, 100); // bored on the bench
+      a.happiness = clamp(a.happiness + (a.happiness > 62 ? -0.4 : 0.4), 0, 100); // drift to neutral
+    }
+
+    // Worldwide stars demand special treatment: a weekly retainer + faster boredom
+    if (a.tier === "Worldwide") {
+      state.money -= 150;
+      if (!busy && a.restWeeks === 0 && a.injuredWeeks === 0 && a.idleWeeks >= 4)
+        a.happiness = clamp(a.happiness - 2, 0, 100);
+    }
+  }
+
+  // --- 3. The market moves: rivals grow, leaderboard reshuffles ---
+  for (const r of state.rivals) r.score += r.growth;
+  state.rank = computeRank();
+  checkTierUnlocks();
+
+  // --- 4. Rivalry showdown every 10 weeks ---
+  if (state.week % 10 === 0) rivalryShowdown();
+
+  // --- 5. Audition Week every 4 weeks; otherwise the 1-3 week event drum ---
+  if (state.queuedControversy) {
+    const c = state.queuedControversy; state.queuedControversy = null;
+    fireControversy(c);
+  } else if (state.week % 4 === 0 && auditionPool().length) {
+    auditionWeek();
+  } else if (state.week - state.lastEventWeek >= state.nextEventGap) {
+    fireRandomEvent();
+  }
+
+  // --- 6. Chemistry-driven incidents & opportunities ---
+  chemistryPulse();
+
+  // --- 7. Win check + autosave + repaint ---
+  if (state.rank === 1 && !state.wonGame) {
+    state.wonGame = true;
+    queueModal({
+      title: "👑 RANK #1!", sound: "chime",
+      body: "<div class='big-combo combo-PERFECT'>#1 BL STUDIO</div>" +
+        esc(state.companyName) + " is officially the <span class='gold'>#1 BL production company in the industry</span>! " +
+        "The " + esc(state.fandomName) + " are losing their minds. You can keep playing — legends never retire.",
+      choices: [{ label: "WE DID IT 🎉", fn: () => { burst(); } }]
+    });
+  }
+  saveGame();
+  renderAll();
+}
+
+// If a lead vanished mid-production (fired/quit), recast or shut down safely.
+function ensureProductionLeads(p) {
+  for (const slot of ["lead1", "lead2"]) {
+    const cur = getActor(p[slot]);
+    if (cur && cur.signed) continue;
+    const rep = myActors().find(a => actorStatus(a) === "Available" && a.id !== p.lead1 && a.id !== p.lead2);
+    if (rep) {
+      addLog("🔄 <b>" + esc(rep.name) + "</b> steps in to replace " + (cur ? esc(cur.name) : "the departed lead") +
+        " on <b>" + esc(p.title) + "</b>.", "log-bad");
+      p[slot] = rep.id;
+    } else {
+      state.productions = state.productions.filter(x => x.id !== p.id);
+      const refund = Math.round(p.cost * 0.3);
+      state.money += refund;
+      addLog("🚫 <b>" + esc(p.title) + "</b> collapsed — no lead actor available. Salvaged " + fmtMoney(refund) + ".", "log-bad");
+      return;
+    }
+  }
+}
+
+// Crossing into a new rank band opens a new tier of talent
+function checkTierUnlocks() {
+  for (const tier of TIER_ORDER) {
+    if (!state.unlockedTiers.includes(tier) && tierUnlocked(tier)) {
+      state.unlockedTiers.push(tier);
+      const n = state.roster.filter(a => a.tier === tier).length;
+      addLog("🔓 <b>" + tier.toUpperCase() + " TIER UNLOCKED!</b> " + n + " new actors can now appear at Audition Weeks.", "log-good");
+      queueModal({
+        title: "🔓 NEW TALENT TIER!", sound: "chime",
+        body: "Your climb to <span class='gold'>Rank #" + state.rank + "</span> has the industry's <b>" + tier +
+          "</b> actors paying attention.<br><br>" + n + " new faces can now show up at <b>Audition Weeks</b> (every 4 weeks)." +
+          (tier === "Worldwide" ? "<br><br><span class='gold'>Worldwide stars demand a $150/week retainer — special treatment only.</span>" : ""),
+        choices: [{ label: "CAN'T WAIT ⭐", fn: () => { } }]
+      });
+    }
+  }
+}
+
+// Filming is done: reveal the genre × type combo and lock final quality.
+function wrapProduction(p) {
+  const a1 = getActor(p.lead1), a2 = getActor(p.lead2);
+  const chem = a1 && a2 ? effChem(a1, a2) : 25;
+  const base = (a1.skills.Acting + a2.skills.Acting + a1.skills.Visual + a2.skills.Visual + chem) / 5;
+  p.quality = base * SCHEDULES[p.schedule].q * p.budgetMult * (1 - (p.qualityPenalty || 0));
+  p.combo = COMBO_TABLE[p.genre][p.type];
+  p.finalQuality = clamp(p.quality * COMBO_MOD[p.combo], 1, 160);
+  p.phase = "releasing"; p.epWeek = 0;
+
+  // ---- Prompt 2 chemistry deltas at wrap ----
+  const chemNotes = [];
+  if (p.scandal) { growChemistry(a1, a2, -15); chemNotes.push("<span class='red'>-15 scandal on set</span>"); }
+  if (a1.happiness < 30 || a2.happiness < 30) { growChemistry(a1, a2, -20); chemNotes.push("<span class='red'>-20 forced to work while unhappy</span>"); }
+  else if (a1.happiness > 70 && a2.happiness > 70) { growChemistry(a1, a2, 10); chemNotes.push("<span class='green'>+10 both leads happy on set</span>"); }
+  const chemNoteTxt = chemNotes.length ? " Chemistry: " + chemNotes.join(", ") + "." : "";
+
+  addLog("🎬 <b>" + esc(p.title) + "</b> wrapped filming! Combo reveal: <span class='combo-" + p.combo + "'>" + p.combo + "</span>." + chemNoteTxt + " Episodes begin next week.", p.combo === "BAD" ? "log-bad" : "log-good");
+  const comboBlurb = {
+    PERFECT: "A " + p.genre + " " + p.type + "? The industry calls this a <span class='combo-PERFECT'>PERFECT</span> match. Quality x1.5!",
+    GOOD: "A " + p.genre + " " + p.type + " is a <span class='combo-GOOD'>GOOD</span>, reliable pairing. Quality x1.0.",
+    BAD: "A " + p.genre + " " + p.type + "... critics are already wincing. <span class='combo-BAD'>BAD</span> combo. Quality x0.6."
+  };
+  queueModal({
+    title: "🎬 THAT'S A WRAP!", sound: p.combo === "BAD" ? "alert" : "pop",
+    body: "<div class='big-combo combo-" + p.combo + "'>" + p.combo + " COMBO</div>" +
+      "<b>" + esc(p.title) + "</b> has finished filming.<br>" + comboBlurb[p.combo] +
+      (chemNoteTxt ? "<br><br>On-set chemistry report:" + chemNoteTxt + "." : "") +
+      "<br><br>The first " + (p.type === "Movie" ? "premiere" : "episode") + " drops <b>next week</b>.",
+    choices: [{ label: "TO THE EDITING BAY ✂", fn: () => { } }]
+  });
+}
+
+/* ==================== 7. EPISODE RELEASES ==================== */
+
+// One release week of one production: numbers, reviews, chatter, money.
+function releaseEpisode(p) {
+  p.epWeek++;
+  const a1 = getActor(p.lead1), a2 = getActor(p.lead2);
+  const chem = a1 && a2 ? effChem(a1, a2) : 25;
+  const plat = PLATFORM_MOD[p.platform], rat = RATING_MOD[p.rating];
+
+  // Episode rating (1-10): quality-driven, chemistry-tilted
+  let epRating = clamp(Math.round(p.finalQuality / 15 + (chem >= 70 ? 1 : chem < 25 ? -1 : 0) + rnd(-1, 1)), 1, 10);
+
+  // Momentum: great episodes snowball, stinkers sink
+  if (epRating >= 8) p.momentum = clamp(p.momentum + 0.15, 0.5, 2);
+  else if (epRating >= 6) p.momentum = clamp(p.momentum + 0.05, 0.5, 2);
+  else if (epRating <= 4) p.momentum = clamp(p.momentum - 0.15, 0.5, 2);
+
+  // Viewers: type base × platform reach × rating reach × your fame × momentum
+  const fameFactor = 0.5 + state.popularity / 150;
+  const viewers = Math.round(TYPES[p.type].baseViewers * plat.reach * rat.reach * fameFactor *
+    p.momentum * (epRating / 7) * rnd(0.85, 1.15));
+
+  // Revenue: per-mille rate × platform money × rating money × budget scale
+  const revenue = Math.round(viewers / 1000 * 120 * plat.money * rat.money * p.budgetMult * rnd(0.9, 1.1));
+
+  // Popularity growth scales with rating and reach
+  const popGain = Math.max(1, Math.round(epRating * plat.reach * p.momentum * 2));
+
+  // Trending score (display metric)
+  const trending = clamp(Math.round(viewers / 1500 + epRating * 5), 1, 100);
+
+  // Bank it, log it
+  state.money += revenue;
+  state.popularity += popGain;
+  state.stats.revenue += revenue;
+  p.totalRevenue += revenue; p.totalViewers += viewers;
+  const ep = { n: p.epWeek, rating: epRating, viewers, revenue, trending, popGain };
+  p.episodes.push(ep);
+
+  // Leads gain fame + career earnings; mood follows the ratings
+  for (const a of [a1, a2]) {
+    if (!a) continue;
+    a.fame += popGain / 40;
+    a.career.earned += Math.round(revenue * 0.05); // their cut (career stat)
+    if (epRating >= 7) a.happiness = clamp(a.happiness + 2, 0, 100);
+    if (epRating <= 4) a.happiness = clamp(a.happiness - 2, 0, 100);
+  }
+
+  const ctx = { A: esc(a1.name), B: esc(a2.name), T: esc(p.title), CP: esc(p.cpName), N: p.epWeek };
+  addLog("📺 <b>" + esc(p.title) + "</b> " + (p.type === "Movie" ? "premiered" : "Ep " + p.epWeek + " aired") +
+    ": " + epRating + "/10, " + fmtNum(viewers) + " viewers, <span class='gold'>+" + fmtMoney(revenue) + "</span>, +" + popGain + " ★.", "log-money");
+
+  // Sentiment buckets for reviews + fan chatter
+  const mood = epRating >= 8 ? "pos" : epRating >= 5 ? "mid" : "neg";
+  const [rev1, rev2] = pickN(REVIEWS[mood], 2).map(t => fill(t, ctx));
+  const posts = pickN(FAN_POSTS[mood], 2).concat(pickN(FAN_POSTS[Math.random() < .7 ? mood : "mid"], 1)).map(t => fill(t, ctx));
+
+  // Celebration + results pop-up
+  queueModal({
+    title: p.type === "Movie" ? "🎬 PREMIERE NIGHT!" : "📺 EPISODE " + p.epWeek + " AIRED!",
+    sound: epRating >= 7 ? "chime" : epRating <= 4 ? "alert" : "pop",
+    onOpen: epRating >= 7 ? () => burst() : null,
+    body:
+      "<b>" + esc(p.title) + "</b> · " + esc(p.cpName) + " stans are watching<br><br>" +
+      "<div class='ep-stats'>" +
+      "<div class='ep-stat'><div class='n'>" + epRating + "/10</div><div class='t'>EP RATING</div></div>" +
+      "<div class='ep-stat'><div class='n'>" + fmtNum(viewers) + "</div><div class='t'>VIEWERS</div></div>" +
+      "<div class='ep-stat'><div class='n'>" + trending + "</div><div class='t'>TRENDING</div></div>" +
+      "<div class='ep-stat'><div class='n'>+" + fmtMoney(revenue) + "</div><div class='t'>REVENUE</div></div>" +
+      "<div class='ep-stat'><div class='n'>+" + popGain + "</div><div class='t'>★ POP</div></div>" +
+      "</div>" +
+      "<h3 style='margin-top:12px;'>💬 FAN REVIEWS</h3>" +
+      "<div class='review'>" + rev1 + "</div><div class='review'>" + rev2 + "</div>" +
+      "<h3 style='margin-top:12px;'>📱 " + esc(state.fandomName).toUpperCase() + " ONLINE</h3>" +
+      posts.map(t => "<div class='fan-post'>" + t + "</div>").join(""),
+    choices: [{ label: p.epWeek >= p.epTotal ? "SEE THE FALLOUT →" : "KEEP IT ROLLING 🍿", fn: () => { } }]
+  });
+
+  // Final episode? Then comes the big judgment.
+  if (p.epWeek >= p.epTotal) {
+    queueModal({
+      title: p.type === "Movie" ? "🏁 PREMIERE COMPLETE!" : "🏁 ALL EPISODES RELEASED!",
+      sound: "pop",
+      body: "Every episode of <b>" + esc(p.title) + "</b> is out in the world.<br>" +
+        "Total audience: <span class='gold'>" + fmtNum(p.totalViewers) + "</span> · Total revenue: <span class='gold'>" + fmtMoney(p.totalRevenue) + "</span><br><br>" +
+        "The four critics have filed their scores...",
+      choices: [{ label: "READ THE CRITIQUES →", fn: () => { } }]
+    });
+    runFinalCritique(p);
+  }
+}
+
+/* ==================== 8. THE FOUR EVALUATORS ==================== */
+
+function starStr(n) {
+  let s = "";
+  for (let i = 1; i <= 5; i++) s += i <= n ? "★" : "<span class='off'>★</span>";
+  return "<span class='stars'>" + s + "</span>";
+}
+
+// Judge the finished production; hand out stars, text, rep, awards.
+function runFinalCritique(p) {
+  const a1 = getActor(p.lead1), a2 = getActor(p.lead2);
+  const chem = a1 && a2 ? effChem(a1, a2) : 25;
+  const visualAvg = (a1.skills.Visual + a2.skills.Visual) / 2;
+  const locked = state.fixedCPs.some(cp => pairKey(cp[0], cp[1]) === pairKey(a1.id, a2.id));
+  const ctx = { A: esc(a1.name), B: esc(a2.name), T: esc(p.title), CP: esc(p.cpName), N: p.epTotal };
+  const evals = [];
+
+  // --- 1. MEDIA CRITIC: real-life promo chemistry & fan service ---
+  {
+    const s = clamp(Math.round(1 + chem / 22 + (locked ? 0.5 : 0) + rnd(-0.5, 0.5)), 1, 5);
+    const txt = s >= 4
+      ? "I covered their press tour and {A} fixed {B}'s collar on live TV. This is ELITE fan service. The fantasy holds even with the cameras off."
+      : s === 3
+        ? "The {CP} promotional run was serviceable — smiles, waves, rehearsed anecdotes. Pleasant, but the magic clearly ends at wrap."
+        : "Their joint interview was painful to sit through. {A} and {B} could barely look at each other. How do you sell a romance like that?";
+    evals.push({ name: "📰 MEDIA CRITIC — fan service & promo chemistry", stars: s, text: fill(txt, ctx) });
+  }
+
+  // --- 2. INDUSTRY CRITIC: trope execution, combo, adaptation faith ---
+  {
+    let base = p.combo === "PERFECT" ? 4.4 : p.combo === "GOOD" ? 3.3 : 1.8;
+    if (p.story === "Adaptation" && p.finalQuality > 80) base += 0.5;
+    if (p.schedule === "12 Months") base += 0.4;
+    base += p.finalQuality / 80;
+    const s = clamp(Math.round(base + rnd(-0.4, 0.4)), 1, 5);
+    const txt = s >= 4
+      ? "A textbook execution of the '" + p.trope + "' trope. " + (p.story === "Adaptation" ? "Fans of the source material can rest easy — this adaptation RESPECTS the text." : "An original script that understands the genre's bones.") + " The " + p.genre + "/" + p.type + " format was the right call."
+      : s === 3
+        ? "The '" + p.trope + "' setup had promise but the execution wobbled. " + (p.combo === "BAD" ? "Frankly, a " + p.genre + " " + p.type + " was fighting itself from day one." : "Competent craft, safe choices.")
+        : "The '" + p.trope + "' trope deserves better than this. A " + p.genre + " " + p.type + " combo that never found its rhythm — the " + p.schedule + " shoot " + (p.schedule === "3 Months" ? "feels rushed." : "still couldn't save the script.");
+    evals.push({ name: "🎓 INDUSTRY CRITIC — craft & trope execution", stars: s, text: txt });
+  }
+
+  // --- 3. BL FAN CRITIC: skinship, eye contact, natural tension ---
+  {
+    const ratingBonus = p.rating === "R" ? 0.5 : p.rating === "PG-13" ? 0.3 : 0;
+    const s = clamp(Math.round(1 + chem / 25 + visualAvg / 60 + ratingBonus + rnd(-0.5, 0.5)), 1, 5);
+    const txt = s >= 4
+      ? "The SKINSHIP. The eye contact in episode " + Math.min(2, p.epTotal) + ". {A} and {B} don't act the tension — they ARE the tension. I have ascended. {CP} forever."
+      : s === 3
+        ? "There are flashes of real tension between {A} and {B}, but some scenes feel choreographed rather than lived. The {CP} ship sails... cautiously."
+        : "I wanted to believe in {CP}, I truly did. But every touch looked contractual. Zero spark, forced fanservice, my group chat is in shambles.";
+    evals.push({ name: "💗 BL FAN CRITIC — skinship & romantic tension", stars: s, text: fill(txt, ctx) });
+  }
+
+  // --- 4. SOCIAL CRITIC: respectful LGBTQ+ portrayal vs queerbaiting ---
+  {
+    let sc = 3.5;
+    sc += p.rating === "PG" ? 1 : p.rating === "PG-13" ? 0.5 : -0.5;
+    if (p.platform === "Streaming") sc -= 0.3; // uncensored = higher risk of fetishization
+    if (p.genre === "School" && p.rating === "R") sc -= 1.2; // especially poor taste
+    if (chem >= 70) sc += 0.4; // genuine affection reads as respectful
+    const s = clamp(Math.round(sc + rnd(-0.5, 0.5)), 1, 5);
+    const txt = s >= 4
+      ? "{T} treats its queer romance with warmth and dignity. No tragedy-bait, no mocking stereotypes — just two people falling in love. More of this, please."
+      : s === 3
+        ? "{T} means well, mostly. A few scenes lean on tired clichés, but the romance at its core is handled with reasonable care."
+        : "{T} tiptoes into queerbaiting territory — intimacy framed for shock value rather than sincerity. The community deserves better than marketing dressed as representation.";
+    evals.push({ name: "🏳️‍🌈 SOCIAL CRITIC — representation & respect", stars: s, text: fill(txt, ctx) });
+    if (s <= 2) state.queuedControversy = p.title; // uh oh — next week gets spicy
+  }
+
+  // --- Verdict: average of four, applied to the company ---
+  const avg = Math.round(evals.reduce((t, e) => t + e.stars, 0) / evals.length * 10) / 10;
+  p.finalScore = avg;
+  const repDelta = Math.round((avg - 3) * 8 * RATING_MOD[p.rating].rep);
+  state.reputation = clamp(state.reputation + repDelta, 0, 100);
+
+  // Book-keeping: history, pair record, stats, actor growth
+  state.productions = state.productions.filter(x => x.id !== p.id);
+  state.completed.unshift(p);
+  state.pairFilms[pairKey(a1.id, a2.id)] = (state.pairFilms[pairKey(a1.id, a2.id)] || 0) + 1;
+  state.stats.productionsDone++;
+  if (avg >= 3.5) state.stats.hits++; else state.stats.flops++;
+  for (const a of [a1, a2]) {
+    if (!a) continue;
+    a.career.productions++;
+    a.skills.Acting = clamp(a.skills.Acting + 1, 0, 100);
+    a.skills.Visual = clamp(a.skills.Visual + 1, 0, 100);
+  }
+
+  // Successful production together: +5 chemistry (Prompt 2 chemistry rule)
+  if (avg >= 3.5) {
+    growChemistry(a1, a2, 5);
+    addLog("💞 <b>" + esc(a1.name) + " × " + esc(a2.name) + "</b> grew closer on a successful shoot. (+5 chemistry)", "log-pink");
+  }
+
+  addLog("🏆 <b>" + esc(p.title) + "</b> final score: <span class='gold'>" + avg + "/5</span> (" + (repDelta >= 0 ? "+" : "") + repDelta + " ♦ rep).", avg >= 3.5 ? "log-good" : "log-bad");
+
+  // Award-worthy? The industry notices excellence.
+  let awardHTML = "";
+  if (avg >= 4.5) {
+    state.stats.awards++;
+    state.reputation = clamp(state.reputation + 10, 0, 100);
+    state.popularity += 25;
+    state.money += 3000; state.stats.revenue += 3000;
+    for (const a of [a1, a2]) if (a) a.career.awards++;
+    awardHTML = "<div class='big-combo combo-PERFECT'>🏆 AWARD WINNER!</div>" +
+      "<b>" + esc(p.title) + "</b> sweeps the BL Drama Awards! +10 ♦ rep, +25 ★ pop, <span class='gold'>+$3,000</span> prize." +
+      "<br><span class='gold'>" + esc(a1.name) + " & " + esc(a2.name) + " each take home a trophy.</span>";
+    addLog("🏆 <b>" + esc(p.title) + "</b> WON at the BL Drama Awards!", "log-good");
+  }
+
+  queueModal({
+    title: "⭐ FINAL CRITIQUE — " + esc(p.title).toUpperCase(),
+    sound: avg >= 4 ? "chime" : avg <= 2.4 ? "alert" : "pop",
+    onOpen: avg >= 4.5 ? () => burst() : null,
+    body:
+      "<div style='text-align:center; margin-bottom:12px;'>OVERALL <span class='stars' style='font-size:18px;'>" + avg + "</span>/5 " +
+      starStr(Math.round(avg)) + "</div>" +
+      evals.map(e => "<div class='eval-block'><div class='eval-name'>" + e.name + "</div>" + starStr(e.stars) +
+        "<div class='eval-text'>" + e.text + "</div></div>").join("") +
+      awardHTML +
+      "<div class='muted' style='margin-top:8px;'>Reputation " + (repDelta >= 0 ? "+" : "") + repDelta + " ♦ · The " + esc(state.fandomName) + " are " +
+      (avg >= 4 ? "ecstatic" : avg >= 3 ? "content" : "restless") + ".</div>",
+    choices: [{ label: "ONWARD 📈", fn: () => { } }]
+  });
+}
+
+/* ==================== 9. AUDITIONS + WEEKLY EVENTS ==================== */
+
+// --- AUDITION WEEK: every 4 weeks, 3 faces from the unlocked pool ---
+function auditionWeek() {
+  state.lastEventWeek = state.week;
+  state.nextEventGap = rndInt(1, 3);
+  const cands = pickN(auditionPool(), 3);
+  if (!cands.length) return;
+
+  const cardHTML = c => {
+    const top = [...SKILL_KEYS].sort((x, y) => c.skills[y] - c.skills[x]).slice(0, 3)
+      .map(k => k + " " + c.skills[k]).join(" · ");
+    return "<div class='aud-card'>" + portraitHTML(c, c.tier === "Worldwide" ? "ww" : "") +
+      "<div class='nm'>" + esc(c.name) + ", " + c.age + "</div>" +
+      "<span class='rank-badge rank-" + c.tier.replace(/ /g, "") + "'>" + c.tier.toUpperCase() + "</span>" +
+      "<div class='muted' style='margin-top:6px;'>" + top + "</div>" +
+      "<div class='muted'>" + c.characteristics.join(" · ") + "</div>" +
+      "<div class='gold' style='font-size:8px; margin-top:6px;'>Fee: " + fmtMoney(c.signCost) + "</div></div>";
+  };
+
+  const total = cands.reduce((t, c) => t + c.signCost, 0);
+  const bundle = round10(total * 0.7);
+
+  const signOne = c => () => {
+    if (state.money < c.signCost) return;
+    state.money -= c.signCost;
+    signActor(c);
+    addLog("🌟 Signed <b>" + esc(c.name) + "</b> (" + c.tier + ") at audition! (-" + fmtMoney(c.signCost) + ")", "log-good");
+  };
+
+  const choices = cands.map(c => ({
+    label: "SIGN " + esc(c.name).toUpperCase() + " (-" + fmtMoney(c.signCost) + ")",
+    disabled: state.money < c.signCost,
+    fn: signOne(c)
+  }));
+  choices.push({
+    label: "SIGN ALL " + cands.length + " (-" + fmtMoney(bundle) + ", 30% OFF)",
+    disabled: state.money < bundle || cands.length < 2,
+    fn: () => {
+      state.money -= bundle;
+      for (const c of cands) signActor(c);
+      addLog("🌟 Bulk signing! <b>" + cands.map(c => esc(c.name)).join(", ") + "</b> all join " + esc(state.companyName) + "! (-" + fmtMoney(bundle) + ")", "log-good");
+      burst();
+    }
+  });
+  choices.push({ label: "REJECT ALL", fn: () => addLog("Passed on this week's auditionees.", "") });
+
+  queueModal({
+    title: "🎤 AUDITION WEEK!", sound: "pop",
+    body: "Week " + state.week + " — hopefuls line up outside " + esc(state.companyName) + ".<br>" +
+      "<span class='muted'>Talent pool: " + auditionPool().length + " unsigned actors in your unlocked tiers.</span>" +
+      "<div class='aud-grid'>" + cands.map(cardHTML).join("") + "</div>",
+    choices: choices
+  });
+}
+
+// Bring an actor onto your roster (used by auditions & direct approaches)
+function signActor(a) {
+  a.signed = true;
+  a.happiness = clamp(a.happiness + 10, 0, 100);
+  a.loyalty = clamp(a.loyalty + 5, 0, 100);
+  a.idleWeeks = 0;
+}
+
+// Rare: a Worldwide star approaches YOU once you're a top-15 studio
+function worldwideApproach() {
+  const w = state.roster.filter(a => !a.signed && a.tier === "Worldwide");
+  if (!w.length) return false;
+  const star = pick(w);
+  queueModal({
+    title: "🌐 A LEGEND CALLS!", sound: "chime",
+    body: "<div style='display:flex; gap:14px; align-items:flex-start;'>" + portraitHTML(star, "ww big") +
+      "<div>Out of nowhere, <b>" + esc(star.name) + "</b> (" + star.age + ") — a <span class='gold'>WORLDWIDE</span> star — " +
+      "says they want to join <b>" + esc(state.companyName) + "</b>!<br><br>" +
+      "Their terms: <span class='gold'>" + fmtMoney(star.signCost) + "</span> signing fee, plus a $150/week retainer " +
+      "(worldwide stars demand special treatment).<br><br>" +
+      "<span class='muted'>" + star.characteristics.join(" · ") + "</span></div></div>",
+    choices: [
+      {
+        label: "SIGN THE LEGEND (-" + fmtMoney(star.signCost) + ")", disabled: state.money < star.signCost, fn: () => {
+          state.money -= star.signCost;
+          signActor(star);
+          state.popularity += 20;
+          addLog("🌐 WORLDWIDE star <b>" + esc(star.name) + "</b> joins " + esc(state.companyName) + "! The industry is SHOOK. (+20 ★)", "log-good");
+          burst();
+        }
+      },
+      { label: "RESPECTFULLY PASS", fn: () => addLog("Passed on a worldwide star's offer. Bold move, boss.", "") }
+    ]
+  });
+  return true;
+}
+
+// Pick one applicable event from the company event pool.
+function fireRandomEvent() {
+  state.lastEventWeek = state.week;
+  state.nextEventGap = rndInt(1, 3);
+  const pool = [];
+
+  // Rare worldwide direct approach at high rank (~1 in 5 event slots when eligible)
+  if (state.rank <= 15 && Math.random() < 0.35 && worldwideApproach()) return;
+
+  // --- Actor-centric events (Prompt 2) live in the same pool ---
+  addActorEvents(pool);
+
+  // 1. Bad review on latest production
+  if (state.completed.length) pool.push(() => {
+    const p = state.completed[0];
+    queueModal({
+      title: "😖 BAD REVIEW!", sound: "alert",
+      body: "A viral critic just roasted <b>" + esc(p.title) + "</b>: " +
+        "<i>'All the romantic tension of a wet cardboard box.'</i><br>The " + esc(state.fandomName) + " are waiting for your response.",
+      choices: [
+        { label: "APOLOGIZE (-10 ♦)", fn: () => { state.reputation = clamp(state.reputation - 10, 0, 100); addLog("Issued a public apology for " + esc(p.title) + ". (-10 ♦)", "log-bad"); } },
+        { label: "IGNORE (-20 ♦)", fn: () => { state.reputation = clamp(state.reputation - 20, 0, 100); addLog("Stayed silent on the " + esc(p.title) + " review. It did not go well. (-20 ♦)", "log-bad"); } }
+      ]
+    });
+  });
+
+  // 2. Brand sponsorship
+  pool.push(() => queueModal({
+    title: "💼 SPONSORSHIP OFFER", sound: "pop",
+    body: "A bubble tea brand wants product placement in your next production.<br>They pay upfront. The logo is... large.",
+    choices: [
+      { label: "ACCEPT (+$2,000)", fn: () => { state.money += 2000; state.stats.revenue += 2000; addLog("💼 Brand deal signed. +$2,000. The leads will be holding a LOT of bubble tea.", "log-money"); } },
+      { label: "REJECT", fn: () => addLog("Declined a sponsorship. Artistic integrity intact.", "") }
+    ]
+  }));
+
+  // 3. Competitor released a hit
+  pool.push(() => queueModal({
+    title: "⚔ RIVAL STRIKES!", sound: "alert",
+    body: "A competitor just dropped a massive BL hit and it's eating the entire trending chart.<br>Your timeline is 90% people screaming about someone else's show.",
+    choices: [{ label: "STAY STRONG (-5 ♦)", fn: () => { state.reputation = clamp(state.reputation - 5, 0, 100); addLog("⚔ A rival's hit dominated the week. (-5 ♦)", "log-bad"); } }]
+  }));
+
+  // 4. Script leak before premiere
+  if (state.productions.length) pool.push(() => {
+    const p = pick(state.productions);
+    queueModal({
+      title: "🕵 SCRIPT LEAK!", sound: "alert",
+      body: "Key scenes from <b>" + esc(p.title) + "</b> — including THE kiss — just leaked online.<br>Spoilers are spreading like wildfire.",
+      choices: [
+        {
+          label: "INVESTIGATE (-$600, +3 ♦)", disabled: state.money < 600, fn: () => {
+            state.money -= 600; state.reputation = clamp(state.reputation + 3, 0, 100);
+            addLog("🕵 Leak traced and plugged. Industry respects the professionalism. (-$600, +3 ♦)", "log-good");
+          }
+        },
+        { label: "IGNORE (-15 ♦)", fn: () => { state.reputation = clamp(state.reputation - 15, 0, 100); addLog("Ignored the script leak. Spoilers everywhere, trust damaged. (-15 ♦)", "log-bad"); } }
+      ]
+    });
+  });
+
+  // 5. International platform offer
+  if (state.completed.length) pool.push(() => queueModal({
+    title: "🌍 INTERNATIONAL OFFER", sound: "pop",
+    body: "An overseas streaming giant wants global rights to your catalog —<br><b>fully uncensored</b>. Big money, bigger exposure.",
+    choices: [
+      { label: "ACCEPT (+$2,500, +3 ★)", fn: () => { state.money += 2500; state.stats.revenue += 2500; state.popularity += 3; addLog("🌍 Went global! International deal signed. (+$2,500, +3 ★)", "log-money"); } },
+      { label: "REJECT (+2 ♦)", fn: () => { state.reputation = clamp(state.reputation + 2, 0, 100); addLog("Declined an international deal. Kept creative control. (+2 ♦)", ""); } }
+    ]
+  }));
+
+  // 6. Actor wants a Fixed CP contract
+  const cpCand = topUnlockedPair();
+  if (cpCand) pool.push(() => {
+    const [a1, a2] = cpCand;
+    queueModal({
+      title: "💍 FIXED CP CONTRACT?", sound: "pop",
+      body: "<b>" + esc(a1.name) + "</b> and <b>" + esc(a2.name) + "</b> want to sign as an <b>official Fixed CP</b> —<br>" +
+        "locked pairing, joint promos, faster chemistry growth... and breakup risk if things sour.",
+      choices: [
+        {
+          label: "SIGN (-$1,000)", disabled: state.money < 1000, fn: () => {
+            state.money -= 1000; state.fixedCPs.push([a1.id, a2.id]); state.popularity += 5;
+            addLog("💍 " + esc(a1.name) + " × " + esc(a2.name) + " are now an OFFICIAL Fixed CP! (-$1,000, +5 ★)", "log-pink");
+          }
+        },
+        { label: "REJECT", fn: () => addLog("Declined a Fixed CP contract. The fans ship freely anyway.", "") }
+      ]
+    });
+  });
+
+  if (pool.length) pick(pool)();
+}
+
+// Most recent lead pair (for rumors)
+function latestPair() {
+  const p = state.productions[0] || state.completed[0];
+  if (!p) return null;
+  const a1 = getActor(p.lead1), a2 = getActor(p.lead2);
+  return a1 && a2 ? [a1, a2] : null;
+}
+// Highest-chemistry pair without a Fixed CP contract yet
+function topUnlockedPair() {
+  let best = null, bestC = 40;
+  const mine = myActors();
+  for (let i = 0; i < mine.length; i++) for (let j = i + 1; j < mine.length; j++) {
+    const a = mine[i], b = mine[j];
+    if (state.fixedCPs.some(cp => pairKey(cp[0], cp[1]) === pairKey(a.id, b.id))) continue;
+    const c = effChem(a, b);
+    if (c > bestC) { bestC = c; best = [a, b]; }
+  }
+  return best;
+}
+
+// An actor leaves the company (fired, poached, quit)
+function removeActor(a, reasonTxt) {
+  a.signed = false;
+  a.restWeeks = 0; a.injuredWeeks = 0; a.idleWeeks = 0;
+  state.fixedCPs = state.fixedCPs.filter(cp => !cp.includes(a.id));
+  addLog(reasonTxt || ("👋 <b>" + esc(a.name) + "</b> has left " + esc(state.companyName) + "."), "log-bad");
+}
+
+/* ==================== 10. THE 10 ACTOR EVENTS ==================== */
+
+// All actor-driven events register themselves here when applicable.
+function addActorEvents(pool) {
+  const mine = myActors();
+  if (!mine.length) return;
+  const filming = state.productions.filter(p => p.phase === "filming");
+  const raiseCost = a => Math.round((TIER_STATS[a.tier].signMax * 0.8) / 10) * 10;
+
+  // 1. Actor wants to switch agencies!
+  if (mine.length) pool.push(() => {
+    const a = pick(mine);
+    const offer = raiseCost(a) + rndInt(100, 400);
+    queueModal({
+      title: "✂️ " + esc(a.name).toUpperCase() + " IS BEING POACHED!", sound: "alert",
+      body: "A rival agency slid into <b>" + esc(a.name) + "</b>'s DMs with a glossy contract.<br>" +
+        "Their agent says matching <span class='gold'>" + fmtMoney(offer) + "</span> would end the conversation." +
+        "<br><br>Mood right now: " + moodEmoji(a) + " <span class='muted'>" + moodWord(a) + "</span>",
+      choices: [
+        {
+          label: "MATCH OFFER (-" + fmtMoney(offer) + ", loyalty +)", disabled: state.money < offer, fn: () => {
+            state.money -= offer;
+            a.loyalty = clamp(a.loyalty + 15, 0, 100); a.happiness = clamp(a.happiness + 8, 0, 100);
+            addLog("✂️ Matched the rival offer — <b>" + esc(a.name) + "</b> stays, feeling valued. (-" + fmtMoney(offer) + ")", "log-good");
+          }
+        },
+        {
+          label: "LET THEM GO", fn: () => {
+            removeActor(a, "✂️ <b>" + esc(a.name) + "</b> signed with a rival agency. Their portraits come down from the lobby.");
+          }
+        }
+      ]
+    });
+  });
+
+  // 2. Actor caught in scandal!
+  if (mine.length) pool.push(() => {
+    const a = pick(mine);
+    const prod = state.productions.find(p => p.lead1 === a.id || p.lead2 === a.id);
+    queueModal({
+      title: "🚨 SCANDAL!", sound: "alert",
+      body: "<b>" + esc(a.name) + "</b> was photographed outside a club at 4AM with someone's fiancé.<br>" +
+        "The tabloids are feasting. " + (prod ? "They're currently filming <b>" + esc(prod.title) + "</b> — the set is tense." : ""),
+      choices: [
+        {
+          label: "PR CLEANUP (-$500)", disabled: state.money < 500, fn: () => {
+            state.money -= 500; a.career.scandals++;
+            a.loyalty = clamp(a.loyalty + 5, 0, 100);
+            addLog("🚨 PR team buried the " + esc(a.name) + " scandal in 48 hours. (-$500)", "log-good");
+          }
+        },
+        {
+          label: "IGNORE (-8 ♦, on-set chemistry -15)", fn: () => {
+            state.reputation = clamp(state.reputation - 8, 0, 100);
+            a.career.scandals++;
+            if (prod) { prod.scandal = true; addLog("🚨 The " + esc(a.name) + " scandal festers. " + esc(prod.title) + " leads drift apart (-15 chemistry at wrap). (-8 ♦)", "log-bad"); }
+            else addLog("🚨 Ignored the " + esc(a.name) + " scandal. The internet never forgets. (-8 ♦)", "log-bad");
+          }
+        },
+        {
+          label: "FIRE THEM", fn: () => {
+            a.career.scandals++;
+            removeActor(a, "🔥 <b>" + esc(a.name) + "</b> was fired over the scandal. Harsh, but the brand is safe.");
+            state.reputation = clamp(state.reputation + 2, 0, 100);
+          }
+        }
+      ]
+    });
+  });
+
+  // 3. Actor dating non-CP co-star!
+  if (mine.length >= 2) pool.push(() => {
+    const a = pick(mine);
+    const others = mine.filter(x => x.id !== a.id && !state.fixedCPs.some(cp => cp.includes(a.id) && cp.includes(x.id)));
+    if (!others.length) return;
+    const b = pick(others);
+    queueModal({
+      title: "💘 OFF-SCRIPT ROMANCE!", sound: "pop",
+      body: "<b>" + esc(a.name) + "</b> is dating <b>" + esc(b.name) + "</b> — and they are NOT an official CP.<br>" +
+        "Fans are confused, shippers are rioting, cameras are circling.",
+      choices: [
+        {
+          label: "CONFIRM (+drama, -5 ♦)", fn: () => {
+            state.popularity += 10; state.reputation = clamp(state.reputation - 5, 0, 100);
+            growChemistry(a, b, 8);
+            addLog("💘 Confirmed: " + esc(a.name) + " × " + esc(b.name) + " are really dating! Chaos, but ratings love chaos. (+10 ★, -5 ♦)", "log-pink");
+          }
+        },
+        {
+          label: "DENY (+3 ♦, -6 ★)", fn: () => {
+            state.reputation = clamp(state.reputation + 3, 0, 100); state.popularity = Math.max(0, state.popularity - 6);
+            a.happiness = clamp(a.happiness - 6, 0, 100); b.happiness = clamp(b.happiness - 6, 0, 100);
+            addLog("💘 Denied the " + esc(a.name) + " × " + esc(b.name) + " romance. Order restored, hearts quietly broken. (+3 ♦, -6 ★)", "");
+          }
+        },
+        { label: "IGNORE", fn: () => addLog("No comment on the off-script romance. Speculation does free marketing, maybe.", "") }
+      ]
+    });
+  });
+
+  // 4. Actor wants a solo project!
+  if (mine.length) pool.push(() => {
+    const a = pick(mine);
+    let partner = null, bestC = -1;
+    for (const o of mine) { if (o.id === a.id) continue; const c = effChem(a, o); if (c > bestC) { bestC = c; partner = o; } }
+    queueModal({
+      title: "🎭 SOLO AMBITIONS!", sound: "pop",
+      body: "<b>" + esc(a.name) + "</b> wants a solo photoshoot exhibition — no CP partner, no shared spotlight.<br>" +
+        (partner ? "Their CP fans (" + esc(a.name) + " × " + esc(partner.name) + ") would NOT take it well." : ""),
+      choices: [
+        {
+          label: "ALLOW (happy +12, CP bonus fades)", fn: () => {
+            a.happiness = clamp(a.happiness + 12, 0, 100);
+            if (partner) { growChemistry(a, partner, -5); addLog("🎭 " + esc(a.name) + " goes solo for a while. The " + esc(a.name) + " × " + esc(partner.name) + " magic cools slightly (-5 chemistry).", ""); }
+            else addLog("🎭 " + esc(a.name) + " shines solo. (+happiness)", "log-good");
+          }
+        },
+        {
+          label: "DENY (-happiness)", fn: () => {
+            a.happiness = clamp(a.happiness - 8, 0, 100);
+            addLog("🎭 Denied " + esc(a.name) + "'s solo project. They smiled... tightly.", "log-bad");
+          }
+        }
+      ]
+    });
+  });
+
+  // 5. Actor injury during filming!
+  if (filming.length) pool.push(() => {
+    const p = pick(filming);
+    const hurt = Math.random() < 0.5 ? getActor(p.lead1) : getActor(p.lead2);
+    queueModal({
+      title: "🤕 ON-SET INJURY!", sound: "alert",
+      body: "<b>" + esc(hurt.name) + "</b> took a bad fall filming a rain scene for <b>" + esc(p.title) + "</b>.<br>" +
+        "Medics say two weeks off their feet, minimum.",
+      choices: [
+        {
+          label: "PAUSE 2 WEEKS (injured, +2wk delay)", fn: () => {
+            hurt.injuredWeeks = 2; p.filmTotal += 2;
+            addLog("🤕 " + esc(hurt.name) + " rests 2 weeks; <b>" + esc(p.title) + "</b> delayed but intact.", "log-bad");
+          }
+        },
+        {
+          label: "REPLACE WITH BACKUP", fn: () => {
+            const reps = mine.filter(x => actorStatus(x) === "Available" && x.id !== p.lead1 && x.id !== p.lead2);
+            if (!reps.length) {
+              hurt.injuredWeeks = 2; p.filmTotal += 2;
+              addLog("🤕 No backup available — forced to pause anyway. " + esc(hurt.name) + " out 2 weeks.", "log-bad");
+              return;
+            }
+            const rep = pick(reps);
+            if (p.lead1 === hurt.id) p.lead1 = rep.id; else p.lead2 = rep.id;
+            hurt.injuredWeeks = 3; hurt.happiness = clamp(hurt.happiness - 10, 0, 100);
+            addLog("🔄 <b>" + esc(rep.name) + "</b> replaces injured " + esc(hurt.name) + " on <b>" + esc(p.title) + "</b>. No delay, but the fans noticed.", "log-bad");
+          }
+        }
+      ]
+    });
+  });
+
+  // 6. Actor fan meeting request!
+  if (mine.length) pool.push(() => {
+    const a = pick(mine);
+    queueModal({
+      title: "🎤 FAN MEETING REQUEST!", sound: "pop",
+      body: "<b>" + esc(a.name) + "</b>'s fanclub is begging for an in-person meet & greet.<br>Venue, security, snacks — it adds up.",
+      choices: [
+        {
+          label: "ORGANIZE (-$400, +★)", disabled: state.money < 400, fn: () => {
+            state.money -= 400; state.popularity += 10;
+            a.happiness = clamp(a.happiness + 8, 0, 100); a.fame += 2;
+            addLog("🎤 " + esc(a.name) + "'s fan meeting was pure joy. (-$400, +10 ★)", "log-pink");
+          }
+        },
+        {
+          label: "DECLINE (-★)", fn: () => {
+            state.popularity = Math.max(0, state.popularity - 4);
+            a.happiness = clamp(a.happiness - 5, 0, 100);
+            addLog("🎤 Declined " + esc(a.name) + "'s fan meeting. The fanclub is quietly furious. (-4 ★)", "log-bad");
+          }
+        }
+      ]
+    });
+  });
+
+  // 7. Actor demands a raise!
+  if (mine.length) pool.push(() => {
+    const a = pick(mine);
+    const amt = raiseCost(a);
+    queueModal({
+      title: "💸 RAISE DEMAND!", sound: "alert",
+      body: "<b>" + esc(a.name) + "</b> (" + a.tier + ") points at the streaming numbers and slides a figure across the desk: " +
+        "<span class='gold'>" + fmtMoney(amt) + "</span>.<br><br>Mood: " + moodEmoji(a) + " <span class='muted'>" + moodWord(a) + "</span>",
+      choices: [
+        {
+          label: "PAY (-" + fmtMoney(amt) + ", loyalty +)", disabled: state.money < amt, fn: () => {
+            state.money -= amt;
+            a.loyalty = clamp(a.loyalty + 12, 0, 100); a.happiness = clamp(a.happiness + 8, 0, 100);
+            addLog("💸 " + esc(a.name) + " got the raise. Loyalty secured. (-" + fmtMoney(amt) + ")", "log-good");
+          }
+        },
+        {
+          label: "REFUSE (loyalty -, may quit)", fn: () => {
+            a.loyalty = clamp(a.loyalty - 15, 0, 100); a.happiness = clamp(a.happiness - 8, 0, 100);
+            if (a.loyalty < 30 && Math.random() < 0.5) {
+              removeActor(a, "💸 <b>" + esc(a.name) + "</b> quit on the spot after the refused raise. Ouch.");
+            } else addLog("💸 Refused " + esc(a.name) + "'s raise. They're staying... for now. (loyalty -15)", "log-bad");
+          }
+        }
+      ]
+    });
+  });
+
+  // 8. Unexpected chemistry with co-star!
+  {
+    const hot = [];
+    for (let i = 0; i < mine.length; i++) for (let j = i + 1; j < mine.length; j++) {
+      const a = mine[i], b = mine[j];
+      if (state.fixedCPs.some(cp => pairKey(cp[0], cp[1]) === pairKey(a.id, b.id))) continue;
+      if (effChem(a, b) >= 55) hot.push([a, b]);
+    }
+    if (hot.length) pool.push(() => {
+      const [a, b] = pick(hot);
+      queueModal({
+        title: "⚡ UNEXPECTED CHEMISTRY!", sound: "chime",
+        body: "Variety show footage of <b>" + esc(a.name) + "</b> and <b>" + esc(b.name) + "</b> is going viral — " +
+          "the lingering looks look REAL. Chemistry reading: <span class='pink'>" + effChem(a, b) + "/100</span>.<br>" +
+          "Fans demand you make it official.",
+        choices: [
+          {
+            label: "FORM NEW CP (+8 ★)", fn: () => {
+              state.fixedCPs.push([a.id, b.id]); state.popularity += 8;
+              addLog("⚡ Made it official: " + esc(a.name) + " × " + esc(b.name) + " are now a Fixed CP! (+8 ★)", "log-pink");
+            }
+          },
+          { label: "IGNORE", fn: () => addLog("Let the " + esc(a.name) + " × " + esc(b.name) + " buzz fade naturally.", "") }
+        ]
+      });
+    });
+  }
+
+  // 9. Language barrier with international co-star!
+  if (filming.length) pool.push(() => {
+    const cands = [];
+    for (const p of filming) for (const id of [p.lead1, p.lead2]) {
+      const a = getActor(id);
+      if (a && a.skills.Language < 40) cands.push({ p, a });
+    }
+    if (!cands.length) return;
+    const { p, a } = pick(cands);
+    queueModal({
+      title: "🗣 LANGUAGE BARRIER!", sound: "alert",
+      body: "<b>" + esc(p.title) + "</b> brought in an international guest star — and <b>" + esc(a.name) + "</b> " +
+        "(Language " + a.skills.Language + ") can't understand a word of direction.<br>Scenes are taking forever.",
+      choices: [
+        {
+          label: "HIRE TUTOR (-$300, Language +10)", disabled: state.money < 300, fn: () => {
+            state.money -= 300; a.skills.Language = clamp(a.skills.Language + 10, 0, 100);
+            addLog("🗣 " + esc(a.name) + " grinds language lessons between takes. (+10 Language, -$300)", "log-good");
+          }
+        },
+        {
+          label: "RISK IT (-10% quality)", fn: () => {
+            p.qualityPenalty = (p.qualityPenalty || 0) + 0.10;
+            a.happiness = clamp(a.happiness - 5, 0, 100);
+            addLog("🗣 Muddled through the language barrier on " + esc(p.title) + ". The footage suffers (-10% quality).", "log-bad");
+          }
+        }
+      ]
+    });
+  });
+
+  // 10. Actor wants a singing debut!
+  if (mine.length) pool.push(() => {
+    const cands = mine.filter(a => a.skills.Singing >= 45);
+    if (!cands.length) return;
+    const a = pick(cands);
+    queueModal({
+      title: "🎵 SINGING DEBUT?!", sound: "pop",
+      body: "<b>" + esc(a.name) + "</b> (Singing " + a.skills.Singing + ") wrote a ballad and wants to debut as a singer.<br>" +
+        "Studio time, mixing, a moody MV: <span class='gold'>$800</span>.",
+      choices: [
+        {
+          label: "PRODUCE SINGLE (-$800)", disabled: state.money < 800, fn: () => {
+            state.money -= 800;
+            const hit = a.skills.Singing >= 70 || Math.random() < 0.4;
+            if (hit) {
+              const earn = rndInt(900, 1600);
+              state.money += earn; state.stats.revenue += earn; state.popularity += 8;
+              a.fame += 4; a.happiness = clamp(a.happiness + 12, 0, 100);
+              addLog("🎵 " + esc(a.name) + "'s single CHARTED! Royalties +" + fmtMoney(earn) + ", +8 ★.", "log-money");
+            } else {
+              a.happiness = clamp(a.happiness + 4, 0, 100);
+              addLog("🎵 " + esc(a.name) + "'s single flopped gently, but they're proud of it. (-$800)", "");
+            }
+          }
+        },
+        {
+          label: "DECLINE (-happiness)", fn: () => {
+            a.happiness = clamp(a.happiness - 10, 0, 100);
+            addLog("🎵 Said no to " + esc(a.name) + "'s singing debut. The ballad stays in the drawer.", "log-bad");
+          }
+        }
+      ]
+    });
+  });
+}
+
+/* ---------- Conditional chemistry & company events ---------- */
+
+// Runs after random events: at most ONE pulse event per week.
+function chemistryPulse() {
+  const cand = [];
+  for (const p of state.productions) {
+    const a1 = getActor(p.lead1), a2 = getActor(p.lead2);
+    if (!a1 || !a2) continue;
+    const c = effChem(a1, a2);
+    if (c < 25 && state.week - ((state.lowChemCd || {})[pairKey(a1.id, a2.id)] || -99) >= 6)
+      cand.push({ w: 3, fn: () => { state.lowChemCd[pairKey(a1.id, a2.id)] = state.week; lowChemEvent(p, a1, a2); } });
+    else if (c >= 75 && state.week - ((state.endorseCd || {})[pairKey(a1.id, a2.id)] || -99) >= 8)
+      cand.push({ w: 2, fn: () => endorsementEvent(a1, a2) });
+  }
+  for (const cp of [...state.fixedCPs]) {
+    const a1 = getActor(cp[0]), a2 = getActor(cp[1]);
+    if (!a1 || !a2 || !a1.signed || !a2.signed) { state.fixedCPs = state.fixedCPs.filter(x => x !== cp); continue; }
+    if (effChem(a1, a2) < 25) cand.push({ w: 4, fn: () => cpBreakupEvent(a1, a2) });
+  }
+  for (const a of myActors()) {
+    if (a.happiness < 20 && a.idleWeeks >= 4) cand.push({ w: 3, fn: () => quitThreatEvent(a) });
+  }
+  if (state.money < 0) cand.push({ w: 5, fn: bankruptcyEvent });
+  if (cand.length) { cand.sort((x, y) => y.w - x.w); cand[0].fn(); }
+}
+
+// Low chemistry: rumors & awkward interviews
+function lowChemEvent(p, a1, a2) {
+  const rumor = Math.random() < 0.5;
+  queueModal({
+    title: rumor ? "🗞 NASTY RUMOR!" : "🎙 AWKWARD INTERVIEW!", sound: "alert",
+    body: rumor
+      ? "Tabloids claim <b>" + esc(a1.name) + "</b> and <b>" + esc(a2.name) + "</b> can't stand each other on the <b>" + esc(p.title) + "</b> set. Honestly? The chemistry readings back it up. Fans are disappointed. (-8 ★)"
+      : "A joint interview for <b>" + esc(p.title) + "</b> went painfully stiff — " + esc(a1.name) + " and " + esc(a2.name) + " answered every question like strangers at a bus stop. The clip is a meme now. (-5 ♦)",
+    choices: [{
+      label: "UGH.", fn: () => {
+        if (rumor) { state.popularity = Math.max(0, state.popularity - 8); addLog("🗞 Feud rumors around " + esc(a1.name) + " × " + esc(a2.name) + ". Chemistry matters! (-8 ★)", "log-bad"); }
+        else { state.reputation = clamp(state.reputation - 5, 0, 100); addLog("🎙 Awkward " + esc(p.title) + " interview went viral for the wrong reasons. (-5 ♦)", "log-bad"); }
+      }
+    }]
+  });
+}
+
+// High chemistry (75+): CP endorsement money walks in
+function endorsementEvent(a1, a2) {
+  state.endorseCd[pairKey(a1.id, a2.id)] = state.week;
+  queueModal({
+    title: "💰 CP ENDORSEMENT!", sound: "chime",
+    body: "The electric chemistry between <b>" + esc(a1.name) + "</b> and <b>" + esc(a2.name) + "</b> has brands lining up!<br>A couple's skincare line wants them BOTH. (+$1,200)",
+    choices: [{
+      label: "CASH IT IN 💅", fn: () => {
+        state.money += 1200; state.stats.revenue += 1200;
+        addLog("💰 " + esc(a1.name) + " × " + esc(a2.name) + " landed a CP endorsement! (+$1,200)", "log-money");
+      }
+    }]
+  });
+}
+
+// Fixed CP whose chemistry collapsed: the dreaded breakup
+function cpBreakupEvent(a1, a2) {
+  queueModal({
+    title: "💔 CP BREAKUP!", sound: "alert",
+    body: "It's official: the Fixed CP <b>" + esc(a1.name) + " × " + esc(a2.name) + "</b> has dissolved.<br>" +
+      "Contract terminated, joint merch recalled, fan communities in mourning. (-15 ★)",
+    choices: [{
+      label: "HANDLE THE FALLOUT", fn: () => {
+        state.fixedCPs = state.fixedCPs.filter(cp => pairKey(cp[0], cp[1]) !== pairKey(a1.id, a2.id));
+        state.popularity = Math.max(0, state.popularity - 15);
+        addLog("💔 Fixed CP " + esc(a1.name) + " × " + esc(a2.name) + " broke up. The " + esc(state.fandomName) + " are grieving. (-15 ★)", "log-bad");
+      }
+    }]
+  });
+}
+
+// Miserable bench actor wants out
+function quitThreatEvent(a) {
+  queueModal({
+    title: "😤 " + esc(a.name).toUpperCase() + " WANTS OUT!", sound: "alert",
+    body: "<b>" + esc(a.name) + "</b> is miserable " + moodEmoji(a) + " and bored of sitting idle.<br>" +
+      "Their agent is quietly taking calls from rival studios.",
+    choices: [
+      {
+        label: "GIVE A RAISE (-$500)", disabled: state.money < 500, fn: () => {
+          state.money -= 500; a.happiness = clamp(a.happiness + 25, 0, 100); a.loyalty = clamp(a.loyalty + 10, 0, 100); a.idleWeeks = 0;
+          addLog("😤 " + esc(a.name) + " stays, pacified by a raise. (-$500)", "log-good");
+        }
+      },
+      {
+        label: "LET THEM GO", fn: () => {
+          removeActor(a, "👋 <b>" + esc(a.name) + "</b> left " + esc(state.companyName) + ". The roster shrinks.");
+        }
+      }
+    ]
+  });
+}
+
+// Money went negative: the bank notices
+function bankruptcyEvent() {
+  queueModal({
+    title: "🚨 DEBT COLLECTORS!", sound: "alert",
+    body: "Your treasury is <span class='red'>" + fmtMoney(state.money) + "</span>. The bank is circling " + esc(state.companyName) + " like a shark.<br>You need cash. NOW.",
+    choices: [
+      {
+        label: "EMERGENCY LOAN (+$5,000, -10 ♦)", fn: () => {
+          state.money += 5000; state.reputation = clamp(state.reputation - 10, 0, 100);
+          addLog("🚨 Took an emergency loan. Debt bought time. (+$5,000, -10 ♦)", "log-bad");
+        }
+      },
+      {
+        label: "SELL EQUIPMENT (+$2,500)", fn: () => {
+          state.money += 2500;
+          addLog("🚨 Sold spare cameras and lights to stay afloat. (+$2,500)", "log-bad");
+        }
+      }
+    ]
+  });
+}
+
+// Social Critic scored 2 or lower: the internet erupts next week
+function fireControversy(title) {
+  queueModal({
+    title: "🔥 CONTROVERSY!", sound: "alert",
+    body: "<b>" + esc(title) + "</b> is under fire for its LGBTQ+ portrayal. Think pieces are multiplying.<br>" +
+      "The phrase 'queerbaiting' is trending. How do you respond?",
+    choices: [
+      {
+        label: "APOLOGIZE + DONATE (-$800, +5 ♦, -5 ★)", disabled: state.money < 800, fn: () => {
+          state.money -= 800; state.reputation = clamp(state.reputation + 5, 0, 100); state.popularity = Math.max(0, state.popularity - 5);
+          addLog("🔥 Apologized and donated to LGBTQ+ orgs after the " + esc(title) + " controversy. Sincerity noted. (-$800, +5 ♦, -5 ★)", "log-good");
+        }
+      },
+      {
+        label: "STAY SILENT (-10 ♦)", fn: () => {
+          state.reputation = clamp(state.reputation - 10, 0, 100);
+          addLog("🔥 Stayed silent during the " + esc(title) + " controversy. The internet did not forget. (-10 ♦)", "log-bad");
+        }
+      },
+      {
+        label: "DEFEND THE WORK (RISK IT)", fn: () => {
+          if (Math.random() < 0.5) {
+            state.reputation = clamp(state.reputation + 8, 0, 100);
+            addLog("🔥 Your passionate defense of " + esc(title) + " won the discourse! (+8 ♦)", "log-good");
+          } else {
+            state.reputation = clamp(state.reputation - 8, 0, 100);
+            addLog("🔥 The defense of " + esc(title) + " backfired spectacularly. (-8 ♦)", "log-bad");
+          }
+        }
+      }
+    ]
+  });
+}
+
+/* ==================== 11. RANKING & RIVALRY ==================== */
+
+// Every 10 weeks: a head-to-head with the company one rank above.
+function rivalryShowdown() {
+  if (state.rank <= 1) return;
+  const rival = state.rivals[state.rank - 2];
+  if (!rival) return;
+  const win = playerScore() > rival.score * rnd(0.9, 1.15);
+  if (win) {
+    rival.score = Math.max(0, rival.score - 25);
+    state.reputation = clamp(state.reputation + 8, 0, 100);
+    state.popularity += 15;
+    state.stats.rivalWins++;
+    state.rank = computeRank();
+    addLog("⚔ <b>RIVALRY WIN!</b> You outshone rank #" + (state.rank + 1) + "'s studio this quarter. (+8 ♦, +15 ★)", "log-good");
+    queueModal({
+      title: "⚔ RIVALRY SHOWDOWN — VICTORY!", sound: "chime", onOpen: () => burst(),
+      body: "The quarterly industry rankings are in, and <b>" + esc(state.companyName) + "</b> OUTCLASSED the studio above you!<br>" +
+        "Current rank: <span class='gold'>#" + state.rank + "</span> (+8 ♦, +15 ★)",
+      choices: [{ label: "KEEP CLIMBING 🧗", fn: () => { } }]
+    });
+  } else {
+    state.reputation = clamp(state.reputation - 4, 0, 100);
+    state.stats.rivalLosses++;
+    rival.score += 10;
+    addLog("⚔ Lost the quarterly showdown against a higher-ranked studio. (-4 ♦)", "log-bad");
+    queueModal({
+      title: "⚔ RIVALRY SHOWDOWN — DEFEAT", sound: "alert",
+      body: "The studio above you flexed a stronger quarter. The gap stings.<br>" +
+        "Current rank: <span class='red'>#" + state.rank + "</span> (-4 ♦)<br><br>" +
+        "<span class='muted'>Tip: higher rep productions, awards and popularity all feed your rank.</span>",
+      choices: [{ label: "WE'LL GET THEM NEXT TIME", fn: () => { } }]
+    });
+  }
+}
+
+/* ==================== 12. MODAL QUEUE ==================== */
+
+// Pop-ups stack into a queue so a busy week plays out like a story.
+const modalQueue = [];
+let modalOpenFlag = false;
+
+function queueModal(m) { modalQueue.push(m); pumpModals(); }
+
+function pumpModals() {
+  if (modalOpenFlag || !modalQueue.length) return;
+  modalOpenFlag = true;
+  const m = modalQueue.shift();
+  if (m.sound === "chime") sfxChime();
+  else if (m.sound === "alert") sfxAlert();
+  else sfxPop();
+  $("m-title").innerHTML = m.title;
+  $("m-body").innerHTML = m.body;
+  const box = $("m-choices");
+  box.innerHTML = "";
+  for (const c of m.choices) {
+    const b = document.createElement("button");
+    b.innerHTML = c.label;
+    if (c.disabled) b.disabled = true;
+    if (c.cls) b.classList.add(c.cls);
+    b.onclick = () => {
+      const veto = c.fn ? c.fn() : undefined;
+      if (veto === false) return; // choice may keep the modal open (e.g. training, bad import)
+      closeModal();
+    };
+    box.appendChild(b);
+  }
+  $("modal-overlay").classList.add("open");
+  if (m.onOpen) m.onOpen();
+}
+
+function closeModal() {
+  $("modal-overlay").classList.remove("open");
+  modalOpenFlag = false;
+  renderAll();
+  pumpModals();
+}
+
+// Confetti celebration burst for episode wins & awards
+function burst() {
+  const root = $("confetti-root");
+  const colors = ["#FF6B9D", "#FFD700", "#FFFFFF", "#5CE1A0", "#6BC5FF"];
+  for (let i = 0; i < 26; i++) {
+    const d = document.createElement("div");
+    d.className = "confetti";
+    d.style.background = pick(colors);
+    d.style.setProperty("--dx", rnd(-340, 340) + "px");
+    d.style.setProperty("--dy", rnd(60, 440) + "px");
+    d.style.setProperty("--rot", rnd(-540, 540) + "deg");
+    d.style.left = (50 + rnd(-8, 8)) + "%";
+    root.appendChild(d);
+    setTimeout(() => d.remove(), 1200);
+  }
+}
+
+function addLog(html, cls) {
+  state.log.unshift({ wk: state.week, txt: html, cls: cls || "" });
+  if (state.log.length > 80) state.log.length = 80;
+}
+
+/* ==================== 13. RENDERING ==================== */
+
+// Money counts up/down instead of snapping
+let moneyAnim = null;
+function syncMoney() {
+  const target = Math.round(state.money);
+  if (moneyAnim) cancelAnimationFrame(moneyAnim);
+  if (displayedMoney === target) { $("tb-money").textContent = fmtMoney(target); return; }
+  const start = displayedMoney, t0 = performance.now(), dur = 600;
+  const step = now => {
+    const k = clamp((now - t0) / dur, 0, 1);
+    const eased = 1 - Math.pow(1 - k, 3);
+    displayedMoney = Math.round(start + (target - start) * eased);
+    $("tb-money").textContent = fmtMoney(displayedMoney);
+    if (k < 1) moneyAnim = requestAnimationFrame(step); else displayedMoney = target;
+  };
+  moneyAnim = requestAnimationFrame(step);
+}
+
+function renderTop() {
+  $("tb-company").textContent = state.companyName + " ✎";
+  $("tb-week").textContent = state.week;
+  syncMoney();
+  $("tb-money").style.color = state.money < 0 ? "var(--red)" : "var(--gold)";
+  $("tb-rep").textContent = "♦ " + Math.round(state.reputation);
+  $("tb-pop").textContent = "★ " + Math.round(state.popularity);
+  $("tb-rank").textContent = "#" + state.rank;
+}
+
+function renderDashboard() {
+  // --- Active productions with progress bars & episode countdowns ---
+  const box = $("active-prods");
+  if (!state.productions.length) {
+    box.innerHTML = "<div class='muted'>No active productions. Hit <span class='pink'>NEW PRODUCTION</span> to greenlight your next hit!</div>";
+  } else {
+    box.innerHTML = state.productions.map(p => {
+      const a1 = getActor(p.lead1), a2 = getActor(p.lead2);
+      const filming = p.phase === "filming";
+      const pct = clamp((filming ? p.filmWeeks / p.filmTotal : p.epWeek / p.epTotal) * 100, 0, 100);
+      const last = p.episodes[p.episodes.length - 1];
+      const face = a => a ? "<img class='mini-face' src='" + a.image_path + "' alt='" + esc(a.name) + "' " +
+        "onerror=\"this.outerHTML='<span class=&quot;mini-face&quot; style=&quot;display:inline-flex;align-items:center;justify-content:center;background:" + a.color + "&quot;>" + esc(a.name[0]) + "</span>'\">" : "";
+      return "<div class='card prod-card'>" +
+        "<div class='prod-head'><span class='prod-title'>" + esc(p.title) + "</span>" +
+        "<span class='phase-tag " + (filming ? "phase-filming" : "phase-releasing") + "'>" + (filming ? "🎥 FILMING" : "📺 RELEASING") + "</span></div>" +
+        "<div class='prod-meta'>" + p.genre + " · " + p.type + " · " + p.platform + " · " + p.rating + " · " + p.story +
+        (p.combo ? " · Combo: <span class='combo-" + p.combo + "'>" + p.combo + "</span>" : " · Combo: <span class='muted'>???</span>") + "</div>" +
+        "<div class='prod-leads'>" + face(a1) + face(a2) +
+        "<span class='pink' style='font-size:8px;'>" + esc(a1 ? a1.name : "?") + " × " + esc(a2 ? a2.name : "?") +
+        "</span> <span class='muted' style='font-size:7px;'>#" + esc(p.cpName) + "</span></div>" +
+        "<div class='progress'><i style='width:" + pct + "%'></i></div>" +
+        "<div class='prod-meta'>" + (filming
+          ? "Shooting week " + p.filmWeeks + " / " + p.filmTotal + " — release begins after the wrap party."
+          : (p.type === "Movie" ? "Premiere week!" : "Episode " + Math.min(p.epWeek + 1, p.epTotal) + " / " + p.epTotal + " — next drop is next week") +
+          " · Earned: <span class='gold'>" + fmtMoney(p.totalRevenue) + "</span>") + "</div>" +
+        (last ? "<div class='ep-stats'>" +
+          "<div class='ep-stat'><div class='n'>" + last.rating + "/10</div><div class='t'>LAST EP</div></div>" +
+          "<div class='ep-stat'><div class='n'>" + fmtNum(last.viewers) + "</div><div class='t'>VIEWERS</div></div>" +
+          "<div class='ep-stat'><div class='n'>" + last.trending + "</div><div class='t'>TRENDING</div></div></div>" : "") +
+        "</div>";
+    }).join("");
+  }
+  // --- Completed history (latest 6) ---
+  const done = $("completed-prods");
+  if (!state.completed.length) {
+    done.innerHTML = "<div class='muted'>Nothing finished yet. Your first masterpiece is in the works.</div>";
+  } else {
+    done.innerHTML = state.completed.slice(0, 6).map(p =>
+      "<div class='prod-meta' style='border-bottom:2px solid var(--shadow); padding:6px 0;'>" +
+      "<span class='prod-title'>" + esc(p.title) + "</span> " + starStr(Math.round(p.finalScore)) +
+      " <span class='gold'>" + p.finalScore + "/5</span> · " + fmtMoney(p.totalRevenue) + " · " + p.genre + " " + p.type + "</div>").join("");
+  }
+  // --- Event log, newest first ---
+  $("event-log").innerHTML = state.log.length
+    ? state.log.map(e => "<div class='log-item " + e.cls + "'><span class='wk'>W" + e.wk + "</span>" + e.txt + "</div>").join("")
+    : "<div class='muted'>Quiet so far...</div>";
+}
+
+/* ---- Actors screen: your roster + audition pool + locked silhouettes ---- */
+function actorCardHTML(a) {
+  const st = actorStatus(a);
+  const top3 = [...SKILL_KEYS].sort((x, y) => a.skills[y] - a.skills[x]).slice(0, 3);
+  let best = null, bestC = -1;
+  for (const o of myActors()) { if (o.id === a.id) continue; const c = effChem(a, o); if (c > bestC) { bestC = c; best = o; } }
+  const ww = a.tier === "Worldwide";
+  return "<div class='actor-card' data-actor='" + a.id + "'>" +
+    "<div class='actor-top'>" + portraitHTML(a, (ww ? "ww " : "") + (st !== "Available" ? "unavail" : "")) +
+    "<div style='min-width:0; flex:1;'>" +
+    "<div class='actor-name'>" + esc(a.name) + " <span class='mood' title='" + moodWord(a) + "'>" + moodEmoji(a) + "</span></div>" +
+    "<div class='actor-age'>AGE " + a.age + "</div>" +
+    "<span class='rank-badge rank-" + a.tier.replace(/ /g, "") + "'>" + a.tier.toUpperCase() + "</span> " +
+    "<span class='status-tag st-" + st.replace(/ /g, "") + "'>" + st.toUpperCase() + (a.restWeeks ? " (" + a.restWeeks + "w)" : a.injuredWeeks ? " (" + a.injuredWeeks + "w)" : "") + "</span>" +
+    "</div></div>" +
+    "<div class='chips'>" + a.characteristics.map(c => "<span class='chip'>" + (CHAR_ICONS[c] || "") + " " + c + "</span>").join("") + "</div>" +
+    top3.map(k => "<div class='skill-row'><span>" + k + "</span><div class='progress tiny'><i style='width:" + a.skills[k] + "%'></i></div><span>" + a.skills[k] + "</span></div>").join("") +
+    (best ? "<div class='chem-list'><span class='gold'>BEST PAIR:</span> " + esc(best.name) + " <span class='" + chemLabel(bestC).cls + "'>" + bestC + "</span></div>" : "") +
+    "</div>";
+}
+
+function poolCardHTML(a) {
+  const ww = a.tier === "Worldwide";
+  return "<div class='actor-card locked-card'>" +
+    "<div class='actor-top'>" + portraitHTML(a, ww ? "ww" : "unavail") +
+    "<div style='min-width:0; flex:1;'>" +
+    "<div class='actor-name'>" + esc(a.name) + "</div>" +
+    "<div class='actor-age'>AGE " + a.age + "</div>" +
+    "<span class='rank-badge rank-" + a.tier.replace(/ /g, "") + "'>" + a.tier.toUpperCase() + "</span>" +
+    "</div></div>" +
+    "<div class='chips'>" + a.characteristics.map(c => "<span class='chip'>" + (CHAR_ICONS[c] || "") + " " + c + "</span>").join("") + "</div>" +
+    "<div class='pool-note'>💰 Signing fee: <span class='gold'>" + fmtMoney(a.signCost) + "</span><br>Appears at Audition Weeks (every 4 weeks).</div>" +
+    "</div>";
+}
+
+function lockedCardHTML(a) {
+  return "<div class='actor-card locked-card'>" +
+    "<div class='actor-top'>" + portraitHTML(a, "locked") +
+    "<div style='min-width:0; flex:1;'>" +
+    "<div class='actor-name muted'>???</div>" +
+    "<span class='rank-badge rank-" + a.tier.replace(/ /g, "") + "'>" + a.tier.toUpperCase() + "</span>" +
+    "</div></div>" +
+    "<div class='locked-note'>🔒 Reach Rank <span class='gold'>#" + actorUnlockRank(a) + "</span> to unlock</div>" +
+    "</div>";
+}
+
+function renderActors() {
+  const mine = myActors();
+  $("roster-count").textContent = "(" + mine.length + "/21 signed)";
+  $("actor-grid").innerHTML = mine.length
+    ? mine.map(actorCardHTML).join("")
+    : "<div class='muted'>No actors under contract! Wait for the next Audition Week (every 4 weeks).</div>";
+  $("pool-grid").innerHTML = auditionPool().map(poolCardHTML).join("") || "<div class='muted'>No scouted talent right now — climb the ranks to unlock more tiers.</div>";
+  const locked = state.roster.filter(a => !a.signed && !tierUnlocked(a.tier));
+  $("locked-grid").innerHTML = locked.map(lockedCardHTML).join("") || "<div class='muted'>Every actor in the industry is within your reach. 👑</div>";
+  // Click any roster card → full profile
+  document.querySelectorAll("#actor-grid .actor-card").forEach(el => {
+    el.onclick = () => openActorProfile(el.dataset.actor);
+  });
+}
+
+/* ---- Actor profile modal: tabs, rest, train, fire ---- */
+function profileBodyHTML(a, tab) {
+  const st = actorStatus(a);
+  let html = "<div class='prof-head'>" + portraitHTML(a, "big " + (a.tier === "Worldwide" ? "ww" : "")) +
+    "<div class='info'>" +
+    "<div class='actor-name' style='font-size:12px;'>" + esc(a.name) + " <span class='mood'>" + moodEmoji(a) + "</span></div>" +
+    "<div class='actor-age'>AGE " + a.age + " · MOOD: " + moodWord(a) + "</div>" +
+    "<div style='margin-top:4px;'><span class='rank-badge rank-" + a.tier.replace(/ /g, "") + "'>" + a.tier.toUpperCase() + "</span> " +
+    "<span class='status-tag st-" + st.replace(/ /g, "") + "'>" + st.toUpperCase() + "</span></div>" +
+    "<div class='chips'>" + a.characteristics.map(c => "<span class='chip'>" + (CHAR_ICONS[c] || "") + " " + c + "</span>").join("") + "</div>" +
+    "</div></div>";
+
+  html += "<div class='tab-row'>" +
+    "<button id='prof-tab-main' class='" + (tab === "main" ? "sel" : "") + "'>PROFILE</button>" +
+    "<button id='prof-tab-chem' class='" + (tab === "chem" ? "sel" : "") + "'>CHEMISTRY</button>" +
+    "</div>";
+
+  if (tab === "main") {
+    html += "<h3>SKILLS <span class='muted'>(train: +" + TIER_STATS[a.tier].trainGain + " / session, $200)</span></h3>" +
+      SKILL_KEYS.map(k =>
+        "<div class='skill-row'><span>" + k + "</span><div class='progress tiny'><i style='width:" + a.skills[k] + "%'></i></div><span>" + a.skills[k] + "</span></div>").join("") +
+      "<h3 style='margin-top:12px;'>CAREER</h3>" +
+      "<table class='stat-table'>" +
+      "<tr><td>Productions completed</td><td>" + a.career.productions + "</td></tr>" +
+      "<tr><td>Awards won</td><td>" + a.career.awards + "</td></tr>" +
+      "<tr><td>Scandals survived</td><td>" + a.career.scandals + "</td></tr>" +
+      "<tr><td>Total money earned</td><td class='gold'>" + fmtMoney(a.career.earned) + "</td></tr>" +
+      "<tr><td>Fame</td><td>" + Math.round(a.fame) + "</td></tr></table>" +
+      "<h3 style='margin-top:12px;'>TRAIN A SKILL (+ " + TIER_STATS[a.tier].trainGain + ", -$200)</h3>" +
+      "<div class='train-grid'>" +
+      SKILL_KEYS.map(k => "<button data-skill='" + k + "' " + (state.money < 200 || a.skills[k] >= 100 ? "disabled" : "") + ">" + k.toUpperCase() + "</button>").join("") +
+      "</div>";
+  } else {
+    const rows = myActors().filter(o => o.id !== a.id)
+      .map(o => ({ o, c: effChem(a, o) }))
+      .sort((x, y) => y.c - x.c);
+    html += rows.length
+      ? rows.map(r => {
+        const lab = chemLabel(r.c);
+        return "<div class='chem-chart-row'><span>" + esc(r.o.name) + "</span>" +
+          "<div class='progress tiny'><i style='width:" + r.c + "%'></i></div>" +
+          "<span class='" + lab.cls + "'>" + r.c + "</span></div>";
+      }).join("") +
+      "<div class='muted' style='margin-top:8px;'>+5 per successful production · +10 if both happy at wrap · -15 scandal · -20 forced while unhappy</div>"
+      : "<div class='muted'>No co-stars signed yet.</div>";
+  }
+  return html;
+}
+
+function openActorProfile(id) {
+  const a = getActor(id);
+  if (!a) return;
+  let tab = "main";
+  const repaint = () => {
+    $("m-body").innerHTML = profileBodyHTML(a, tab);
+    $("prof-tab-main").onclick = () => { tab = "main"; repaint(); };
+    $("prof-tab-chem").onclick = () => { tab = "chem"; repaint(); };
+    document.querySelectorAll(".train-grid button").forEach(b => {
+      b.onclick = () => {
+        const k = b.dataset.skill;
+        if (state.money < 200 || a.skills[k] >= 100) return;
+        state.money -= 200;
+        a.skills[k] = clamp(a.skills[k] + TIER_STATS[a.tier].trainGain, 0, 100);
+        addLog("🏋 <b>" + esc(a.name) + "</b> trained " + k + " +" + TIER_STATS[a.tier].trainGain + " (now " + a.skills[k] + "). (-$200)", "log-good");
+        sfxPop();
+        repaint();
+      };
+    });
+  };
+  const st = actorStatus(a);
+  queueModal({
+    title: "🌟 ACTOR PROFILE", sound: "pop",
+    body: "<div id='prof-body'></div>",
+    onOpen: repaint,
+    choices: [
+      {
+        label: st === "Resting" ? "🛌 RESTING... (" + a.restWeeks + "w left, $100/wk)" : "🛌 REST 4 WEEKS ($100/wk, prevents burnout)",
+        disabled: st !== "Available",
+        fn: () => {
+          a.restWeeks = 4;
+          addLog("🛌 <b>" + esc(a.name) + "</b> starts a 4-week break. Self-care is productive.", "");
+          saveGame();
+        }
+      },
+      {
+        label: "🔥 FIRE ACTOR", cls: "danger-btn",
+        disabled: st === "In Production",
+        fn: () => {
+          removeActor(a, "🔥 You fired <b>" + esc(a.name) + "</b>. They return to the talent pool, bitter.");
+          a.happiness = 20; a.loyalty = 10;
+          saveGame();
+        }
+      },
+      { label: "CLOSE", fn: () => { saveGame(); } }
+    ]
+  });
+}
+
+function renderStatus() {
+  $("s-company").value = state.companyName;
+  $("s-fandom").value = state.fandomName;
+  const s = state.stats;
+  const cpTxt = state.fixedCPs.length
+    ? state.fixedCPs.map(cp => { const a = getActor(cp[0]), b = getActor(cp[1]); return a && b ? esc(a.name) + " × " + esc(b.name) : ""; }).filter(Boolean).join(", ")
+    : "None";
+  const tierNote = TIER_ORDER.map(t => (tierUnlocked(t) ? "✅ " : "🔒 ") + t).join(" · ");
+  const rows = [
+    ["Industry rank", "#" + state.rank + " of 50"],
+    ["Weeks operating", state.week],
+    ["Productions completed", s.productionsDone],
+    ["Hits (final score ≥ 3.5)", s.hits],
+    ["Flops", s.flops],
+    ["Awards won", s.awards],
+    ["Total revenue", fmtMoney(s.revenue)],
+    ["Rivalry record", s.rivalWins + "W / " + s.rivalLosses + "L"],
+    ["Roster", myActors().length + " / 21 actors"],
+    ["Talent tiers", tierNote],
+    ["Next audition", "Week " + (Math.floor(state.week / 4) * 4 + 4)],
+    ["Fixed CPs", cpTxt]
+  ];
+  $("s-stats").innerHTML = rows.map(r => "<tr><td>" + r[0] + "</td><td>" + r[1] + "</td></tr>").join("");
+  if (state.rank > 1) {
+    const above = state.rivals[state.rank - 2];
+    $("s-rank-note").innerHTML = "Your score: <span class='gold'>" + Math.round(playerScore()) + "</span> · rank #" + (state.rank - 1) +
+      " sits at <span class='pink'>" + Math.round(above.score) + "</span> · rivalry showdowns every 10 weeks";
+    $("s-rank-bar").style.width = clamp(playerScore() / above.score * 100, 0, 100) + "%";
+  } else {
+    $("s-rank-note").innerHTML = "<span class='gold'>👑 You are the #1 BL studio in the industry. LEGEND.</span>";
+    $("s-rank-bar").style.width = "100%";
+  }
+}
+
+/* ---------------- View switching ---------------- */
+let currentView = "dashboard";
+function showView(name) {
+  currentView = name;
+  for (const v of ["dashboard", "production", "actors", "status"])
+    $("view-" + v).style.display = v === name ? "block" : "none";
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.toggle("active", b.dataset.view === name));
+  if (name === "production") {
+    if (!draft) freshDraft();
+    // fresh suggestions each visit; user edits set data-touched to protect them
+    $("f-title").dataset.touched = ""; $("f-title").value = "";
+    $("f-cpname").dataset.touched = ""; $("f-cpname").value = "";
+    renderProductionForm();
+  }
+  if (name === "actors") renderActors();
+  if (name === "status") renderStatus();
+}
+
+function renderAll() {
+  renderTop();
+  renderDashboard();
+  if (currentView === "actors") renderActors();
+  else if (currentView === "status") renderStatus();
+  else if (currentView === "production") renderProductionForm();
+}
+
+/* ==================== 14. SAVE IO + BOOT ==================== */
+function exportSave() {
+  queueModal({
+    title: "💾 EXPORT SAVE",
+    body: "Copy this JSON string somewhere safe:<br><textarea id='export-box' rows='8' readonly>" + esc(JSON.stringify(state)) + "</textarea>",
+    choices: [
+      {
+        label: "COPY TO CLIPBOARD 📋", fn: () => {
+          const box = $("export-box");
+          const done = () => addLog("💾 Save exported to clipboard.", "log-good");
+          if (navigator.clipboard && navigator.clipboard.writeText)
+            navigator.clipboard.writeText(box.value).then(done).catch(() => { box.select(); document.execCommand("copy"); done(); });
+          else { box.select(); document.execCommand("copy"); done(); }
+        }
+      },
+      { label: "CLOSE", fn: () => { } }
+    ]
+  });
+}
+
+function importSave() {
+  queueModal({
+    title: "📥 IMPORT SAVE",
+    body: "Paste your exported JSON string:<br>" +
+      "<textarea id='import-box' rows='8' placeholder='{\"version\":2,...}'></textarea>" +
+      "<div class='red' id='import-err' style='font-size:8px; margin-top:6px;'></div>",
+    choices: [
+      {
+        label: "LOAD SAVE ✅", fn: () => {
+          try {
+            const data = JSON.parse($("import-box").value);
+            if (!data || data.version !== 2 || typeof data.week !== "number" || !Array.isArray(data.roster)) throw new Error("bad shape");
+            state = data; draft = null;
+            displayedMoney = Math.round(state.money);
+            saveGame();
+            showView("dashboard");
+            addLog("📥 Save imported — welcome back to Week " + state.week + "!", "log-good");
+          } catch (e) {
+            $("import-err").textContent = "⚠ That doesn't look like a valid v2 save string.";
+            return false; // keep the modal open so they can retry
+          }
+        }
+      },
+      { label: "CANCEL", fn: () => { } }
+    ]
+  });
+}
+
+function resetGame() {
+  queueModal({
+    title: "♻ RESET GAME?",
+    body: "This wipes your save and starts a brand-new company at Week 1.<br><span class='red'>There is no undo.</span>",
+    choices: [
+      { label: "YES, START FRESH", fn: () => { localStorage.removeItem(SAVE_KEY); newGame(); showView("dashboard"); addLog("♻ Fresh start! Good luck, boss.", ""); } },
+      { label: "CANCEL", fn: () => { } }
+    ]
+  });
+}
+
+function renameCompany() {
+  queueModal({
+    title: "✎ RENAME COMPANY",
+    body: "<input type='text' id='rename-input' maxlength='24' value='" + esc(state.companyName) + "'>",
+    choices: [
+      {
+        label: "SAVE NAME", fn: () => {
+          const v = $("rename-input").value.trim();
+          if (v) { state.companyName = v; addLog("Company renamed to <b>" + esc(v) + "</b>.", ""); saveGame(); }
+        }
+      },
+      { label: "CANCEL", fn: () => { } }
+    ]
+  });
+}
+
+/* ==================== GAME SETUP ==================== */
+
+function newGame() {
+  state = freshState();
+  initRivals();
+  // Build all 21 actors + fully-linked chemistry map (every pair covered)
+  for (const def of ACTOR_ROSTER) state.roster.push(createActor(def));
+  for (let i = 0; i < state.roster.length; i++)
+    for (let j = i + 1; j < state.roster.length; j++)
+      linkChemistry(state.roster[i], state.roster[j]);
+  // Two founding rookies sign for free so you can shoot from Week 1
+  signActor(getActor("actor_01"));
+  signActor(getActor("actor_02"));
+  draft = null;
+  displayedMoney = Math.round(state.money);
+  state.rank = computeRank();
+  addLog("🏢 <b>" + esc(state.companyName) + "</b> opens its doors! Founding actors " +
+    esc(getActor("actor_01").name) + " & " + esc(getActor("actor_02").name) + ", $10,000, and a dream.", "log-pink");
+  addLog("Produce BL hits, grow your stars, climb from Rank #50 to #1. New talent arrives at <span class='pink'>Audition Weeks</span> (every 4 weeks).", "");
+  saveGame();
+}
+
+function init() {
+  // Core loop + navigation
+  $("btn-next").onclick = () => nextWeek();
+  document.querySelectorAll(".nav-btn").forEach(b => b.onclick = () => showView(b.dataset.view));
+  // Save system buttons (sidebar + status page)
+  $("btn-export").onclick = exportSave;
+  $("btn-import").onclick = importSave;
+  $("s-export").onclick = exportSave;
+  $("s-import").onclick = importSave;
+  $("s-reset").onclick = resetGame;
+  $("tb-company").onclick = renameCompany;
+  // Production form bindings
+  $("f-start").onclick = startProduction;
+  $("f-lead1").onchange = e => { draft.lead1 = e.target.value; renderProductionForm(); };
+  $("f-lead2").onchange = e => { draft.lead2 = e.target.value; renderProductionForm(); };
+  $("f-title").oninput = () => { $("f-title").dataset.touched = "1"; };
+  $("f-cpname").oninput = () => { $("f-cpname").dataset.touched = "1"; };
+  $("f-budget-slider").oninput = e => {
+    draft.budgetCustom = parseFloat(e.target.value);
+    $("f-budget-val").textContent = "x" + draft.budgetCustom.toFixed(1);
+    updateCostBox();
+  };
+  // Company status bindings
+  $("s-company").onchange = e => { const v = e.target.value.trim(); if (v) { state.companyName = v; renderTop(); saveGame(); } };
+  $("s-fandom").onchange = e => { const v = e.target.value.trim(); if (v) { state.fandomName = v; saveGame(); addLog("Your fandom shall be known as <b>" + esc(v) + "</b>!", "log-pink"); } };
+
+  // Boot: resume the auto-save if there is one
+  if (!loadGame()) newGame();
+  else { displayedMoney = Math.round(state.money); addLog("💾 Save loaded — welcome back, boss!", "log-good"); }
+  renderAll();
+  showView("dashboard");
+}
+init();
+</script>
+</body>
+</html>
