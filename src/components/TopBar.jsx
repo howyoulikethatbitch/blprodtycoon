@@ -1,146 +1,114 @@
 /**
- * TopBar.jsx — Sticky header with stats and week advance button
+ * TopBar.jsx — Sticky header: company name (rename), stats, week, last saved.
+ * Prompt 3: company name is click-to-rename inline, money animates, stats scroll on mobile.
+ * NEXT WEEK button moved to Sidebar.
  */
-import React, { useState } from 'react'
-import { useGame, A, pushToast } from '../game/state.jsx'
+import React, { useState, useEffect, useRef } from 'react'
+import { useGame, A } from '../game/state.jsx'
 import { fmtMoney, fmtPop, calcRank } from '../game/ranking.js'
-import { rollWeeklyEvents } from '../game/events.js'
-import { tickProduction, calcRevenue, calcScore } from '../game/productions.js'
-import { weeklyActorRecovery, grantExp } from '../game/actors.js'
-import { calcChemistryBonus, calcBondGrowth, applyBondDeltas } from '../game/chemistry.js'
-import { evaluateProduction } from '../game/evaluators.js'
-import { SFX, resumeAudio } from '../game/audio.js'
+import { SFX } from '../game/audio.js'
+
+// Ease-out cubic
+function easeOut(t) { return 1 - Math.pow(1 - t, 3) }
 
 export default function TopBar() {
   const { state, dispatch } = useGame()
-  const [advancing, setAdvancing] = useState(false)
 
-  const rank = calcRank(state.reputation, state.popularity)
+  // ── Animated money counter ─────────────────────────────────────────────────
+  const [displayMoney, setDisplayMoney] = useState(state.money)
+  const prevMoneyRef  = useRef(state.money)
+  const animFrameRef  = useRef(null)
 
-  async function advanceWeek() {
-    if (advancing) return
-    resumeAudio()
-    SFX.nextTurn()
-    setAdvancing(true)
+  useEffect(() => {
+    const from  = prevMoneyRef.current
+    const to    = state.money
+    if (from === to) return
 
-    // 1. Tick all active productions
-    const completedThisWeek = []
-    for (const prod of state.productions) {
-      if (prod.status !== 'active') continue
-      const patch = tickProduction(prod)
-      dispatch({ type: A.UPDATE_PRODUCTION, id: prod.id, patch })
-      if (patch.status === 'completed') {
-        completedThisWeek.push({ ...prod, ...patch })
+    const start    = performance.now()
+    const duration = 600
+
+    cancelAnimationFrame(animFrameRef.current)
+    function step(now) {
+      const t = Math.min((now - start) / duration, 1)
+      setDisplayMoney(Math.round(from + (to - from) * easeOut(t)))
+      if (t < 1) {
+        animFrameRef.current = requestAnimationFrame(step)
+      } else {
+        prevMoneyRef.current = to
       }
     }
+    animFrameRef.current = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(animFrameRef.current)
+  }, [state.money])
 
-    // 2. Evaluate completed productions
-    for (const prod of completedThisWeek) {
-      const castActors = state.actors.filter(a => prod.castIds.includes(a.id))
-      const chemBonus  = calcChemistryBonus(castActors)
-      const score      = calcScore(prod, castActors, chemBonus)
-      const revenue    = calcRevenue(score, prod.budget, prod.type, state.reputation)
-      const evalResult = evaluateProduction({ production: prod, score, revenue, reputation: state.reputation })
+  // ── Inline company rename ──────────────────────────────────────────────────
+  const [renaming, setRenaming] = useState(false)
+  const [nameInput, setNameInput] = useState(state.companyName)
+  const nameRef = useRef(null)
 
-      // Financial & reputation effects
-      dispatch({ type: A.ADD_MONEY,      amount: revenue })
-      dispatch({ type: A.ADD_REPUTATION, amount: evalResult.repDelta })
-      dispatch({ type: A.SET_POPULARITY, value: state.popularity + evalResult.popDelta })
-
-      // Chemistry growth
-      const chemDeltas = calcBondGrowth(castActors, score)
-      for (const actor of castActors) {
-        const expPatch  = grantExp(actor, evalResult.xpPerActor)
-        const newChemMap = applyBondDeltas(actor, chemDeltas)
-        dispatch({
-          type: A.UPDATE_ACTOR, id: actor.id,
-          patch: {
-            ...expPatch,
-            chemistry_map: newChemMap,
-            status:         'available',
-            assignedTo:     null,
-            completedProds: (actor.completedProds ?? 0) + 1,
-          },
-        })
-      }
-
-      // Mark completed
-      dispatch({
-        type: A.COMPLETE_PRODUCTION,
-        id: prod.id,
-        record: {
-          ...prod, score, revenue,
-          grade:         evalResult.grade,
-          weekCompleted: state.week,
-          castIds:       prod.castIds,
-        },
-      })
-
-      // Show result modal
-      dispatch({
-        type: A.PUSH_MODAL,
-        modal: { type: 'productionResult', data: { prod, eval: evalResult, score, revenue } },
-      })
-    }
-
-    // 3. Weekly actor tick
-    for (const actor of state.actors) {
-      if (!actor.signed) continue
-      // Skip actors who just finished — they already got their update above
-      if (completedThisWeek.find(p => p.castIds.includes(actor.id))) continue
-      const patch = weeklyActorRecovery(actor)
-      dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch })
-    }
-
-    // 4. Update rank string
-    const newRank = calcRank(state.reputation, state.popularity)
-    if (newRank.id !== state.rank) {
-      dispatch({ type: A.SET_RANK, rank: newRank.id })
-      dispatch({
-        type: A.PUSH_MODAL,
-        modal: { type: 'rankUp', data: { rank: newRank } },
-      })
-    }
-
-    // 5. Random events
-    const events = rollWeeklyEvents(state)
-    for (const ev of events) {
-      dispatch({ type: A.PUSH_MODAL, modal: { type: 'event', data: ev } })
-    }
-
-    // 6. Advance week counter
-    dispatch({ type: A.ADVANCE_WEEK })
-    pushToast(dispatch, `Week ${state.week + 1} begins.`)
-
-    setAdvancing(false)
+  function startRename() {
+    SFX.click()
+    setNameInput(state.companyName)
+    setRenaming(true)
+    setTimeout(() => nameRef.current?.select(), 30)
   }
+
+  function commitRename() {
+    const trimmed = nameInput.trim()
+    if (trimmed && trimmed !== state.companyName) {
+      dispatch({ type: A.SET_COMPANY_NAME, name: trimmed })
+    }
+    setRenaming(false)
+  }
+
+  function handleNameKey(e) {
+    if (e.key === 'Enter') commitRename()
+    if (e.key === 'Escape') setRenaming(false)
+  }
+
+  // ── Rank & last-saved ──────────────────────────────────────────────────────
+  const rank      = calcRank(state.reputation, state.popularity)
+  const savedTime = state.lastSaved
+    ? new Date(state.lastSaved).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : null
 
   return (
     <header style={styles.bar}>
-      {/* Company name */}
-      <div style={styles.company}>{state.companyName}</div>
-
-      {/* Stats row */}
-      <div style={styles.stats}>
-        <Stat label="₩"    value={fmtMoney(state.money)}    color="var(--gold)" />
-        <Stat label="REP"  value={state.reputation}         color="var(--pink)" />
-        <Stat label="POP"  value={fmtPop(state.popularity)} color="var(--gold)" />
-        <Stat label="RANK" value={rank.id}                  color="var(--green)" small />
+      {/* Company name — click to rename */}
+      <div style={styles.companyWrap}>
+        {renaming ? (
+          <input
+            ref={nameRef}
+            value={nameInput}
+            maxLength={28}
+            onChange={e => setNameInput(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={handleNameKey}
+            style={styles.nameInput}
+          />
+        ) : (
+          <button
+            onClick={startRename}
+            title="Click to rename studio"
+            style={styles.companyBtn}
+          >
+            {state.companyName}
+            <span style={styles.editHint}>✏️</span>
+          </button>
+        )}
+        {savedTime && (
+          <div style={styles.savedHint}>saved {savedTime}</div>
+        )}
       </div>
 
-      {/* Week display */}
-      <div style={styles.week}>WK{state.week}</div>
-
-      {/* Advance button */}
-      <button
-        className="btn-primary"
-        style={styles.nextBtn}
-        onClick={advanceWeek}
-        disabled={advancing}
-        aria-label="Advance one week"
-      >
-        {advancing ? '⏳' : '▶ NEXT'}
-      </button>
+      {/* Stats — horizontal scroll on mobile */}
+      <div style={styles.statsScroll}>
+        <Stat label="₩"    value={fmtMoney(displayMoney)} color="var(--gold)"  />
+        <Stat label="REP"  value={state.reputation}        color="var(--pink)"  />
+        <Stat label="POP"  value={fmtPop(state.popularity)} color="var(--blue)" />
+        <Stat label="RANK" value={rank.id}                  color={rank.color} small />
+        <Stat label="WK"   value={state.week}               color="var(--lav)"  />
+      </div>
     </header>
   )
 }
@@ -156,60 +124,89 @@ function Stat({ label, value, color, small }) {
 
 const styles = {
   bar: {
-    display:        'flex',
-    alignItems:     'center',
-    gap:            10,
-    background:     'var(--bg-deep)',
-    borderBottom:   '3px solid var(--pink)',
-    padding:        '8px 12px',
-    position:       'sticky',
-    top:            0,
-    zIndex:         50,
-    flexWrap:       'wrap',
-    minHeight:      'var(--topbar-h)',
+    display:      'flex',
+    alignItems:   'center',
+    gap:          8,
+    background:   'var(--bg-deep)',
+    borderBottom: '3px solid var(--pink)',
+    padding:      '6px 10px',
+    position:     'sticky',
+    top:          0,
+    zIndex:       50,
+    minHeight:    'var(--topbar-h)',
+    flexWrap:     'nowrap',
+    overflow:     'hidden',
   },
-  company: {
-    color:          'var(--pink)',
-    fontSize:       9,
-    borderBottom:   '2px dashed var(--pink-dim)',
-    paddingBottom:  2,
-    flexShrink:     0,
-    maxWidth:       120,
-    overflow:       'hidden',
-    textOverflow:   'ellipsis',
-    whiteSpace:     'nowrap',
+  companyWrap: {
+    display:       'flex',
+    flexDirection: 'column',
+    flexShrink:    0,
+    maxWidth:      110,
   },
-  stats: {
-    display:        'flex',
-    gap:            10,
-    flex:           1,
-    flexWrap:       'wrap',
-    alignItems:     'center',
+  companyBtn: {
+    display:       'flex',
+    alignItems:    'center',
+    gap:           4,
+    background:    'transparent',
+    border:        'none',
+    boxShadow:     'none',
+    color:         'var(--pink)',
+    fontSize:      8,
+    padding:       '2px 0',
+    minHeight:     'auto',
+    minWidth:      'auto',
+    borderBottom:  '1px dashed var(--pink-dim)',
+    cursor:        'pointer',
+    overflow:      'hidden',
+    whiteSpace:    'nowrap',
+    textOverflow:  'ellipsis',
+    maxWidth:      110,
+  },
+  editHint: {
+    fontSize:  10,
+    opacity:   0.5,
+    flexShrink: 0,
+  },
+  nameInput: {
+    fontSize:   8,
+    color:      'var(--pink)',
+    background: 'var(--bg-inset)',
+    border:     '2px solid var(--gold)',
+    padding:    '3px 5px',
+    width:      110,
+    minHeight:  'auto',
+    fontFamily: 'inherit',
+  },
+  savedHint: {
+    fontSize:    6,
+    color:       'var(--gray)',
+    marginTop:   2,
+    whiteSpace:  'nowrap',
+  },
+  statsScroll: {
+    display:    'flex',
+    gap:        10,
+    flex:       1,
+    overflowX:  'auto',
+    alignItems: 'center',
+    // hide scrollbar visually but keep scrollable
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
   },
   statWrap: {
-    display:        'flex',
-    flexDirection:  'column',
-    alignItems:     'flex-start',
-    minWidth:       48,
+    display:       'flex',
+    flexDirection: 'column',
+    alignItems:    'flex-start',
+    flexShrink:    0,
+    minWidth:      44,
   },
   statLbl: {
-    fontSize:       7,
-    color:          'var(--lav)',
-    letterSpacing:  1,
+    fontSize:     6,
+    color:        'var(--lav)',
+    letterSpacing: 1,
   },
   statVal: {
-    fontSize:       11,
-    fontFamily:     'inherit',
-  },
-  week: {
-    fontSize:       8,
-    color:          'var(--lav)',
-    flexShrink:     0,
-  },
-  nextBtn: {
-    fontSize:       10,
-    padding:        '10px 14px',
-    textAlign:      'center',
-    flexShrink:     0,
+    fontSize:   11,
+    fontFamily: 'inherit',
   },
 }
