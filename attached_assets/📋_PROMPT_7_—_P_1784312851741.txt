@@ -1,0 +1,26 @@
+PROMPT 7: Ranking, Auditions & Settings
+
+RANKING SYSTEM:
+- 49 simulated rival companies with scores
+- Player score = reputation×2 + popularity×0.8 + awards×20 + revenue/3000
+- Rank computed weekly
+- Every 10 weeks: rivalry showdown with rank above
+- Win: +8 rep, +15 pop, rival score -25
+- Lose: -4 rep, rival score +10
+- Unlock tiers at ranks: Rookie #50, Rising Star #39, Popular #24, Worldwide #9
+
+AUDITION WEEKS (every 4 weeks):
+- 3 random unsigned actors from unlocked tiers appear
+- Sign individually or bulk (30% discount)
+- Actors have signing fees based on tier
+
+SETTINGS (moved from sidebar):
+- Export Save: downloads JSON file
+- Import Save: uploads JSON file
+- Audio toggle (sfx on/off)
+- Scanline effect toggle
+- Animation speed (fast/normal/slow)
+- Reset Game (with confirmation)
+
+Keep auto-save to localStorage every week. Import/Export uses JSON file download/upload (not copy-paste strings).
+

@@ -1,41 +1,46 @@
 # BL Production Tycoon
 
-A turn-based Boys' Love production management tycoon game — mobile-first React + Vite webapp.
+A turn-based Boys' Love (BL) production management tycoon game built with React 18 + Vite 5.
 
 ## Stack
-- **React 18** + **Vite 5**
-- **React Context** for global game state
-- **CSS variables** for theming (dark purple / hot pink / gold)
-- **Web Audio API** for SFX
-- **localStorage** for auto-save
+- **Frontend**: React 18 + Vite 5
+- **Styling**: CSS custom properties (`/src/styles/theme.css`), Press Start 2P pixel font
+- **State**: React Context + useReducer with localStorage auto-save
+- **Deploy target**: GitHub Pages (`npm run deploy`)
 
-## Project Structure
+## Project structure
 ```
-src/
-  components/     React UI components
-  game/           Pure game logic modules
-  styles/         Global theme CSS
-public/
-  images/         Actor portraits (actor_01.png – actor_20.png)
+/src
+  /components   — 9 UI components (TitleScreen, Dashboard, ProductionForm, ActorRoster, ActorProfile, Settings, ModalSystem, Sidebar, TopBar)
+  /game         — 7 pure logic modules (state.jsx, actors.js, productions.js, chemistry.js, evaluators.js, ranking.js, events.js, audio.js)
+  /styles       — theme.css (CSS variables, scanline overlay, pixel font)
+/public/images  — actor_01.jpg through actor_20.jpg (pixel-art portraits)
 ```
 
-## Running
+## How to run
 ```bash
-npm run dev       # Dev server on port 5000
-npm run build     # Production build
-npm run deploy    # Build + publish to GitHub Pages
+npm install
+npm run dev       # dev server on port 5000
+npm run build     # production build → /dist
+npm run deploy    # build + push to GitHub Pages
 ```
 
-## GitHub Pages Deployment
-The Vite base path is set to `/bl-production-tycoon/` in `vite.config.js`.
-Update this if your repo name differs or if deploying to a custom domain (use `'/'`).
+## Mobile-first
+The game targets mobile web. Bottom nav on <760px, 44px touch targets, no hover-dependent interactions.
 
-## Mobile-First
-- All layouts responsive; sidebar collapses to bottom nav on screens < 760px
-- Touch targets minimum 44px
-- No hover-dependent interactions
+## Reference
+Original monolithic prototype: `attached_assets/index_1784307841414.html`
+Use as the functional reference for all game systems and formulas.
 
-## User Preferences
-- Preserve all game formulas exactly from source index.html
-- Do not restructure or migrate existing systems without explicit request
-- One click = one week (turn-based)
+## Actor portraits
+Portraits are `.jpg` files at `/public/images/actor_01.jpg` through `actor_20.jpg`.
+Code references them via the `getPortraitUrl(id)` helper in `src/game/actors.js`.
+
+## GitHub Pages base
+`vite.config.js` sets `base: '/bl-production-tycoon/'`. Update if the repo name changes.
+
+## User preferences
+- Mobile-first, touch-friendly (thumb-sized buttons, no hover-only interactions)
+- Pixel/retro aesthetic with scanline overlay
+- Keep all game logic in `/game/` as pure functions; components only handle rendering and input
+- Do not restructure or migrate the existing stack

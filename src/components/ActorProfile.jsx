@@ -61,7 +61,7 @@ export default function ActorProfile({ actorId, onBack }) {
         <div style={styles.identityRow}>
           <div style={styles.portraitWrap}>
             <img
-              src={`${BASE}images/actor_${String(actor.id).padStart(2, '0')}.png`}
+              src={`${BASE}images/actor_${String(actor.id).padStart(2, '0')}.jpg`}
               alt={actor.name}
               style={{
                 ...styles.bigPortrait,
@@ -154,7 +154,7 @@ export default function ActorProfile({ actorId, onBack }) {
               return (
                 <div key={other.id} style={styles.bondRow}>
                   <img
-                    src={`${BASE}images/actor_${String(other.id).padStart(2, '0')}.png`}
+                    src={`${BASE}images/actor_${String(other.id).padStart(2, '0')}.jpg`}
                     alt={other.name}
                     style={styles.tinyPortrait}
                     onError={e => { e.target.style.display = 'none' }}

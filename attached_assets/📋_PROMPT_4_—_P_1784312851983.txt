@@ -1,0 +1,29 @@
+PROMPT 4: Dashboard & Production System
+
+Dashboard view:
+- Active Productions card: shows filming progress bar, episode countdown, lead actor mini-portraits, combo status (hidden until wrap), last episode stats if releasing
+- Completed Productions card: last 6 finished shows with star rating, revenue, genre
+- Event Log card: scrollable, newest first, color-coded (green good, red bad, gold money, pink news)
+
+New Production form:
+- Title input (auto-suggests from pool of 24 titles)
+- Lead 1 & Lead 2 dropdowns (only Available actors)
+- CP name input (auto-generates portmanteau: first half of name1 + second half of name2)
+- Live chemistry preview bar with shared traits, warnings for unhappy actors
+- Genre: Romance, Comedy, Slice of Life, School, Office
+- Type: Mini Series (3 weeks), Series (4 weeks), Movie (1 week)
+- Story: Original, Adaptation
+- Schedule: 3 Months (12 weeks, q0.8), 6 Months (24 weeks, q1.0), 12 Months (48 weeks, q1.3)
+- Platform: TV (censored, wide reach) or Streaming (uncensored, niche, more money)
+- Rating: PG, PG-13, R (TV blocks R)
+- Budget: Min (x0.5), Max (x2.0), Custom slider (x0.5 to x2.5)
+- Cost preview with treasury check
+
+Production phases:
+1. FILMING: progresses weekly, chemistry grows, actors become busy
+2. WRAP: reveal genre×type combo (PERFECT/GOOD/BAD with multipliers 1.5/1.0/0.6), apply chemistry deltas
+3. RELEASING: one episode per week, ratings 1-10, viewer counts, revenue, momentum system, fan reviews, social posts
+4. FINAL CRITIQUE: four evaluators score the show (see Prompt 5)
+
+MOBILE: Form fields stack vertically. Segmented buttons become full-width rows. Chemistry preview is collapsible.
+

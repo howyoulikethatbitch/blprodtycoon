@@ -214,7 +214,7 @@ function CastCard({ actor, selected, onToggle, peers, base }) {
       }}
     >
       <img
-        src={`${base}images/actor_${String(actor.id).padStart(2, '0')}.png`}
+        src={`${base}images/actor_${String(actor.id).padStart(2, '0')}.jpg`}
         alt={actor.name}
         style={styles.miniPortrait}
         onError={e => { e.target.style.display = 'none' }}

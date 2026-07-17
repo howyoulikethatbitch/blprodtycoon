@@ -97,7 +97,7 @@ function ActorCard({ actor, onClick }) {
       {/* Portrait */}
       <div style={{ position: 'relative', flexShrink: 0 }}>
         <img
-          src={`${BASE}images/actor_${String(actor.id).padStart(2,'0')}.png`}
+          src={`${BASE}images/actor_${String(actor.id).padStart(2,'0')}.jpg`}
           alt={actor.name}
           style={{
             ...styles.portrait,

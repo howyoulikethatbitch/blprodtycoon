@@ -1,0 +1,20 @@
+PROMPT 3: Title Screen & Navigation
+
+Create a TitleScreen component that shows on first load:
+
+- Game title: "BL PRODUCTION TYCOON" in large pixel font with gold/pink glow
+- Buttons: NEW GAME, CONTINUE (disabled if no save), SETTINGS
+- Background: animated subtle particles or gradient, scanline overlay
+- Below title: small version number or "Press Start 2P" font credit
+
+After clicking NEW GAME or CONTINUE, fade to the main game layout.
+
+Main layout:
+- TopBar: company name (clickable to rename), week, money (animated count), reputation, popularity, rank, last saved
+- Sidebar: NEXT WEEK button (LARGER than other buttons), Dashboard, New Production, Actors, Company Status, Settings
+- Main area: switches between views
+
+The NEXT WEEK button must be visually dominant — bigger, maybe different color (hot pink), maybe pulse animation.
+
+MOBILE: Sidebar becomes bottom tab bar on mobile. NEXT WEEK is a floating action button or prominent top button. TopBar stats scroll horizontally or collapse to icons.
+

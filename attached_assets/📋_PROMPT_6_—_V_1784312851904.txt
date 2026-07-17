@@ -1,0 +1,34 @@
+PROMPT 6: Events & Actor Events
+
+Implement two event systems:
+
+COMPANY EVENTS (random, every 1-3 weeks):
+- Bad review on latest production (apologize or ignore)
+- Brand sponsorship (+$2000)
+- Competitor hit (-5 rep)
+- Script leak (investigate or ignore)
+- International platform offer (+$2500)
+- Worldwide star approaches YOU (rare, rank ≤15)
+- Fixed CP contract offer (if high chemistry pair exists)
+
+ACTOR EVENTS (10 types):
+1. Poached by rival agency (match offer or let go)
+2. Scandal! (PR cleanup, ignore, or fire)
+3. Off-script romance with non-CP co-star (confirm, deny, ignore)
+4. Solo ambitions (allow or deny)
+5. On-set injury (pause 2 weeks or replace)
+6. Fan meeting request (organize or decline)
+7. Raise demand (pay or refuse → may quit)
+8. Unexpected chemistry viral moment (form CP or ignore)
+9. Language barrier with international guest (tutor or risk quality)
+10. Singing debut request (produce single or decline)
+
+CHEMISTRY PULSE (weekly check):
+- <25 chemistry: rumors or awkward interview (6 week cooldown)
+- ≥75 chemistry: CP endorsement +$1200 (8 week cooldown)
+- Fixed CP with <25 chemistry: breakup event
+- Actor happiness <20 + idle 4+ weeks: quit threat
+- Negative money: bankruptcy event (emergency loan or sell equipment)
+
+MOBILE: Modal choices are full-width stacked buttons. Text is readable at small sizes. Scrollable modals for long content.
+

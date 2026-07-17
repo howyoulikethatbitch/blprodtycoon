@@ -1,0 +1,49 @@
+PROMPT 2: Game Data & Actor System
+
+Implement the actor system with EXACTLY these 20 actors:
+
+Rookie (unlock at Rank #50):
+- Aiden (actor_01)
+- Ren (actor_02)
+- Jun (actor_03)
+- Kaito (actor_04)
+- Rain (actor_05)
+
+Rising Star (unlock at Rank #39):
+- Kentaro (actor_06)
+- Ryul (actor_07)
+- Sora (actor_08)
+- Haru (actor_09)
+- Rei (actor_10)
+
+Popular (unlock at Rank #24):
+- Kai (actor_11)
+- Tian (actor_12)
+- Shin (actor_13)
+- Yuan (actor_14)
+- Minho (actor_15)
+
+Worldwide (unlock at Rank #9):
+- Theo (actor_16)
+- Jay (actor_17)
+- Felix (actor_18)
+- Eliot (actor_19)
+- Leon (actor_20)
+
+Each actor has:
+- 8 skills (Acting, Singing, Dancing, Visual, Language, Comedy, Art, Fitness) 0-100
+- 3 characteristics from a pool of 29 (Cute, Adorable, Innocent, Sweet, Playful, Charming, Handsome, Elegant, Gentleman, Mature, Sexy, Charismatic, Confident, Bold, Stylish, Cool, Cold, Serious, Quiet, Calm, Chic, Cheerful, Energetic, Sunshine, Friendly, Optimistic, Funny, Positive, Unique)
+- Chemistry map with every other actor (0-100)
+- Hidden happiness (0-100) and loyalty (0-100)
+- Status: Available, In Production, Resting, Injured
+- Tier determines skill ranges, signing cost, and training gain
+
+Chemistry formula:
+- Base = random(0-30) + (shared characteristics × 20)
+- Live chemistry = base + (shared productions × 2) + ((avg happiness - 60) × 0.15)
+- Chemistry changes: +5 successful production, +10 both happy at wrap, -15 scandal, -20 forced while unhappy, +1.5 per filming week (or +2.5 for Fixed CPs)
+
+Portraits load from /images/actor_XX.png with colored fallback if image fails.
+
+Also upload these 20 actor portrait images to /public/images/: actor_01.png through actor_20.png
+

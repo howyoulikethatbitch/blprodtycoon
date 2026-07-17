@@ -1,0 +1,29 @@
+PROMPT 5: The Four Evaluators
+
+After all episodes release, four critics score the production 1-5 stars:
+
+1. MEDIA CRITIC — fan service & promo chemistry
+   - High weight on live chemistry, bonus for Fixed CPs
+   - "I covered their press tour..."
+
+2. INDUSTRY CRITIC — craft & trope execution
+   - Weights: combo quality, adaptation faithfulness, schedule length, final quality
+   - "A textbook execution of the '[trope]' trope..."
+
+3. BL FAN CRITIC — skinship & romantic tension
+   - Weights: chemistry, visual average, rating (R gets bonus)
+   - "The SKINSHIP. The eye contact..."
+
+4. SOCIAL CRITIC — LGBTQ+ representation & respect
+   - PG ratings score higher (less fetishization risk), School+R is penalized heavily
+   - Low scores (≤2) trigger a controversy event next week
+   - "Treats its queer romance with warmth and dignity..."
+
+Final score = average of four. Reputation delta = (avg - 3) × 8 × rating modifier.
+Awards for 4.5+: +10 rep, +25 pop, +$3000, actor awards++.
+
+Include 5 positive, 5 mid, 5 negative fan review templates with {A} {B} {T} {CP} {N} substitution.
+Include 5 positive, 3 mid, 4 negative fake social media posts.
+
+MOBILE: Evaluator cards stack vertically. Star ratings use large touch-friendly stars.
+

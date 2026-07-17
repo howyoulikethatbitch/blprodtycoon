@@ -94,5 +94,5 @@ export function canAssign(actor) {
  */
 export function portraitUrl(actorId, base = '') {
   const padded = String(actorId).padStart(2, '0')
-  return `${base}images/actor_${padded}.png`
+  return `${base}images/actor_${padded}.jpg`
 }
