@@ -1,98 +1,301 @@
 /**
- * actors.js — Actor data, stat helpers, availability logic
- * Source of truth: index.html ACTOR_DATA array (21 actors)
- * Populated incrementally across prompts; full data in Prompt 2.
+ * actors.js — Actor data, stat helpers, status logic
+ * 20 actors across 4 tiers: Rookie / Rising Star / Popular / Worldwide
+ * Full spec: Prompt 2
  */
 
-// ─── Actor archetypes / stat keys ─────────────────────────────────────────────
-export const STAT_KEYS = ['act', 'sing', 'dance', 'charm', 'stamina']
+// ─── Skill keys (8 skills per Prompt 2) ──────────────────────────────────────
+export const SKILL_KEYS = ['act', 'sing', 'dance', 'visual', 'lang', 'comedy', 'art', 'fitness']
 
-export const STAT_LABELS = {
+export const SKILL_LABELS = {
   act:     'ACT',
   sing:    'SING',
   dance:   'DANCE',
-  charm:   'CHARM',
-  stamina: 'STA',
+  visual:  'VIS',
+  lang:    'LANG',
+  comedy:  'COM',
+  art:     'ART',
+  fitness: 'FIT',
 }
 
-// ─── Actor data (placeholder — full data injected in Prompt 2) ────────────────
-export const ACTOR_DATA = []
+// Backward-compat aliases used by older components
+export const STAT_KEYS   = SKILL_KEYS
+export const STAT_LABELS = SKILL_LABELS
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── 29 Characteristics pool ─────────────────────────────────────────────────
+export const ALL_CHARACTERISTICS = [
+  'Cute','Adorable','Innocent','Sweet','Playful','Charming','Handsome','Elegant',
+  'Gentleman','Mature','Sexy','Charismatic','Confident','Bold','Stylish','Cool',
+  'Cold','Serious','Quiet','Calm','Chic','Cheerful','Energetic','Sunshine',
+  'Friendly','Optimistic','Funny','Positive','Unique',
+]
 
-/**
- * Returns a fresh actor object merged with runtime fields.
- */
+// ─── Tier configuration ───────────────────────────────────────────────────────
+export const TIER_STATS = {
+  'Rookie':      { skillMin: 10, skillMax: 30, signMin: 100,  signMax: 300,  trainGain: 10, unlockRank: 50 },
+  'Rising Star': { skillMin: 30, skillMax: 55, signMin: 400,  signMax: 800,  trainGain: 7,  unlockRank: 39 },
+  'Popular':     { skillMin: 55, skillMax: 80, signMin: 1000, signMax: 2000, trainGain: 5,  unlockRank: 24 },
+  'Worldwide':   { skillMin: 80, skillMax: 95, signMin: 3000, signMax: 5000, trainGain: 3,  unlockRank: 9  },
+}
+
+export const TIER_UNLOCK_RANK = {
+  'Rookie': 50, 'Rising Star': 39, 'Popular': 24, 'Worldwide': 9,
+}
+
+export const TIER_ORDER = ['Rookie', 'Rising Star', 'Popular', 'Worldwide']
+
+// Tier display colours
+export const TIER_COLOR = {
+  'Rookie':      '#9B86C4',
+  'Rising Star': '#6BC5FF',
+  'Popular':     '#FF6B9D',
+  'Worldwide':   '#FFD700',
+}
+
+// ─── Portrait fallback colours (used when image fails to load) ────────────────
+export const PORTRAIT_COLORS = [
+  '#FF6B9D','#6BC5FF','#FFD700','#5CE1A0','#C792EA','#FF9F68',
+  '#7BE0D4','#F26D6D','#A8E063','#B28DFF','#FF85AC','#68C5FF',
+  '#E8C468','#6BFFB8','#FF6BD5','#8AB4FF','#FFC46B','#6BFFD4',
+  '#D58AFF','#9DFF6B',
+]
+
+// ─── 20 Actor base definitions (Prompt 2 spec) ────────────────────────────────
+export const ACTOR_DATA = [
+  // ── ROOKIE (actor_01-05 · skills 10-30) ─────────────────────────────────────
+  {
+    id: 1,  name: 'Aiden',  tier: 'Rookie',      signCost: 180,
+    skills: { act:22, sing:15, dance:18, visual:25, lang:12, comedy:20, art:14, fitness:19 },
+    characteristics: ['Cute','Sweet','Playful'],
+  },
+  {
+    id: 2,  name: 'Ren',    tier: 'Rookie',      signCost: 150,
+    skills: { act:18, sing:24, dance:14, visual:22, lang:16, comedy:12, art:26, fitness:15 },
+    characteristics: ['Quiet','Innocent','Calm'],
+  },
+  {
+    id: 3,  name: 'Jun',    tier: 'Rookie',      signCost: 220,
+    skills: { act:25, sing:13, dance:22, visual:17, lang:19, comedy:28, art:11, fitness:24 },
+    characteristics: ['Cheerful','Friendly','Optimistic'],
+  },
+  {
+    id: 4,  name: 'Kaito',  tier: 'Rookie',      signCost: 250,
+    skills: { act:16, sing:26, dance:12, visual:30, lang:14, comedy:15, art:19, fitness:13 },
+    characteristics: ['Handsome','Charming','Elegant'],
+  },
+  {
+    id: 5,  name: 'Rain',   tier: 'Rookie',      signCost: 200,
+    skills: { act:20, sing:17, dance:28, visual:16, lang:23, comedy:16, art:12, fitness:29 },
+    characteristics: ['Unique','Cool','Bold'],
+  },
+
+  // ── RISING STAR (actor_06-10 · skills 30-55) ─────────────────────────────────
+  {
+    id: 6,  name: 'Kentaro', tier: 'Rising Star', signCost: 600,
+    skills: { act:52, sing:38, dance:42, visual:50, lang:33, comedy:35, art:40, fitness:46 },
+    characteristics: ['Handsome','Mature','Serious'],
+  },
+  {
+    id: 7,  name: 'Ryul',    tier: 'Rising Star', signCost: 700,
+    skills: { act:48, sing:32, dance:36, visual:44, lang:53, comedy:30, art:38, fitness:40 },
+    characteristics: ['Cool','Charismatic','Confident'],
+  },
+  {
+    id: 8,  name: 'Sora',    tier: 'Rising Star', signCost: 550,
+    skills: { act:38, sing:52, dance:50, visual:42, lang:35, comedy:46, art:30, fitness:48 },
+    characteristics: ['Cheerful','Energetic','Sunshine'],
+  },
+  {
+    id: 9,  name: 'Haru',    tier: 'Rising Star', signCost: 480,
+    skills: { act:44, sing:36, dance:30, visual:54, lang:31, comedy:40, art:48, fitness:33 },
+    characteristics: ['Adorable','Gentleman','Sweet'],
+  },
+  {
+    id: 10, name: 'Rei',     tier: 'Rising Star', signCost: 750,
+    skills: { act:50, sing:40, dance:44, visual:36, lang:47, comedy:30, art:32, fitness:42 },
+    characteristics: ['Cold','Serious','Stylish'],
+  },
+
+  // ── POPULAR (actor_11-15 · skills 55-80) ─────────────────────────────────────
+  {
+    id: 11, name: 'Kai',   tier: 'Popular', signCost: 1500,
+    skills: { act:75, sing:65, dance:72, visual:80, lang:58, comedy:62, art:55, fitness:76 },
+    characteristics: ['Charming','Sexy','Confident'],
+  },
+  {
+    id: 12, name: 'Tian',  tier: 'Popular', signCost: 1800,
+    skills: { act:65, sing:78, dance:68, visual:75, lang:80, comedy:57, art:62, fitness:63 },
+    characteristics: ['Elegant','Stylish','Chic'],
+  },
+  {
+    id: 13, name: 'Shin',  tier: 'Popular', signCost: 1200,
+    skills: { act:80, sing:60, dance:58, visual:68, lang:62, comedy:76, art:65, fitness:72 },
+    characteristics: ['Bold','Charismatic','Energetic'],
+  },
+  {
+    id: 14, name: 'Yuan',  tier: 'Popular', signCost: 1600,
+    skills: { act:70, sing:72, dance:76, visual:78, lang:74, comedy:55, art:64, fitness:68 },
+    characteristics: ['Handsome','Elegant','Mature'],
+  },
+  {
+    id: 15, name: 'Minho', tier: 'Popular', signCost: 1400,
+    skills: { act:62, sing:80, dance:66, visual:72, lang:64, comedy:78, art:58, fitness:67 },
+    characteristics: ['Funny','Positive','Friendly'],
+  },
+
+  // ── WORLDWIDE (actor_16-20 · skills 80-95) ─────────────────────────────────────
+  {
+    id: 16, name: 'Theo',  tier: 'Worldwide', signCost: 4000,
+    skills: { act:93, sing:85, dance:88, visual:95, lang:80, comedy:83, art:86, fitness:91 },
+    characteristics: ['Charismatic','Sexy','Confident'],
+  },
+  {
+    id: 17, name: 'Jay',   tier: 'Worldwide', signCost: 4500,
+    skills: { act:88, sing:95, dance:94, visual:90, lang:92, comedy:82, art:80, fitness:86 },
+    characteristics: ['Cool','Stylish','Unique'],
+  },
+  {
+    id: 18, name: 'Felix', tier: 'Worldwide', signCost: 3500,
+    skills: { act:90, sing:83, dance:95, visual:92, lang:88, comedy:87, art:84, fitness:94 },
+    characteristics: ['Energetic','Cheerful','Sunshine'],
+  },
+  {
+    id: 19, name: 'Eliot', tier: 'Worldwide', signCost: 4200,
+    skills: { act:95, sing:87, dance:82, visual:90, lang:93, comedy:80, art:89, fitness:84 },
+    characteristics: ['Mature','Serious','Calm'],
+  },
+  {
+    id: 20, name: 'Leon',  tier: 'Worldwide', signCost: 3800,
+    skills: { act:85, sing:92, dance:86, visual:95, lang:82, comedy:90, art:93, fitness:88 },
+    characteristics: ['Handsome','Gentleman','Charming'],
+  },
+]
+
+// ─── Initialize a single actor with runtime fields ─────────────────────────────
+// Rookies start signed; all other tiers require audition (Prompt 7).
 export function initActor(data) {
+  const isSigned = data.tier === 'Rookie'
   return {
     ...data,
-    exp: data.exp ?? 0,
-    level: data.level ?? 1,
-    fatigue: data.fatigue ?? 0,
-    mood: data.mood ?? 80,
-    available: true,
-    assignedTo: null,   // production id or null
-    bond: data.bond ?? {},
+    signed:         isSigned,
+    status:         isSigned ? 'available' : 'locked',   // available | filming | resting | injured | locked
+    happiness:      rndInt(55, 85),   // hidden from player — surface as mood emoji only
+    loyalty:        rndInt(45, 85),   // hidden from player
+    idleWeeks:      0,
+    injuredWeeks:   0,
+    completedProds: 0,
+    awards:         0,
+    fame:           0,
+    retainerOwed:   data.tier === 'Worldwide' ? 150 : 0,
+    chemistry_map:  {},  // filled by initChemistry() after all actors are created
+    // Legacy compat
+    assignedTo:     null,
+    level:          1,
+    exp:            0,
   }
 }
 
-/**
- * Effective stat = base * level modifier * fatigue penalty * mood modifier
- */
-export function effectiveStat(actor, statKey) {
-  const base = actor.stats?.[statKey] ?? 0
-  const levelBonus = 1 + (actor.level - 1) * 0.05
-  const fatiguePenalty = 1 - Math.min(actor.fatigue, 100) / 200  // max -50%
-  const moodMod = 0.7 + (Math.min(actor.mood, 100) / 100) * 0.6  // 0.7–1.3
-  return Math.round(base * levelBonus * fatiguePenalty * moodMod)
+// ─── Build chemistry maps for all actors ──────────────────────────────────────
+// Formula: base = random(0-30) + (shared characteristics × 20), capped 0-100
+// Must be called AFTER all actors are initActor'd.
+export function initChemistry(actors) {
+  const result = actors.map(a => ({ ...a, chemistry_map: {} }))
+  for (let i = 0; i < result.length; i++) {
+    for (let j = i + 1; j < result.length; j++) {
+      const a = result[i]
+      const b = result[j]
+      const shared = a.characteristics.filter(c => b.characteristics.includes(c)).length
+      const base   = clamp(rndInt(0, 30) + shared * 20, 0, 100)
+      result[i].chemistry_map[b.id] = base
+      result[j].chemistry_map[a.id] = base
+    }
+  }
+  return result
 }
 
-/**
- * XP required to reach next level (quadratic curve).
- */
+// ─── Status display ───────────────────────────────────────────────────────────
+export const STATUS_LABEL = {
+  available: '✅ FREE',
+  filming:   '🎬 FILMING',
+  resting:   '😴 RESTING',
+  injured:   '🤕 INJURED',
+  locked:    '🔒 LOCKED',
+}
+
+export const STATUS_COLOR = {
+  available: 'var(--pink)',
+  filming:   'var(--blue)',
+  resting:   'var(--gold)',
+  injured:   'var(--red)',
+  locked:    'var(--gray)',
+}
+
+// ─── Mood emoji — surface of the hidden happiness stat ────────────────────────
+export function moodEmoji(happiness) {
+  if (happiness >= 75) return '😊'
+  if (happiness >= 50) return '😐'
+  if (happiness >= 25) return '😠'
+  return '😢'
+}
+
+// ─── Portrait URL helper ──────────────────────────────────────────────────────
+export function portraitUrl(actorId, base = '') {
+  const padded = String(actorId).padStart(2, '0')
+  return `${base}images/actor_${padded}.jpg`
+}
+
+// ─── Can be assigned to a production ─────────────────────────────────────────
+export function canAssign(actor) {
+  return actor.signed && actor.status === 'available'
+}
+
+// ─── Weekly actor tick (called on NEXT WEEK) ──────────────────────────────────
+export function weeklyActorTick(actor) {
+  const patch = {}
+
+  if (actor.status === 'filming') {
+    patch.happiness = clamp((actor.happiness ?? 70) - 2, 0, 100)
+  } else if (actor.status === 'resting') {
+    patch.happiness = clamp((actor.happiness ?? 70) + 5, 0, 100)
+    patch.idleWeeks = 0
+  } else if (actor.status === 'available') {
+    const idle = (actor.idleWeeks ?? 0) + 1
+    patch.idleWeeks = idle
+    let h = actor.happiness ?? 70
+    if (idle >= 8) h = clamp(h - 1, 0, 100)
+    h = clamp(h + (h > 62 ? -0.4 : 0.4), 0, 100)  // drift to neutral
+    patch.happiness = Math.round(h)
+  } else if (actor.status === 'injured') {
+    const weeks = Math.max(0, (actor.injuredWeeks ?? 1) - 1)
+    patch.injuredWeeks = weeks
+    if (weeks === 0) patch.status = 'available'
+  }
+
+  return patch
+}
+
+// Alias kept for TopBar compat
+export const weeklyActorRecovery = weeklyActorTick
+
+// ─── XP / level (stub — training system in Prompt 7) ─────────────────────────
+export function grantExp(actor, amount) {
+  return { exp: (actor.exp ?? 0) + (amount ?? 0), level: actor.level ?? 1 }
+}
+
 export function xpToNextLevel(level) {
   return Math.floor(100 * Math.pow(level, 1.4))
 }
 
-/**
- * Apply weekly fatigue recovery (called during week advance).
- * Returns patch object for the actor.
- */
-export function weeklyActorRecovery(actor) {
-  const recovery = actor.assignedTo ? 0 : 8
-  const moodDelta = actor.assignedTo ? -3 : 5
-  return {
-    fatigue: Math.max(0, actor.fatigue - recovery),
-    mood:    Math.max(0, Math.min(100, actor.mood + moodDelta)),
-  }
+// ─── Stat accessor (now reads from actor.skills) ──────────────────────────────
+export function effectiveStat(actor, key) {
+  return actor.skills?.[key] ?? actor.stats?.[key] ?? 0
 }
 
-/**
- * Grant XP to actor and level up if threshold met.
- * Returns patch object.
- */
-export function grantExp(actor, amount) {
-  let exp = actor.exp + amount
-  let level = actor.level
-  while (exp >= xpToNextLevel(level)) {
-    exp -= xpToNextLevel(level)
-    level += 1
-  }
-  return { exp, level }
+// ─── Utilities ────────────────────────────────────────────────────────────────
+function rndInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
-/**
- * Check whether an actor can be assigned to a production.
- */
-export function canAssign(actor) {
-  return actor.available && !actor.assignedTo && actor.fatigue < 90
-}
-
-/**
- * Portrait image URL helper.
- * Falls back gracefully if image not found.
- */
-export function portraitUrl(actorId, base = '') {
-  const padded = String(actorId).padStart(2, '0')
-  return `${base}images/actor_${padded}.jpg`
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v))
 }

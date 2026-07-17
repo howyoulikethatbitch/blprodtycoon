@@ -2,19 +2,16 @@
  * TitleScreen.jsx — Intro / new game / load game screen
  */
 import React, { useState, useEffect } from 'react'
-import { useGame } from '../game/state.jsx'
-import { A } from '../game/state.jsx'
-import { initActor, ACTOR_DATA } from '../game/actors.js'
+import { useGame, A } from '../game/state.jsx'
+import { initActor, ACTOR_DATA, initChemistry } from '../game/actors.js'
 import { initAudio, SFX } from '../game/audio.js'
-
-const BLINK_TEXT = '▶ TAP TO START ◀'
 
 export default function TitleScreen() {
   const { dispatch } = useGame()
-  const [phase, setPhase] = useState('title')   // 'title' | 'newgame' | 'loading'
+  const [phase, setPhase]             = useState('title')   // 'title' | 'newgame'
   const [companyName, setCompanyName] = useState('Studio Sakura')
-  const [blink, setBlink] = useState(true)
-  const [hasSave, setHasSave] = useState(false)
+  const [blink, setBlink]             = useState(true)
+  const [hasSave, setHasSave]         = useState(false)
 
   useEffect(() => {
     const save = localStorage.getItem('bl_tycoon_save')
@@ -31,7 +28,7 @@ export default function TitleScreen() {
 
   function handleLoad() {
     initAudio()
-    SFX.confirm()
+    SFX.confirm?.() ?? SFX.click()
     try {
       const raw = localStorage.getItem('bl_tycoon_save')
       if (!raw) return
@@ -44,8 +41,10 @@ export default function TitleScreen() {
 
   function handleNewGame(e) {
     e.preventDefault()
-    SFX.success()
-    const actors = ACTOR_DATA.map(initActor)
+    SFX.success?.() ?? SFX.click()
+    // Build actors: init each one, then wire up chemistry maps between all pairs
+    const rawActors  = ACTOR_DATA.map(initActor)
+    const actors     = initChemistry(rawActors)
     dispatch({
       type: A.START_GAME,
       companyName: companyName.trim() || 'Studio Sakura',
@@ -91,7 +90,6 @@ export default function TitleScreen() {
   return (
     <div style={styles.wrap} onClick={phase === 'title' ? handleStart : undefined}>
       <div style={styles.box}>
-        {/* Decorative scanline box */}
         <div style={styles.deco}>🎬</div>
 
         <div style={styles.bigTitle}>
@@ -103,7 +101,7 @@ export default function TitleScreen() {
         </div>
 
         <div style={{ ...styles.blinkText, opacity: blink ? 1 : 0 }}>
-          {BLINK_TEXT}
+          ▶ TAP TO START ◀
         </div>
 
         <div style={styles.btnRow}>
@@ -152,7 +150,6 @@ const styles = {
   deco: {
     fontSize: 48,
     filter: 'drop-shadow(0 0 16px #FF6B9D)',
-    animation: 'none',
   },
   bigTitle: {
     fontSize: 22,

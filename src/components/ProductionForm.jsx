@@ -55,9 +55,9 @@ export default function ProductionForm({ setScreen }) {
     dispatch({ type: A.ADD_PRODUCTION, production: prod })
     dispatch({ type: A.ADD_MONEY, amount: -cost })
 
-    // Mark actors as assigned
+    // Mark actors as assigned / filming
     for (const id of castIds) {
-      dispatch({ type: A.UPDATE_ACTOR, id, patch: { assignedTo: prod.id, available: false } })
+      dispatch({ type: A.UPDATE_ACTOR, id, patch: { assignedTo: prod.id, status: 'filming' } })
     }
 
     pushToast(dispatch, `"${prod.title}" production started!`, 'green')
@@ -224,7 +224,7 @@ function CastCard({ actor, selected, onToggle, peers, base }) {
           {actor.name}
         </div>
         <div style={{ fontSize: 7, color: 'var(--lav)' }}>
-          Lv.{actor.level} · {actor.archetype}
+          {actor.tier}
         </div>
       </div>
       {selected && <span style={{ color: 'var(--pink)', fontSize: 14, flexShrink: 0 }}>✓</span>}

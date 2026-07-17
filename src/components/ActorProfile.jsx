@@ -1,11 +1,13 @@
 /**
- * ActorProfile.jsx — Detailed actor page with full stats, bond map, history
+ * ActorProfile.jsx — Detailed actor page with full stats, chemistry map, filmography
+ * Updated for Prompt 2: 8 skills, characteristics, chemistry_map, mood emoji.
  */
 import React, { useMemo } from 'react'
 import { useGame } from '../game/state.jsx'
-import { effectiveStat, STAT_KEYS, STAT_LABELS, xpToNextLevel } from '../game/actors.js'
-import { chemTier, getBond } from '../game/chemistry.js'
+import { SKILL_KEYS, SKILL_LABELS, STATUS_LABEL, STATUS_COLOR, TIER_COLOR, moodEmoji } from '../game/actors.js'
+import { getChem, chemTier } from '../game/chemistry.js'
 import { SFX } from '../game/audio.js'
+import { ActorPortrait } from './ActorRoster.jsx'
 
 const BASE = import.meta.env.BASE_URL
 
@@ -22,7 +24,10 @@ export default function ActorProfile({ actorId, onBack }) {
     )
   }
 
-  const isLocked = actor.locked
+  const isLocked   = !actor.signed
+  const status     = actor.status ?? (isLocked ? 'locked' : 'available')
+  const tierColor  = TIER_COLOR[actor.tier] ?? 'var(--lav)'
+  const mood       = moodEmoji(actor.happiness ?? 70)
 
   // Productions this actor appeared in
   const appearances = useMemo(
@@ -30,20 +35,13 @@ export default function ActorProfile({ actorId, onBack }) {
     [state.history, actor.id]
   )
 
-  const xpNeeded = xpToNextLevel(actor.level)
-  const xpPct = Math.min((actor.exp / xpNeeded) * 100, 100)
-
-  // Bond list (sorted by value)
-  const bonds = useMemo(() => {
-    if (!actor.bond) return []
-    return Object.entries(actor.bond)
-      .map(([otherId, val]) => ({
-        actor: state.actors.find(a => a.id === Number(otherId)),
-        val,
-      }))
-      .filter(b => b.actor)
+  // Chemistry list: all OTHER signed actors, sorted by chemistry value desc
+  const chemList = useMemo(() => {
+    return state.actors
+      .filter(a => a.id !== actor.id && a.signed)
+      .map(other => ({ other, val: getChem(actor, other.id) }))
       .sort((a, b) => b.val - a.val)
-  }, [actor.bond, state.actors])
+  }, [actor, state.actors])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -56,139 +54,129 @@ export default function ActorProfile({ actorId, onBack }) {
         ← BACK TO ROSTER
       </button>
 
-      {/* Identity panel */}
+      {/* ── Identity panel ── */}
       <div className="panel">
         <div style={styles.identityRow}>
-          <div style={styles.portraitWrap}>
-            <img
-              src={`${BASE}images/actor_${String(actor.id).padStart(2, '0')}.jpg`}
-              alt={actor.name}
-              style={{
-                ...styles.bigPortrait,
-                filter: isLocked ? 'brightness(0) opacity(0.7)' : 'none',
-              }}
-              onError={e => { e.target.style.display = 'none' }}
+          {/* Portrait */}
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <ActorPortrait actor={actor} size={120} isLocked={isLocked}
+              style={{ border: `3px solid ${isLocked ? 'var(--gray)' : tierColor}` }}
             />
+            {actor.tier === 'Worldwide' && !isLocked && (
+              <div style={styles.wwGlow} />
+            )}
           </div>
 
           <div style={styles.identityInfo}>
-            <div style={{ fontSize: 12, color: 'var(--pink)', marginBottom: 6 }}>
-              {isLocked ? '???' : actor.name}
+            {/* Name + mood */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={{ fontSize: 13, color: isLocked ? 'var(--gray)' : 'var(--pink)' }}>
+                {isLocked ? '???' : actor.name}
+              </span>
+              {!isLocked && <span style={{ fontSize: 20 }}>{mood}</span>}
             </div>
-            <div style={{ fontSize: 8, color: 'var(--lav)', marginBottom: 4 }}>
-              {isLocked ? '???' : actor.archetype}
+
+            {/* Tier badge */}
+            <div style={{ fontSize: 8, color: tierColor, marginBottom: 6 }}>
+              {actor.tier}
+              {actor.tier === 'Worldwide' && (
+                <span style={{ color: 'var(--gold)', marginLeft: 6 }}>★ $150/wk retainer</span>
+              )}
             </div>
-            {!isLocked && actor.tags && (
+
+            {/* Characteristics */}
+            {!isLocked && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-                {actor.tags.map(t => (
-                  <span key={t} className="tag-chip">{t}</span>
+                {(actor.characteristics ?? []).map(c => (
+                  <span key={c} className="tag-chip">{c}</span>
                 ))}
               </div>
             )}
-            <div style={{ fontSize: 8, color: 'var(--gold)' }}>
-              Lv.{actor.level} · {appearances.length} productions
+
+            {/* Status */}
+            <div style={{ fontSize: 8, color: STATUS_COLOR[status] ?? 'var(--gray)', marginBottom: 6 }}>
+              {STATUS_LABEL[status]}
             </div>
 
-            {/* XP bar */}
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 7, color: 'var(--lav)', marginBottom: 4 }}>
-                EXP: {actor.exp} / {xpNeeded}
+            {/* Productions count + awards */}
+            {!isLocked && (
+              <div style={{ fontSize: 7, color: 'var(--gold)' }}>
+                {appearances.length} production{appearances.length !== 1 ? 's' : ''}
+                {(actor.awards ?? 0) > 0 && ` · ${actor.awards} 🏆`}
               </div>
-              <div style={styles.xpTrack}>
-                <div style={{ ...styles.xpFill, width: `${xpPct}%` }} />
+            )}
+
+            {/* Locked info */}
+            {isLocked && (
+              <div style={{ fontSize: 7, color: 'var(--gray)', marginTop: 4 }}>
+                Appears at Audition Weeks<br />
+                Sign cost: ₩{(actor.signCost ?? 0).toLocaleString()}
               </div>
-            </div>
+            )}
           </div>
         </div>
-
-        {/* Status indicators */}
-        {!isLocked && (
-          <div style={styles.statusRow}>
-            <StatusPill label="FATIGUE" value={actor.fatigue} max={100}
-              color={actor.fatigue > 70 ? 'var(--red)' : 'var(--green)'} />
-            <StatusPill label="MOOD" value={actor.mood} max={100}
-              color={actor.mood > 60 ? 'var(--green)' : 'var(--gold)'} />
-            <div style={styles.statusItem}>
-              <span style={{ fontSize: 7, color: 'var(--lav)' }}>STATUS</span>
-              <span style={{ fontSize: 8, color: actor.assignedTo ? 'var(--blue)' : 'var(--green)' }}>
-                {actor.assignedTo ? '🎬 WORKING' : '✅ FREE'}
-              </span>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Stats panel */}
+      {/* ── Stats panel ── */}
       {!isLocked && (
         <div className="panel">
-          <div className="panel-title">📊 STATS</div>
-          {STAT_KEYS.map(key => {
-            const base = actor.stats?.[key] ?? 0
-            const eff  = effectiveStat(actor, key)
-            return (
-              <div key={key} className="stat-bar-wrap">
-                <span className="bar-label">{STAT_LABELS[key]}</span>
-                <div className="bar-track" style={{ flex: 1 }}>
-                  <div className="bar-fill" style={{ width: `${eff}%` }} />
-                </div>
-                <span className="bar-val">
-                  {eff}
-                  {eff !== base && <span style={{ color: 'var(--lav)', fontSize: 6 }}> ({base})</span>}
-                </span>
-              </div>
-            )
-          })}
+          <div className="panel-title">📊 SKILLS</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
+            {SKILL_KEYS.map(key => (
+              <SkillBar
+                key={key}
+                label={SKILL_LABELS[key]}
+                value={actor.skills?.[key] ?? 0}
+                tier={actor.tier}
+              />
+            ))}
+          </div>
           <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 8 }}>
-            * Effective stats account for fatigue & mood penalties
+            Sign cost: ₩{(actor.signCost ?? 0).toLocaleString()}
           </div>
         </div>
       )}
 
-      {/* Chemistry / bonds */}
-      {!isLocked && bonds.length > 0 && (
+      {/* ── Chemistry panel ── */}
+      {!isLocked && chemList.length > 0 && (
         <div className="panel">
           <div className="panel-title">💕 CHEMISTRY</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {bonds.slice(0, 8).map(({ actor: other, val }) => {
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {chemList.map(({ other, val }) => {
               const tier = chemTier(val)
               return (
-                <div key={other.id} style={styles.bondRow}>
-                  <img
-                    src={`${BASE}images/actor_${String(other.id).padStart(2, '0')}.jpg`}
-                    alt={other.name}
-                    style={styles.tinyPortrait}
-                    onError={e => { e.target.style.display = 'none' }}
-                  />
+                <div key={other.id} style={styles.chemRow}>
+                  <ActorPortrait actor={other} size={32} isLocked={!other.signed} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 8, color: 'var(--white)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {other.locked ? '???' : other.name}
+                    <div style={{ fontSize: 7, color: 'var(--white)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {other.name}
                     </div>
-                    <div style={styles.bondTrack}>
-                      <div style={{ ...styles.bondFill, width: `${val}%`, background: tier.color }} />
+                    <div style={styles.chemTrack}>
+                      <div style={{ ...styles.chemFill, width: `${val}%`, background: tier.color }} />
                     </div>
                   </div>
-                  <span style={{ fontSize: 8, color: tier.color, flexShrink: 0 }}>
-                    {tier.emoji} {val}
-                  </span>
+                  <div style={{ fontSize: 8, color: tier.color, flexShrink: 0, textAlign: 'right' }}>
+                    <div>{tier.emoji} {val}</div>
+                    <div style={{ fontSize: 6 }}>{tier.label}</div>
+                  </div>
                 </div>
               )
             })}
           </div>
+
+          {/* Shared characteristics note */}
+          <div style={{ marginTop: 12, fontSize: 7, color: 'var(--lav)' }}>
+            ★ Chemistry base = shared traits × 20. Grows through filming.
+          </div>
         </div>
       )}
 
-      {/* Appearances */}
+      {/* ── Filmography ── */}
       {appearances.length > 0 && (
         <div className="panel">
           <div className="panel-title">🎬 FILMOGRAPHY</div>
           {appearances.map(h => (
-            <div key={h.id} style={styles.filmRow}>
-              <span style={{ fontSize: 9, color: 'var(--gold)', width: 24 }}>{h.grade}</span>
-              <span style={{ flex: 1, fontSize: 8, color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {h.title}
-              </span>
-              <span style={{ fontSize: 7, color: 'var(--lav)', flexShrink: 0 }}>Wk{h.weekCompleted}</span>
-            </div>
+            <FilmRow key={h.id} record={h} />
           ))}
         </div>
       )}
@@ -196,82 +184,81 @@ export default function ActorProfile({ actorId, onBack }) {
   )
 }
 
-function StatusPill({ label, value, max, color }) {
+// ─── Skill bar with tier-coloured fill ────────────────────────────────────────
+function SkillBar({ label, value, tier }) {
+  const fillColor =
+    tier === 'Worldwide'   ? 'var(--gold)'  :
+    tier === 'Popular'     ? 'var(--pink)'  :
+    tier === 'Rising Star' ? 'var(--blue)'  :
+    'var(--lav)'
+
   return (
-    <div style={styles.statusItem}>
-      <span style={{ fontSize: 7, color: 'var(--lav)' }}>{label}</span>
-      <span style={{ fontSize: 8, color }}>{value}/{max}</span>
+    <div className="stat-bar-wrap">
+      <span className="bar-label" style={{ width: 28 }}>{label}</span>
+      <div className="bar-track" style={{ flex: 1 }}>
+        <div className="bar-fill" style={{ width: `${value}%`, background: fillColor }} />
+      </div>
+      <span className="bar-val">{value}</span>
+    </div>
+  )
+}
+
+function FilmRow({ record }) {
+  const gradeColor = {
+    'S+': '#FFD700', S: '#FFD700', A: '#5CE1A0',
+     B: '#6BC5FF',  C: '#9B86C4', D: '#FF5470', F: '#FF5470',
+  }
+  return (
+    <div style={styles.filmRow}>
+      <span style={{ color: gradeColor[record.grade] ?? 'var(--white)', fontSize: 12, width: 24 }}>
+        {record.grade}
+      </span>
+      <span style={{ flex: 1, fontSize: 8, color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {record.title}
+      </span>
+      <span style={{ fontSize: 7, color: 'var(--lav)', flexShrink: 0 }}>Wk{record.weekCompleted}</span>
     </div>
   )
 }
 
 const styles = {
   identityRow: {
-    display: 'flex',
-    gap: 14,
+    display:  'flex',
+    gap:      14,
     flexWrap: 'wrap',
   },
-  portraitWrap: {
-    flexShrink: 0,
+  identityInfo: {
+    flex:    1,
+    minWidth: 140,
   },
-  bigPortrait: {
-    width: 128,
-    height: 128,
-    objectFit: 'cover',
-    borderRadius: 4,
-    border: '3px solid var(--pink)',
-    imageRendering: 'pixelated',
-    display: 'block',
+  wwGlow: {
+    position:   'absolute',
+    inset:      -4,
+    borderRadius: 6,
+    boxShadow:  '0 0 18px rgba(255,215,0,0.5)',
+    pointerEvents: 'none',
   },
-  identityInfo: { flex: 1, minWidth: 140 },
-  xpTrack: {
-    height: 8,
-    background: 'var(--bg-inset)',
-    border: '2px solid var(--shadow)',
-  },
-  xpFill: {
-    height: '100%',
-    background: 'var(--gold)',
-    transition: 'width 0.4s ease',
-  },
-  statusRow: {
-    display: 'flex',
-    gap: 16,
-    marginTop: 12,
-    flexWrap: 'wrap',
-  },
-  statusItem: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 3,
-  },
-  bondRow: {
-    display: 'flex',
+  chemRow: {
+    display:    'flex',
     alignItems: 'center',
-    gap: 8,
-    padding: '4px 0',
+    gap:        8,
+    padding:    '3px 0',
     borderBottom: '1px solid var(--shadow)',
   },
-  bondTrack: {
-    height: 6,
+  chemTrack: {
+    height:     6,
     background: 'var(--bg-inset)',
-    border: '1px solid var(--shadow)',
+    border:     '1px solid var(--shadow)',
   },
-  bondFill: { height: '100%', transition: 'width 0.3s' },
-  tinyPortrait: {
-    width: 32,
-    height: 32,
-    objectFit: 'cover',
-    borderRadius: 2,
-    border: '2px solid var(--pink-dim)',
-    flexShrink: 0,
-    imageRendering: 'pixelated',
+  chemFill: {
+    height:     '100%',
+    transition: 'width 0.3s',
   },
   filmRow: {
-    display: 'flex',
+    display:    'flex',
     alignItems: 'center',
-    gap: 10,
-    padding: '5px 0',
+    gap:        10,
+    padding:    '5px 0',
     borderBottom: '1px solid var(--shadow)',
   },
 }
