@@ -1,51 +1,81 @@
 /**
- * Settings.jsx — Game settings + save/load controls
+ * Settings.jsx — Game settings + JSON export/import
+ * Prompt 7: export/import JSON, audio toggle, scanline toggle, anim speed, reset
  */
-import React from 'react'
-import { useGame, A, pushToast } from '../game/state.jsx'
-import { INITIAL_STATE } from '../game/state.jsx'
-import { setSfxVolume, setBgmVolume, SFX } from '../game/audio.js'
+import React, { useRef, useState } from 'react'
+import { useGame, A, pushToast, INITIAL_STATE } from '../game/state.jsx'
+import { SFX } from '../game/audio.js'
 
 export default function Settings() {
-  const { state, dispatch } = useGame()
-  const { settings } = state
+  const { state, dispatch }  = useGame()
+  const { settings }         = state
+  const fileInputRef         = useRef(null)
+  const [confirmReset, setConfirmReset] = useState(false)
 
-  function updateSetting(key, value) {
+  // ─── Helpers ────────────────────────────────────────────────────────────────
+  function set(key, value) {
     dispatch({ type: A.SET_SETTINGS, patch: { [key]: value } })
-    if (key === 'sfxVolume') setSfxVolume(value)
-    if (key === 'bgmVolume') setBgmVolume(value)
   }
 
-  function handleSave() {
+  // ─── Export JSON ─────────────────────────────────────────────────────────────
+  function handleExport() {
     SFX.confirm()
     try {
-      localStorage.setItem('bl_tycoon_save', JSON.stringify(state))
-      pushToast(dispatch, 'Game saved!', 'green')
+      const json = JSON.stringify(state, null, 2)
+      const blob = new Blob([json], { type: 'application/json' })
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href     = url
+      a.download = `bl_tycoon_save_wk${state.week}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      pushToast(dispatch, '📁 Save exported!', 'green')
     } catch (e) {
-      pushToast(dispatch, 'Save failed.', 'red')
+      pushToast(dispatch, 'Export failed.', 'red')
     }
   }
 
-  function handleLoad() {
+  // ─── Import JSON ─────────────────────────────────────────────────────────────
+  function handleImportClick() {
     SFX.click()
-    try {
-      const raw = localStorage.getItem('bl_tycoon_save')
-      if (!raw) { pushToast(dispatch, 'No save found.', 'red'); return }
-      const save = JSON.parse(raw)
-      dispatch({ type: A.LOAD_SAVE, saveData: save })
-      pushToast(dispatch, 'Game loaded!', 'green')
-    } catch (e) {
-      pushToast(dispatch, 'Load failed — save may be corrupted.', 'red')
-    }
+    fileInputRef.current?.click()
   }
 
+  function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const save = JSON.parse(ev.target.result)
+        if (!save || typeof save !== 'object' || !save.week) {
+          pushToast(dispatch, 'Invalid save file.', 'red')
+          return
+        }
+        dispatch({ type: A.LOAD_SAVE, saveData: save })
+        pushToast(dispatch, `📂 Save imported! (Week ${save.week})`, 'green')
+      } catch {
+        pushToast(dispatch, 'Import failed — file corrupted.', 'red')
+      }
+    }
+    reader.readAsText(file)
+    // reset so re-selecting same file fires onChange again
+    e.target.value = ''
+  }
+
+  // ─── Reset ───────────────────────────────────────────────────────────────────
   function handleReset() {
+    if (!confirmReset) { setConfirmReset(true); return }
     SFX.fail()
-    if (!window.confirm('Reset ALL progress? This cannot be undone.')) return
     localStorage.removeItem('bl_tycoon_save')
     dispatch({ type: A.LOAD_SAVE, saveData: { ...INITIAL_STATE, started: false } })
+    setConfirmReset(false)
+    pushToast(dispatch, 'Game reset.', '')
   }
 
+  // ─── Rename ──────────────────────────────────────────────────────────────────
   function handleRename() {
     SFX.click()
     const name = window.prompt('Enter new studio name:', state.companyName)
@@ -58,83 +88,178 @@ export default function Settings() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
+      {/* ── Audio ── */}
       <div className="panel">
-        <div className="panel-title">⚙️ SETTINGS</div>
+        <div className="panel-title">🔊 AUDIO</div>
 
-        {/* SFX Volume */}
-        <div className="field">
-          <label>SFX VOLUME: {Math.round(settings.sfxVolume * 100)}%</label>
-          <input
-            type="range" min={0} max={1} step={0.05}
-            value={settings.sfxVolume}
-            onChange={e => updateSetting('sfxVolume', Number(e.target.value))}
-          />
-        </div>
-
-        {/* BGM Volume */}
-        <div className="field">
-          <label>MUSIC VOLUME: {Math.round(settings.bgmVolume * 100)}%</label>
-          <input
-            type="range" min={0} max={1} step={0.05}
-            value={settings.bgmVolume}
-            onChange={e => updateSetting('bgmVolume', Number(e.target.value))}
-          />
-        </div>
-
-        {/* Animation speed */}
-        <div className="field">
-          <label>ANIMATION SPEED</label>
+        <SettingRow label="SOUND EFFECTS">
           <div className="seg">
-            {[{ id: 0.5, label: 'SLOW' }, { id: 1, label: 'NORMAL' }, { id: 2, label: 'FAST' }].map(s => (
-              <button key={s.id} type="button"
+            <button
+              type="button"
+              className={settings.sfxOn !== false ? 'sel' : ''}
+              onClick={() => { SFX.click(); set('sfxOn', true) }}
+            >
+              ON
+            </button>
+            <button
+              type="button"
+              className={settings.sfxOn === false ? 'sel' : ''}
+              onClick={() => set('sfxOn', false)}
+            >
+              OFF
+            </button>
+          </div>
+        </SettingRow>
+      </div>
+
+      {/* ── Display ── */}
+      <div className="panel">
+        <div className="panel-title">🖥️ DISPLAY</div>
+
+        <SettingRow label="SCANLINE EFFECT">
+          <div className="seg">
+            <button
+              type="button"
+              className={settings.scanlines !== false ? 'sel' : ''}
+              onClick={() => { SFX.click(); set('scanlines', true) }}
+            >
+              ON
+            </button>
+            <button
+              type="button"
+              className={settings.scanlines === false ? 'sel' : ''}
+              onClick={() => { SFX.click(); set('scanlines', false) }}
+            >
+              OFF
+            </button>
+          </div>
+        </SettingRow>
+
+        <SettingRow label="ANIMATION SPEED">
+          <div className="seg">
+            {[
+              { id: 'slow',   label: 'SLOW'   },
+              { id: 'normal', label: 'NORMAL' },
+              { id: 'fast',   label: 'FAST'   },
+            ].map(s => (
+              <button
+                key={s.id}
+                type="button"
                 className={settings.animSpeed === s.id ? 'sel' : ''}
-                onClick={() => updateSetting('animSpeed', s.id)}
+                onClick={() => { SFX.click(); set('animSpeed', s.id) }}
               >
                 {s.label}
               </button>
             ))}
           </div>
-        </div>
+        </SettingRow>
       </div>
 
-      {/* Studio */}
+      {/* ── Studio ── */}
       <div className="panel">
         <div className="panel-title">🏢 STUDIO</div>
         <div style={{ fontSize: 8, color: 'var(--lav)', marginBottom: 10 }}>
           Current name: <span style={{ color: 'var(--pink)' }}>{state.companyName}</span>
         </div>
-        <button onClick={handleRename} style={{ fontSize: 8, padding: '10px 14px' }}>
+        <button
+          onClick={handleRename}
+          style={{ fontSize: 8, padding: '10px 14px', width: '100%', textAlign: 'center' }}
+        >
           ✏️ RENAME STUDIO
         </button>
       </div>
 
-      {/* Save / Load */}
+      {/* ── Save data ── */}
       <div className="panel">
         <div className="panel-title">💾 SAVE DATA</div>
+        <div style={{ fontSize: 7, color: 'var(--lav)', marginBottom: 10, lineHeight: 2 }}>
+          Auto-saved every week · Week {state.week} · {state.history.length} productions
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <button className="btn-gold" onClick={handleSave} style={{ textAlign: 'center', fontSize: 9 }}>
-            💾 SAVE GAME
+          <button
+            className="btn-gold"
+            onClick={handleExport}
+            style={btnStyle}
+          >
+            📤 EXPORT SAVE (JSON)
           </button>
-          <button onClick={handleLoad} style={{ textAlign: 'center', fontSize: 9 }}>
-            📂 LOAD GAME
+
+          <button
+            onClick={handleImportClick}
+            style={btnStyle}
+          >
+            📥 IMPORT SAVE (JSON)
           </button>
-          <button className="btn-danger" onClick={handleReset} style={{ textAlign: 'center', fontSize: 9, marginTop: 8 }}>
-            🗑️ RESET ALL DATA
-          </button>
+
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            style={{ display: 'none' }}
+            onChange={handleFileChange}
+          />
         </div>
       </div>
 
-      {/* Game info */}
+      {/* ── Danger zone ── */}
+      <div className="panel" style={{ borderColor: 'var(--red)' }}>
+        <div className="panel-title" style={{ borderColor: 'var(--red)', color: 'var(--red)' }}>
+          ⚠️ DANGER ZONE
+        </div>
+
+        {confirmReset ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontSize: 8, color: 'var(--red)', lineHeight: 2, textAlign: 'center' }}>
+              This will erase ALL progress.<br />Are you sure?
+            </div>
+            <button
+              className="btn-danger"
+              onClick={handleReset}
+              style={btnStyle}
+            >
+              ✓ YES, RESET EVERYTHING
+            </button>
+            <button
+              onClick={() => { SFX.click(); setConfirmReset(false) }}
+              style={btnStyle}
+            >
+              ✕ CANCEL
+            </button>
+          </div>
+        ) : (
+          <button
+            className="btn-danger"
+            onClick={handleReset}
+            style={btnStyle}
+          >
+            🗑️ RESET GAME
+          </button>
+        )}
+      </div>
+
+      {/* ── Game info ── */}
       <div className="panel">
         <div className="panel-title">ℹ️ GAME INFO</div>
         <div style={{ fontSize: 7, color: 'var(--lav)', lineHeight: 2.5 }}>
-          <div>BL PRODUCTION TYCOON</div>
-          <div>Version: 1.0</div>
-          <div>Week: {state.week}</div>
-          <div>Productions completed: {state.history.length}</div>
+          <div>BL PRODUCTION TYCOON · v1.0</div>
+          <div>Week: {state.week} · Awards: {state.awards ?? 0}</div>
+          <div>Rank: #{state.numericRank ?? 50} of 50</div>
           <div>Company: {state.companyName}</div>
         </div>
       </div>
+
     </div>
   )
 }
+
+function SettingRow({ label, children }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+      <span style={{ fontSize: 7, color: 'var(--lav)' }}>{label}</span>
+      {children}
+    </div>
+  )
+}
+
+const btnStyle = { textAlign: 'center', fontSize: 8, padding: '12px 14px', width: '100%' }

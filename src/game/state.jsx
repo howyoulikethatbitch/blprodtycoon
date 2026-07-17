@@ -1,8 +1,9 @@
 /**
  * state.jsx — Central game state via React Context
- * Prompt 4: added eventLog array + PUSH_EVENT_LOG action.
+ * Prompt 7: rivals, numeric rank, bulk sign
  */
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react'
+import { generateRivals } from './ranking.js'
 
 // ─── Initial State ────────────────────────────────────────────────────────────
 export const INITIAL_STATE = {
@@ -24,6 +25,7 @@ export const INITIAL_STATE = {
   modalQueue:    [],
   toasts:        [],
   fixedCPs:      [],   // array of [actorIdA, actorIdB] pairs
+  rivals:        [],   // 49 rival studios {id, name, score} — generated at START_GAME
   settings: {
     sfxOn:      true,
     scanlines:  true,
@@ -61,6 +63,8 @@ export const A = {
   PUSH_EVENT_LOG:     'PUSH_EVENT_LOG',
   ADD_FIXED_CP:       'ADD_FIXED_CP',
   REMOVE_FIXED_CP:    'REMOVE_FIXED_CP',
+  UPDATE_RIVALS:      'UPDATE_RIVALS',
+  BULK_SIGN:          'BULK_SIGN',
   SET_COMPANY_NAME:   'SET_COMPANY_NAME',
   SET_SETTINGS:       'SET_SETTINGS',
   SET_FLAG:           'SET_FLAG',
@@ -78,6 +82,7 @@ function gameReducer(state, action) {
         started:     true,
         companyName: action.companyName ?? state.companyName,
         actors:      action.actors     ?? state.actors,
+        rivals:      state.rivals?.length ? state.rivals : generateRivals(),
       }
 
     case A.ADVANCE_WEEK:
@@ -203,6 +208,31 @@ function gameReducer(state, action) {
       }
     }
 
+    case A.UPDATE_RIVALS:
+      return {
+        ...state,
+        rivals: (state.rivals ?? []).map(r =>
+          r.id === action.id
+            ? { ...r, score: Math.max(0, r.score + action.scoreDelta) }
+            : r
+        ),
+      }
+
+    case A.BULK_SIGN: {
+      // action.pairs: [{id, cost}, ...]  — 30% discount applied to total
+      const discounted = Math.round(
+        action.pairs.reduce((s, p) => s + p.cost, 0) * 0.7
+      )
+      return {
+        ...state,
+        money: state.money - discounted,
+        actors: state.actors.map(a => {
+          const match = action.pairs.find(p => p.id === a.id)
+          return match ? { ...a, signed: true, status: 'available' } : a
+        }),
+      }
+    }
+
     case A.SET_COMPANY_NAME:
       return { ...state, companyName: action.name }
 
@@ -218,6 +248,9 @@ function gameReducer(state, action) {
         started:   true,
         eventLog:  action.saveData.eventLog  ?? [],
         fixedCPs:  action.saveData.fixedCPs  ?? [],
+        rivals:    action.saveData.rivals?.length
+          ? action.saveData.rivals
+          : generateRivals(),
       }
 
     case A.MARK_SAVED:

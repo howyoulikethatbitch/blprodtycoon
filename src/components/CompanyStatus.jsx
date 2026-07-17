@@ -1,12 +1,20 @@
 /**
  * CompanyStatus.jsx — Company overview panel
- * Prompt 3: "Company Status" nav item
+ * Prompt 7: added numeric rank + rival leaderboard
  */
-import React from 'react'
+import React, { useState } from 'react'
 import { useGame } from '../game/state.jsx'
-import { fmtMoney, fmtPop, calcRank, rankProgress, RANKS } from '../game/ranking.js'
+import { fmtMoney, fmtPop, fmtScore, calcRank, rankProgress, RANKS, buildLeaderboard, playerScore } from '../game/ranking.js'
 import { TIER_COLOR } from '../game/actors.js'
 import { SFX } from '../game/audio.js'
+
+// Convert #RRGGBB to "R,G,B" for rgba()
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `${r},${g},${b}`
+}
 
 export default function CompanyStatus({ setScreen }) {
   const { state } = useGame()
@@ -14,9 +22,18 @@ export default function CompanyStatus({ setScreen }) {
   const progress  = rankProgress(state.reputation, state.popularity)
   const nextRank  = RANKS[RANKS.findIndex(r => r.id === rank.id) + 1] ?? null
 
+  const [showFullBoard, setShowFullBoard] = useState(false)
   const signedActors   = state.actors.filter(a => a.signed)
   const filmingActors  = signedActors.filter(a => a.status === 'filming')
   const activeProds    = state.productions.filter(p => p.status === 'active')
+
+  const leaderboard  = buildLeaderboard(state)
+  const ps           = playerScore(state)
+  const numRank      = state.numericRank ?? 50
+  const displayRows  = showFullBoard ? leaderboard : [
+    ...leaderboard.slice(0, 5),
+    ...(numRank > 5 ? [leaderboard.find(e => e.isPlayer)].filter(Boolean) : []),
+  ]
 
   // Tier breakdown of signed actors
   const byTier = ['Rookie', 'Rising Star', 'Popular', 'Worldwide'].map(tier => ({
@@ -88,6 +105,94 @@ export default function CompanyStatus({ setScreen }) {
         >
           ⭐ VIEW FULL ROSTER →
         </button>
+      </div>
+
+      {/* ── Numeric rank + leaderboard ── */}
+      <div className="panel">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div className="panel-title" style={{ margin: 0, border: 'none', padding: 0 }}>
+            📊 INDUSTRY RANKING
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 14, color: numRank <= 9 ? '#FFD700' : numRank <= 24 ? '#FF6B9D' : 'var(--lav)' }}>
+              #{numRank}
+            </div>
+            <div style={{ fontSize: 6, color: 'var(--gray)' }}>of 50 studios</div>
+          </div>
+        </div>
+        <div style={{ fontSize: 7, color: 'var(--lav)', marginBottom: 8 }}>
+          Your score: <span style={{ color: 'var(--gold)' }}>{fmtScore(ps)}</span>
+          <span style={{ color: 'var(--gray)', marginLeft: 8 }}>rep×2 + pop×0.8 + awards×20 + revenue÷3000</span>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {displayRows.map(entry => (
+            <div key={entry.id} style={{
+              display:      'flex',
+              alignItems:   'center',
+              gap:          8,
+              padding:      '5px 7px',
+              background:   entry.isPlayer ? 'rgba(255,107,157,0.12)' : 'transparent',
+              border:       entry.isPlayer ? '1px solid var(--pink-dim)' : '1px solid transparent',
+            }}>
+              <span style={{
+                fontSize:   7,
+                color:      entry.rank <= 3 ? 'var(--gold)' : 'var(--gray)',
+                minWidth:   20,
+                flexShrink: 0,
+              }}>
+                #{entry.rank}
+              </span>
+              <span style={{
+                fontSize:  7,
+                flex:      1,
+                color:     entry.isPlayer ? 'var(--pink)' : 'var(--white)',
+                overflow:  'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                {entry.isPlayer ? `★ ${entry.name}` : entry.name}
+              </span>
+              <span style={{ fontSize: 7, color: 'var(--lav)', flexShrink: 0 }}>
+                {fmtScore(entry.score)}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {!showFullBoard && leaderboard.length > 6 && (
+          <button
+            onClick={() => { SFX.click(); setShowFullBoard(true) }}
+            style={{ marginTop: 8, fontSize: 7, padding: '6px 10px', width: '100%', textAlign: 'center' }}
+          >
+            SHOW ALL 50 STUDIOS ↓
+          </button>
+        )}
+        {showFullBoard && (
+          <button
+            onClick={() => { SFX.click(); setShowFullBoard(false) }}
+            style={{ marginTop: 8, fontSize: 7, padding: '6px 10px', width: '100%', textAlign: 'center' }}
+          >
+            COLLAPSE ↑
+          </button>
+        )}
+
+        <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {[
+            { label: 'Rising Star', rank: 39, color: '#6BC5FF' },
+            { label: 'Popular',     rank: 24, color: '#FF6B9D' },
+            { label: 'Worldwide',   rank: 9,  color: '#FFD700' },
+          ].map(t => (
+            <div key={t.label} style={{
+              fontSize: 6, padding: '3px 7px',
+              background: numRank <= t.rank ? `rgba(${hexToRgb(t.color)},0.15)` : 'var(--bg-inset)',
+              border: `1px solid ${numRank <= t.rank ? t.color : 'var(--shadow)'}`,
+              color: numRank <= t.rank ? t.color : 'var(--gray)',
+            }}>
+              #{t.rank} {t.label} {numRank <= t.rank ? '✓' : `(need #${t.rank})`}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* ── Active productions ── */}

@@ -10,7 +10,7 @@ import { weeklyActorRecovery, grantExp } from './actors.js'
 import { calcChemistryBonus, calcBondGrowth, applyBondDeltas, getChem } from './chemistry.js'
 import { evaluateProduction } from './evaluators.js'
 import { rollWeeklyEvents, rollActorEvent, runChemPulse } from './events.js'
-import { calcRank } from './ranking.js'
+import { calcRank, computeNumericRank, playerScore } from './ranking.js'
 import { SFX, resumeAudio } from './audio.js'
 
 export function useWeekAdvance() {
@@ -212,7 +212,93 @@ export function useWeekAdvance() {
       dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch })
     }
 
-    // ── 6. Rank update ────────────────────────────────────────────────────────
+    // ── 5.5 Numeric rank + tier unlocks ─────────────────────────────────────
+    const numRank = computeNumericRank(state)
+    if (numRank !== state.numericRank) {
+      dispatch({ type: A.SET_NUMERIC_RANK, rank: numRank })
+    }
+    // Unlock tiers when crossing numeric rank thresholds
+    if (numRank <= 39 && !state.unlockedTiers.includes('Rising Star')) {
+      dispatch({ type: A.UNLOCK_TIER, tier: 'Rising Star' })
+      pushEventLog(dispatch, '🌟 Rising Star tier unlocked! New actors available.', 'gold', week)
+      dispatch({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
+        title: '🌟 TIER UNLOCKED — RISING STAR',
+        message: `Studio reached rank #${numRank}!\n\nRising Star actors are now available for audition.`,
+      } } })
+    }
+    if (numRank <= 24 && !state.unlockedTiers.includes('Popular')) {
+      dispatch({ type: A.UNLOCK_TIER, tier: 'Popular' })
+      pushEventLog(dispatch, '💕 Popular tier unlocked! New actors available.', 'gold', week)
+      dispatch({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
+        title: '💕 TIER UNLOCKED — POPULAR',
+        message: `Studio reached rank #${numRank}!\n\nPopular tier actors are now available for audition.`,
+      } } })
+    }
+    if (numRank <= 9 && !state.unlockedTiers.includes('Worldwide')) {
+      dispatch({ type: A.UNLOCK_TIER, tier: 'Worldwide' })
+      pushEventLog(dispatch, '🌍 Worldwide tier unlocked! Elite actors available.', 'gold', week)
+      dispatch({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
+        title: '🌍 TIER UNLOCKED — WORLDWIDE',
+        message: `Studio reached rank #${numRank}!\n\nWorldwide elite actors are now available for audition.`,
+      } } })
+    }
+
+    // ── 5.6 Rivalry showdown (every 10 weeks) ────────────────────────────────
+    if (week > 0 && week % 10 === 0 && (state.rivals ?? []).length > 0) {
+      const ps       = playerScore(state)
+      // Find the rival ranked just above the player (lowest score still above player)
+      const rivals   = [...state.rivals].sort((a, b) => a.score - b.score)
+      const rival    = rivals.find(r => r.score > ps)
+      if (rival) {
+        // Win chance proportional to relative scores; small random factor for drama
+        const winChance  = Math.min(0.88, (ps / (ps + rival.score)) * 1.6 + 0.05)
+        const playerWins = Math.random() < winChance
+        if (playerWins) {
+          dispatch({ type: A.ADD_REPUTATION,  amount: 8 })
+          dispatch({ type: A.SET_POPULARITY,  value: state.popularity + 15000 })
+          dispatch({ type: A.UPDATE_RIVALS,   id: rival.id, scoreDelta: -25 })
+          pushEventLog(dispatch,
+            `⚔️ Showdown vs ${rival.name}: WON! +8 rep +15K pop`, 'gold', week)
+          dispatch({ type: A.PUSH_MODAL, modal: { type: 'event', data: {
+            label: '⚔️ RIVALRY SHOWDOWN — VICTORY!',
+            message:
+              `Your studio faced off against ${rival.name} in the weekly rankings!\n\n` +
+              `Your score: ${ps.toLocaleString()}\nRival score: ${rival.score.toLocaleString()}\n\n` +
+              `VICTORY! +8 rep · +15,000 pop · rival weakened.`,
+            choices: [{ label: '🏆 CELEBRATE!', effect: () => {} }],
+          } } })
+        } else {
+          dispatch({ type: A.ADD_REPUTATION, amount: -4 })
+          dispatch({ type: A.UPDATE_RIVALS,  id: rival.id, scoreDelta: 10 })
+          pushEventLog(dispatch,
+            `⚔️ Showdown vs ${rival.name}: lost. −4 rep`, 'red', week)
+          dispatch({ type: A.PUSH_MODAL, modal: { type: 'event', data: {
+            label: '⚔️ RIVALRY SHOWDOWN — DEFEAT',
+            message:
+              `Your studio faced off against ${rival.name} in the weekly rankings.\n\n` +
+              `Your score: ${ps.toLocaleString()}\nRival score: ${rival.score.toLocaleString()}\n\n` +
+              `DEFEAT. −4 rep · rival grows stronger. Improve your score!`,
+            choices: [{ label: '😤 NOTED', effect: () => {} }],
+          } } })
+        }
+      }
+    }
+
+    // ── 5.7 Audition week (every 4 weeks) ────────────────────────────────────
+    if (week > 0 && week % 4 === 0) {
+      const unsigned = state.actors.filter(
+        a => !a.signed && state.unlockedTiers.includes(a.tier)
+      )
+      if (unsigned.length > 0) {
+        const shuffled   = [...unsigned].sort(() => Math.random() - 0.5)
+        const candidates = shuffled.slice(0, Math.min(3, shuffled.length))
+        dispatch({ type: A.PUSH_MODAL, modal: { type: 'audition', data: { candidates } } })
+        pushEventLog(dispatch,
+          `🎭 Audition week! ${candidates.length} candidate(s) seeking contracts.`, 'pink', week)
+      }
+    }
+
+    // ── 6. Label rank update ─────────────────────────────────────────────────
     const newRank = calcRank(state.reputation, state.popularity)
     if (newRank.id !== state.rank) {
       dispatch({ type: A.SET_RANK, rank: newRank.id })

@@ -6,6 +6,7 @@ import React, { useState } from 'react'
 import { useGame, A } from '../game/state.jsx'
 import { fmtMoney } from '../game/ranking.js'
 import { SFX } from '../game/audio.js'
+import { TIER_COLOR } from '../game/actors.js'
 
 export default function ModalSystem() {
   const { state, dispatch } = useGame()
@@ -31,6 +32,9 @@ export default function ModalSystem() {
       )}
       {modal.type === 'generic' && (
         <GenericModal data={modal.data} onClose={dismiss} />
+      )}
+      {modal.type === 'audition' && (
+        <AuditionModal data={modal.data} onClose={dismiss} dispatch={dispatch} state={state} />
       )}
     </div>
   )
@@ -257,6 +261,167 @@ function GenericModal({ data, onClose }) {
       <button className="btn-primary" style={styles.closeBtn} onClick={onClose}>OK</button>
     </div>
   )
+}
+
+// ── Audition ──────────────────────────────────────────────────────────────────
+function AuditionModal({ data, onClose, dispatch, state }) {
+  const { candidates } = data
+  // Track which actor IDs have been signed from this modal (local optimistic state)
+  const [signedIds, setSignedIds] = React.useState([])
+
+  const unsigned = candidates.filter(a => !signedIds.includes(a.id) && !state.actors.find(sa => sa.id === a.id && sa.signed))
+
+  function signOne(actor) {
+    SFX.confirm()
+    if (state.money < actor.signCost) {
+      dispatch({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
+        title: '💸 INSUFFICIENT FUNDS',
+        message: `You need ₩${actor.signCost.toLocaleString()} to sign ${actor.name}.`,
+      } } })
+      return
+    }
+    dispatch({ type: A.SIGN_ACTOR, id: actor.id, cost: actor.signCost })
+    setSignedIds(prev => [...prev, actor.id])
+  }
+
+  function signAll() {
+    SFX.success()
+    const eligible = unsigned
+    if (!eligible.length) return
+    const total = Math.round(eligible.reduce((s, a) => s + a.signCost, 0) * 0.7)
+    if (state.money < total) {
+      dispatch({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
+        title: '💸 INSUFFICIENT FUNDS',
+        message: `You need ₩${total.toLocaleString()} (30% off) to sign all ${eligible.length} actors.`,
+      } } })
+      return
+    }
+    dispatch({ type: A.BULK_SIGN, pairs: eligible.map(a => ({ id: a.id, cost: a.signCost })) })
+    setSignedIds(prev => [...prev, ...eligible.map(a => a.id)])
+  }
+
+  const bulkTotal = Math.round(unsigned.reduce((s, a) => s + a.signCost, 0) * 0.7)
+
+  return (
+    <div className="modal-box" style={{ maxHeight: '92dvh', overflowY: 'auto', padding: 0 }}>
+      {/* Header */}
+      <div style={{ ...styles.header, position: 'sticky', top: 0, zIndex: 2 }}>
+        <div style={styles.headerTitle}>🎭 AUDITION WEEK</div>
+        <button className="modal-close" onClick={onClose} style={{ position: 'static', marginLeft: 'auto' }}>✕</button>
+      </div>
+
+      <div style={{ padding: '10px 14px 14px' }}>
+        <div style={{ fontSize: 7, color: 'var(--lav)', marginBottom: 12, lineHeight: 2 }}>
+          Actors seeking contracts this week. Sign now or wait for the next audition round.
+        </div>
+
+        {/* Candidate cards */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14 }}>
+          {candidates.map(actor => {
+            const alreadySigned = signedIds.includes(actor.id) ||
+              state.actors.find(a => a.id === actor.id && a.signed)
+            const canAfford     = state.money >= actor.signCost
+            return (
+              <div key={actor.id} style={{
+                ...auStyles.card,
+                borderColor: alreadySigned ? 'var(--green)' : 'var(--shadow)',
+                opacity: alreadySigned ? 0.7 : 1,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {/* Tier dot */}
+                  <div style={{ ...auStyles.tierDot, background: TIER_COLOR[actor.tier] ?? '#aaa' }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 10, color: 'var(--white)' }}>{actor.name}</div>
+                    <div style={{ fontSize: 7, color: TIER_COLOR[actor.tier] ?? 'var(--lav)' }}>
+                      {actor.tier}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 8, color: 'var(--gold)' }}>
+                      ₩{actor.signCost.toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Top 4 skills */}
+                <div style={auStyles.skills}>
+                  {Object.entries(actor.skills ?? {}).slice(0, 4).map(([k, v]) => (
+                    <div key={k} style={auStyles.skillItem}>
+                      <span style={{ fontSize: 6, color: 'var(--lav)' }}>{k.toUpperCase()}</span>
+                      <span style={{ fontSize: 8, color: 'var(--pink)' }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Sign button */}
+                {alreadySigned ? (
+                  <div style={{ fontSize: 8, color: 'var(--green)', textAlign: 'center', padding: '8px 0' }}>
+                    ✓ SIGNED
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => signOne(actor)}
+                    disabled={!canAfford}
+                    style={{
+                      width: '100%', textAlign: 'center', fontSize: 8, padding: '10px',
+                      marginTop: 6,
+                      opacity: canAfford ? 1 : 0.45,
+                    }}
+                  >
+                    {canAfford ? `✍️ SIGN (₩${actor.signCost.toLocaleString()})` : '💸 INSUFFICIENT FUNDS'}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Bulk sign */}
+        {unsigned.length >= 2 && (
+          <button
+            className="btn-gold"
+            onClick={signAll}
+            disabled={state.money < bulkTotal}
+            style={{ ...styles.closeBtn, marginBottom: 8, opacity: state.money >= bulkTotal ? 1 : 0.45 }}
+          >
+            💕 SIGN ALL {unsigned.length} — ₩{bulkTotal.toLocaleString()} (30% OFF)
+          </button>
+        )}
+
+        <button onClick={onClose} style={{ ...styles.closeBtn, fontSize: 8 }}>
+          PASS THIS WEEK
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const auStyles = {
+  card: {
+    background:  'var(--bg-inset)',
+    border:      '2px solid',
+    padding:     '10px 12px',
+  },
+  tierDot: {
+    width:        10,
+    height:       10,
+    borderRadius: '50%',
+    flexShrink:   0,
+  },
+  skills: {
+    display:             'grid',
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    gap:                 6,
+    margin:              '8px 0 0',
+  },
+  skillItem: {
+    display:        'flex',
+    flexDirection:  'column',
+    alignItems:     'center',
+    gap:            2,
+    background:     'var(--bg-deep)',
+    padding:        '4px 2px',
+  },
 }
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
