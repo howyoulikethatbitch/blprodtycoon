@@ -1,6 +1,6 @@
 /**
  * state.jsx — Central game state via React Context
- * Updated for Prompt 2: new actor shape, awards, numericRank, unlockedTiers.
+ * Prompt 4: added eventLog array + PUSH_EVENT_LOG action.
  */
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react'
 
@@ -12,22 +12,23 @@ export const INITIAL_STATE = {
   money:         50000,
   reputation:    10,
   popularity:    0,
-  rank:          'INDIE',       // string rank ID for display (calcRank system)
-  numericRank:   50,            // 1-50 position in rival leaderboard (Prompt 7)
+  rank:          'INDIE',
+  numericRank:   50,
   awards:        0,
-  unlockedTiers: ['Rookie'],    // tiers whose audition pool is available
-  actors:        [],            // populated from ACTOR_DATA on START_GAME
-  productions:   [],            // active productions
-  history:       [],            // completed production records
-  events:        [],            // pending event queue
-  modalQueue:    [],            // pending modals to show sequentially
-  toasts:        [],            // ephemeral notifications
+  unlockedTiers: ['Rookie'],
+  actors:        [],
+  productions:   [],
+  history:       [],
+  events:        [],
+  eventLog:      [],   // ← new: color-coded game log entries
+  modalQueue:    [],
+  toasts:        [],
   settings: {
-    sfxOn:       true,
-    scanlines:   true,
-    animSpeed:   'normal',      // 'fast' | 'normal' | 'slow'
+    sfxOn:      true,
+    scanlines:  true,
+    animSpeed:  'normal',
   },
-  flags:         {},            // arbitrary boolean/value flags for events
+  flags:         {},
   lastSaved:     null,
 }
 
@@ -56,6 +57,7 @@ export const A = {
   DISMISS_TOAST:      'DISMISS_TOAST',
   PUSH_EVENT:         'PUSH_EVENT',
   RESOLVE_EVENT:      'RESOLVE_EVENT',
+  PUSH_EVENT_LOG:     'PUSH_EVENT_LOG',   // ← new
   SET_COMPANY_NAME:   'SET_COMPANY_NAME',
   SET_SETTINGS:       'SET_SETTINGS',
   SET_FLAG:           'SET_FLAG',
@@ -170,6 +172,15 @@ function gameReducer(state, action) {
     case A.RESOLVE_EVENT:
       return { ...state, events: state.events.filter(e => e.id !== action.id) }
 
+    case A.PUSH_EVENT_LOG:
+      return {
+        ...state,
+        eventLog: [
+          action.entry,
+          ...(state.eventLog ?? []),
+        ].slice(0, 80),   // keep last 80 entries
+      }
+
     case A.SET_COMPANY_NAME:
       return { ...state, companyName: action.name }
 
@@ -180,7 +191,11 @@ function gameReducer(state, action) {
       return { ...state, flags: { ...state.flags, [action.key]: action.value } }
 
     case A.LOAD_SAVE:
-      return { ...action.saveData, started: true }
+      return {
+        ...action.saveData,
+        started:  true,
+        eventLog: action.saveData.eventLog ?? [],
+      }
 
     case A.MARK_SAVED:
       return { ...state, lastSaved: action.ts }
@@ -199,7 +214,7 @@ export function GameProvider({ children }) {
   const [state, dispatch] = useReducer(gameReducer, INITIAL_STATE)
   const saveTimer = useRef(null)
 
-  // Auto-save to localStorage on state change (debounced 1 s)
+  // Auto-save (debounced 1 s)
   useEffect(() => {
     if (!state.started) return
     clearTimeout(saveTimer.current)
@@ -234,4 +249,20 @@ export function pushToast(dispatch, message, variant = '') {
 
 export function pushModal(dispatch, modal) {
   dispatch({ type: A.PUSH_MODAL, modal })
+}
+
+/**
+ * Push a color-coded entry to the Event Log.
+ * variant: 'green' | 'red' | 'gold' | 'pink' | ''
+ */
+export function pushEventLog(dispatch, message, variant = '', week = null) {
+  dispatch({
+    type: A.PUSH_EVENT_LOG,
+    entry: {
+      id:      Date.now() + Math.random(),
+      message,
+      variant,
+      week,
+    },
+  })
 }

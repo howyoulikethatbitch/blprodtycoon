@@ -1,138 +1,252 @@
 /**
  * productions.js — Production types, cost formulas, progress logic
- * Updated for 8-skill system (Prompt 2).
- * Reference: index.html for formulas.
+ * Prompt 4: new type/schedule/platform/rating schema, combo system, title pool, CP name.
  */
 
 // ─── Production types ─────────────────────────────────────────────────────────
 export const PROD_TYPES = {
-  drama:  { label: 'Drama Series',  icon: '🎭', weeksMin: 4,  weeksMax: 12, baseCost: 8000  },
-  movie:  { label: 'Feature Film',  icon: '🎬', weeksMin: 8,  weeksMax: 20, baseCost: 20000 },
-  variety:{ label: 'Variety Show',  icon: '🎪', weeksMin: 2,  weeksMax: 6,  baseCost: 4000  },
-  concert:{ label: 'Concert Tour',  icon: '🎤', weeksMin: 3,  weeksMax: 8,  baseCost: 10000 },
-  cf:     { label: 'CF / Ad',       icon: '📺', weeksMin: 1,  weeksMax: 3,  baseCost: 3000  },
-  web:    { label: 'Web Drama',     icon: '📱', weeksMin: 2,  weeksMax: 6,  baseCost: 5000  },
+  mini_series: { label: 'Mini Series', icon: '📺', episodes: 3, baseCost: 5000  },
+  series:      { label: 'Series',      icon: '🎭', episodes: 4, baseCost: 9000  },
+  movie:       { label: 'Movie',       icon: '🎬', episodes: 1, baseCost: 18000 },
 }
 
-// ─── Budget tiers ─────────────────────────────────────────────────────────────
-export const BUDGET_TIERS = [
-  { id: 'shoestring', label: 'Shoestring',  mult: 0.5  },
-  { id: 'modest',     label: 'Modest',      mult: 1.0  },
-  { id: 'standard',   label: 'Standard',    mult: 1.5  },
-  { id: 'premium',    label: 'Premium',     mult: 2.5  },
-  { id: 'blockbuster',label: 'Blockbuster', mult: 4.0  },
+// ─── Schedules (production duration & quality multiplier) ─────────────────────
+export const SCHEDULES = [
+  { id: '3m',  label: '3 Months',  weeks: 12, qMult: 0.8 },
+  { id: '6m',  label: '6 Months',  weeks: 24, qMult: 1.0 },
+  { id: '12m', label: '12 Months', weeks: 48, qMult: 1.3 },
 ]
 
-// ─── Genre tags ───────────────────────────────────────────────────────────────
-export const GENRES = [
-  'Romance', 'Action', 'Comedy', 'Thriller', 'Fantasy',
-  'Slice of Life', 'Historical', 'Sci-Fi', 'Horror', 'Musical',
+// ─── Platforms ────────────────────────────────────────────────────────────────
+export const PLATFORMS = [
+  { id: 'tv',        label: 'TV',        icon: '📡', reachMult: 1.3, revMult: 0.8, blocksR: true  },
+  { id: 'streaming', label: 'Streaming', icon: '📱', reachMult: 0.8, revMult: 1.3, blocksR: false },
+]
+
+// ─── Ratings ─────────────────────────────────────────────────────────────────
+export const RATINGS = [
+  { id: 'pg',   label: 'PG',    popMult: 1.1 },
+  { id: 'pg13', label: 'PG-13', popMult: 1.0 },
+  { id: 'r',    label: 'R',     popMult: 0.8 },   // TV blocks R
+]
+
+// ─── Genres ───────────────────────────────────────────────────────────────────
+export const GENRES = ['Romance', 'Comedy', 'Slice of Life', 'School', 'Office']
+
+// ─── Story origin ─────────────────────────────────────────────────────────────
+export const STORY_TYPES = [
+  { id: 'original',    label: 'Original',    scoreMod: +3 },
+  { id: 'adaptation',  label: 'Adaptation',  scoreMod: +5 },   // known IP bonus
+]
+
+// ─── Title suggestion pool ────────────────────────────────────────────────────
+export const TITLE_POOL = [
+  'Love on Set', 'Two Hearts One Script', 'Beyond the Curtain',
+  'Our Secret Stage', 'The Leading Man', 'Autumn Leads',
+  'Spotlight Romance', 'Behind the Scenes', 'Chemistry',
+  'The Perfect Take', 'Falling for the Lead', 'Studio Crush',
+  'Off-Script', 'The Last Episode', 'Summer Wrap',
+  'Breaking the Fourth Wall', 'Candid Camera Heart', 'Under the Lights',
+  'Scene Partners', 'Overtime Together', 'Final Cut',
+  'The Method Actor', 'Love in the Edit', 'Golden Hour',
+]
+
+// ─── CP (couple) name generator ───────────────────────────────────────────────
+export function genCpName(name1, name2) {
+  if (!name1 || !name2) return ''
+  const a = (name1.trim().split(' ')[0])   // take first name
+  const b = (name2.trim().split(' ')[0])
+  const half1 = a.slice(0, Math.ceil(a.length / 2))
+  const half2 = b.slice(Math.floor(b.length / 2))
+  return half1 + half2
+}
+
+// ─── Genre × Type combo system ────────────────────────────────────────────────
+const COMBO_TABLE = {
+  mini_series: { Romance: 1.5, Comedy: 1.5, School: 1.5, 'Slice of Life': 1.0, Office: 0.6 },
+  series:      { Romance: 1.5, Office: 1.5, Comedy:  1.0, 'Slice of Life': 1.0, School: 0.6 },
+  movie:       { Romance: 1.5, 'Slice of Life': 1.5, School: 1.0, Comedy: 1.0, Office: 0.6 },
+}
+
+export function getComboResult(type, genre) {
+  const mult = COMBO_TABLE[type]?.[genre] ?? 1.0
+  if (mult >= 1.5) return { label: 'PERFECT', mult: 1.5, emoji: '✨', color: 'var(--gold)' }
+  if (mult <= 0.6) return { label: 'BAD FIT', mult: 0.6, emoji: '💔', color: 'var(--red)'  }
+  return              { label: 'GOOD',     mult: 1.0, emoji: '💕', color: 'var(--green)' }
+}
+
+// ─── Legacy budget tiers (kept for backward compat) ───────────────────────────
+export const BUDGET_TIERS = [
+  { id: 'min',    label: 'Min',    mult: 0.5 },
+  { id: 'standard', label: 'Standard', mult: 1.0 },
+  { id: 'max',    label: 'Max',    mult: 2.0 },
 ]
 
 // ─── Cost formula ─────────────────────────────────────────────────────────────
-export function calcCost(type, budget, weeks, castSize) {
+export function calcCost(type, budgetMult, scheduleId, castSize) {
   const t = PROD_TYPES[type]
-  const b = BUDGET_TIERS.find(bt => bt.id === budget)
-  if (!t || !b) return 0
-  const base     = t.baseCost * b.mult
-  const weekCost = base * 0.08 * weeks
-  const castCost = castSize * 2000 * b.mult
+  const s = SCHEDULES.find(sc => sc.id === scheduleId)
+  if (!t || !s) return 0
+  const base     = t.baseCost * budgetMult
+  const weekCost = base * 0.055 * s.weeks
+  const castCost = castSize * 1500 * budgetMult
   return Math.round(base + weekCost + castCost)
 }
 
 // ─── Revenue formula ──────────────────────────────────────────────────────────
-export function calcRevenue(score, budget, type, reputation) {
-  const b = BUDGET_TIERS.find(bt => bt.id === budget)
-  const t = PROD_TYPES[type]
-  if (!b || !t) return 0
-  const baseRevenue = t.baseCost * b.mult * 3.5
+export function calcRevenue(score, budgetMult, type, reputation, platform, comboMult = 1.0) {
+  const t  = PROD_TYPES[type]
+  const pf = PLATFORMS.find(p => p.id === platform)
+  if (!t) return 0
+  const baseRevenue = t.baseCost * budgetMult * 3.5
   const scoreMult   = Math.pow(score / 100, 1.3)
   const repBonus    = 1 + reputation / 200
-  return Math.round(baseRevenue * scoreMult * repBonus)
+  const platMult    = pf?.revMult ?? 1.0
+  return Math.round(baseRevenue * scoreMult * repBonus * platMult * comboMult)
 }
 
 // ─── Score formula ────────────────────────────────────────────────────────────
-// Updated to use 8-skill system.
 export function calcScore(production, castActors, chemistryBonus = 0) {
   if (!castActors.length) return 0
 
-  const { type, budget } = production
-  const b = BUDGET_TIERS.find(bt => bt.id === budget)
+  const { type, budget, schedule, story } = production
+  const budgetMult = typeof budget === 'number' ? budget : 1.0
+  const s = SCHEDULES.find(sc => sc.id === schedule)
+  const qMult = s?.qMult ?? 1.0
   const weights = statWeightsByType(type)
+  const storyMod = STORY_TYPES.find(st => st.id === story)?.scoreMod ?? 0
 
   let statScore = 0
   for (const actor of castActors) {
     let actorScore = 0
     for (const [stat, w] of Object.entries(weights)) {
-      // Read from actor.skills (new) or actor.stats (old) for compat
       actorScore += (actor.skills?.[stat] ?? actor.stats?.[stat] ?? 0) * w
     }
     statScore += actorScore
   }
   statScore = statScore / castActors.length
 
-  const budgetMod = b ? 0.5 + b.mult * 0.15 : 1
-  const score     = statScore * budgetMod + chemistryBonus * 5
-  return Math.round(Math.max(0, Math.min(100, score)))
+  const budgetMod = 0.5 + budgetMult * 0.2
+  const raw = statScore * budgetMod * qMult + chemistryBonus * 5 + storyMod
+  return Math.round(Math.max(0, Math.min(100, raw)))
 }
 
-// Stat weights by production type — updated for 8 skills
+// ─── Stat weights by type ─────────────────────────────────────────────────────
 function statWeightsByType(type) {
   switch (type) {
+    case 'mini_series':
+      return { act:0.35, visual:0.20, comedy:0.20, sing:0.10, dance:0.08, lang:0.04, art:0.02, fitness:0.01 }
+    case 'series':
+      return { act:0.40, visual:0.20, comedy:0.15, sing:0.10, dance:0.08, lang:0.04, art:0.02, fitness:0.01 }
+    case 'movie':
+      return { act:0.45, visual:0.25, comedy:0.10, dance:0.08, sing:0.07, lang:0.03, art:0.01, fitness:0.01 }
+    // Legacy types (for old saves)
     case 'drama':
       return { act:0.35, visual:0.20, comedy:0.15, sing:0.10, dance:0.10, lang:0.05, art:0.03, fitness:0.02 }
-    case 'movie':
-      return { act:0.40, visual:0.25, comedy:0.10, dance:0.10, sing:0.08, lang:0.04, art:0.02, fitness:0.01 }
     case 'variety':
       return { comedy:0.30, dance:0.25, sing:0.20, visual:0.15, act:0.05, lang:0.03, art:0.01, fitness:0.01 }
-    case 'concert':
-      return { sing:0.40, dance:0.35, visual:0.10, fitness:0.10, lang:0.03, comedy:0.01, art:0.01, act:0.00 }
-    case 'cf':
-      return { visual:0.40, act:0.25, comedy:0.15, sing:0.10, dance:0.05, lang:0.03, art:0.01, fitness:0.01 }
-    case 'web':
-      return { act:0.40, visual:0.30, comedy:0.15, sing:0.08, dance:0.05, lang:0.02, art:0.00, fitness:0.00 }
     default:
       return { act:0.30, visual:0.25, comedy:0.15, sing:0.12, dance:0.10, lang:0.04, art:0.02, fitness:0.02 }
   }
 }
 
-// ─── Production status ────────────────────────────────────────────────────────
-export const PROD_STATUS = {
-  ACTIVE:    'active',
-  COMPLETED: 'completed',
-  CANCELLED: 'cancelled',
+// ─── Popularity delta ─────────────────────────────────────────────────────────
+export function popularityDeltaByPlatform(score, platform, rating) {
+  const pf  = PLATFORMS.find(p => p.id === platform)
+  const rat = RATINGS.find(r => r.id === rating)
+  const basePop = Math.round((score / 100) * 500)
+  return Math.round(basePop * (pf?.reachMult ?? 1) * (rat?.popMult ?? 1))
+}
+
+// ─── Star rating helper ───────────────────────────────────────────────────────
+export function scoreToStars(score) {
+  const n = Math.round((score / 100) * 5)
+  return '★'.repeat(Math.max(0, n)) + '☆'.repeat(Math.max(0, 5 - n))
 }
 
 // ─── Create a new production record ──────────────────────────────────────────
-export function createProduction({ type, title, genre, budget, weeks, castIds }) {
+export function createProduction({
+  type, title, genre, budget, schedule,
+  platform, rating, story, castIds, leadIds,
+  cpName, weekStarted,
+}) {
+  const s = SCHEDULES.find(sc => sc.id === schedule) ?? SCHEDULES[1]
+  const t = PROD_TYPES[type]
   return {
-    id:          Date.now(),
+    id:               Date.now(),
     type,
     title,
     genre,
-    budget,
-    weeksTotal:  weeks,
-    weeksLeft:   weeks,
-    castIds:     castIds ?? [],
-    status:      PROD_STATUS.ACTIVE,
-    progressPct: 0,
-    score:       null,
-    revenue:     null,
-    weekStarted: null,
-    scandal:     false,
-    fixedCP:     false,
+    budget,           // number: budgetMult (0.5–2.5)
+    schedule,         // '3m' | '6m' | '12m'
+    platform:         platform ?? 'tv',
+    rating:           rating   ?? 'pg13',
+    story:            story    ?? 'original',
+    castIds:          castIds  ?? [],
+    leadIds:          leadIds  ?? [],
+    cpName:           cpName   ?? '',
+    status:           'active',
+    phase:            'filming',  // 'filming' | 'wrap' | 'releasing' | 'done'
+    weeksTotal:       s.weeks,
+    weeksLeft:        s.weeks,
+    progressPct:      0,
+    qMult:            s.qMult,
+    episodesTotal:    t?.episodes ?? 1,
+    episodesReleased: 0,
+    episodeRatings:   [],
+    viewerCount:      0,
+    comboResult:      null,       // computed at wrap
+    scandal:          false,
+    weekStarted:      weekStarted ?? null,
   }
 }
 
 // ─── Advance production by one week ──────────────────────────────────────────
 export function tickProduction(production) {
-  const weeksLeft  = Math.max(0, production.weeksLeft - 1)
-  const progressPct = Math.round(
-    ((production.weeksTotal - weeksLeft) / production.weeksTotal) * 100
-  )
-  return {
-    weeksLeft,
-    progressPct,
-    status: weeksLeft === 0 ? PROD_STATUS.COMPLETED : PROD_STATUS.ACTIVE,
+  const { phase } = production
+
+  if (phase === 'filming') {
+    const weeksLeft   = Math.max(0, production.weeksLeft - 1)
+    const progressPct = Math.round(
+      ((production.weeksTotal - weeksLeft) / production.weeksTotal) * 100
+    )
+    if (weeksLeft === 0) {
+      // Move to wrap phase
+      const comboResult = getComboResult(production.type, production.genre)
+      return { weeksLeft: 0, progressPct: 100, phase: 'wrap', comboResult, status: 'active' }
+    }
+    return { weeksLeft, progressPct, phase: 'filming', status: 'active' }
   }
+
+  if (phase === 'wrap') {
+    // Wrap → releasing: one episode begins
+    return { phase: 'releasing', episodesReleased: 0, status: 'active' }
+  }
+
+  if (phase === 'releasing') {
+    const ep        = (production.episodesReleased ?? 0) + 1
+    const rating    = rollEpisodeRating(production)
+    const epRatings = [...(production.episodeRatings ?? []), rating]
+    const viewers   = rollViewers(production, rating, ep)
+    if (ep >= production.episodesTotal) {
+      return { phase: 'done', episodesReleased: ep, episodeRatings: epRatings, viewerCount: viewers, status: 'completed' }
+    }
+    return { phase: 'releasing', episodesReleased: ep, episodeRatings: epRatings, viewerCount: viewers, status: 'active' }
+  }
+
+  return { status: 'completed' }
+}
+
+function rollEpisodeRating(production) {
+  const comboMult = production.comboResult?.mult ?? 1.0
+  const base = 4 + Math.random() * 4          // 4–8 base
+  return Math.round(Math.min(10, Math.max(1, base * comboMult)))
+}
+
+function rollViewers(production, rating, ep) {
+  const pf    = PLATFORMS.find(p => p.id === production.platform)
+  const reach = pf?.reachMult ?? 1.0
+  const momentum = 1 + (ep - 1) * 0.1        // slight growth each ep
+  const base = 50000 + Math.random() * 100000
+  return Math.round(base * reach * momentum * rating / 7)
 }
