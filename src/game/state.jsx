@@ -25,6 +25,7 @@ export const INITIAL_STATE = {
   modalQueue:    [],
   toasts:        [],
   fixedCPs:      [],   // array of [actorIdA, actorIdB] pairs
+  freeAgentsPool: [], // 3.4: ex-actors + new talent pool entries
   rivals:        [],   // 49 rival studios {id, name, score} — generated at START_GAME
   settings: {
     sfxOn:      true,
@@ -70,6 +71,11 @@ export const A = {
   SET_FLAG:           'SET_FLAG',
   LOAD_SAVE:          'LOAD_SAVE',
   MARK_SAVED:         'MARK_SAVED',
+  // 3.4 Free Agents Pool
+  ADD_FREE_AGENT:     'ADD_FREE_AGENT',
+  REMOVE_FREE_AGENT:  'REMOVE_FREE_AGENT',
+  UPDATE_FREE_AGENT:  'UPDATE_FREE_AGENT',
+  INIT_FREE_AGENTS:   'INIT_FREE_AGENTS',
 }
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -242,13 +248,40 @@ function gameReducer(state, action) {
     case A.SET_FLAG:
       return { ...state, flags: { ...state.flags, [action.key]: action.value } }
 
+    case A.ADD_FREE_AGENT: {
+      const pool = state.freeAgentsPool ?? []
+      const exists = pool.some(e => e.poolId === action.entry.poolId)
+      if (exists) return state
+      return { ...state, freeAgentsPool: [...pool, action.entry] }
+    }
+
+    case A.REMOVE_FREE_AGENT:
+      return {
+        ...state,
+        freeAgentsPool: (state.freeAgentsPool ?? []).filter(
+          e => e.poolId !== action.poolId
+        ),
+      }
+
+    case A.UPDATE_FREE_AGENT:
+      return {
+        ...state,
+        freeAgentsPool: (state.freeAgentsPool ?? []).map(e =>
+          e.poolId === action.poolId ? { ...e, ...action.patch } : e
+        ),
+      }
+
+    case A.INIT_FREE_AGENTS:
+      return { ...state, freeAgentsPool: action.pool }
+
     case A.LOAD_SAVE:
       return {
         ...action.saveData,
-        started:   true,
-        eventLog:  action.saveData.eventLog  ?? [],
-        fixedCPs:  action.saveData.fixedCPs  ?? [],
-        rivals:    action.saveData.rivals?.length
+        started:        true,
+        eventLog:       action.saveData.eventLog       ?? [],
+        fixedCPs:       action.saveData.fixedCPs       ?? [],
+        freeAgentsPool: action.saveData.freeAgentsPool ?? [],
+        rivals:         action.saveData.rivals?.length
           ? action.saveData.rivals
           : generateRivals(),
       }

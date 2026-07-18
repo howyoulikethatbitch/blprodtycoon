@@ -35,13 +35,24 @@ export default function ActorProfile({ actorId, onBack }) {
     [state.history, actor.id]
   )
 
-  // Chemistry list: all OTHER signed actors, sorted by chemistry value desc
-  const chemList = useMemo(() => {
-    return state.actors
-      .filter(a => a.id !== actor.id && a.signed)
-      .map(other => ({ other, val: getChem(actor, other.id) }))
-      .sort((a, b) => b.val - a.val)
-  }, [actor, state.actors])
+  // 3.1: Chemistry only shown when actor is filming; only show CP partner
+  const isFilming = actor.status === 'filming'
+
+  const cpChemInfo = useMemo(() => {
+    if (!isFilming) return null
+    // Find their active production
+    const activeProd = state.productions.find(
+      p => p.status === 'active' && (p.castIds ?? []).includes(actor.id)
+    )
+    if (!activeProd) return null
+    const leadIds = activeProd.leadIds ?? []
+    // Find the partner (other lead)
+    const partnerId = leadIds.find(id => id !== actor.id)
+    if (!partnerId) return { partner: null, val: 0 }
+    const partner = state.actors.find(a => a.id === partnerId)
+    if (!partner) return { partner: null, val: 0 }
+    return { partner, val: getChem(actor, partner.id) }
+  }, [actor, state.actors, state.productions, isFilming])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -137,19 +148,20 @@ export default function ActorProfile({ actorId, onBack }) {
         </div>
       )}
 
-      {/* ── Chemistry panel ── */}
-      {!isLocked && chemList.length > 0 && (
+      {/* ── Chemistry panel — 3.1: only visible when actor is actively filming ── */}
+      {!isLocked && isFilming && (
         <div className="panel">
-          <div className="panel-title">💕 CHEMISTRY</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {chemList.map(({ other, val }) => {
-              const tier = chemTier(val)
-              return (
-                <div key={other.id} style={styles.chemRow}>
-                  <ActorPortrait actor={other} size={32} isLocked={!other.signed} />
+          <div className="panel-title">💕 CHEMISTRY (ON-SET)</div>
+          {cpChemInfo?.partner ? (() => {
+            const { partner, val } = cpChemInfo
+            const tier = chemTier(val)
+            return (
+              <div>
+                <div style={styles.chemRow}>
+                  <ActorPortrait actor={partner} size={32} isLocked={!partner.signed} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 7, color: 'var(--white)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {other.name}
+                    <div style={{ fontSize: 7, color: 'var(--white)', marginBottom: 3 }}>
+                      {partner.name} (CP Partner)
                     </div>
                     <div style={styles.chemTrack}>
                       <div style={{ ...styles.chemFill, width: `${val}%`, background: tier.color }} />
@@ -160,13 +172,23 @@ export default function ActorProfile({ actorId, onBack }) {
                     <div style={{ fontSize: 6 }}>{tier.label}</div>
                   </div>
                 </div>
-              )
-            })}
-          </div>
-
-          {/* Shared characteristics note */}
-          <div style={{ marginTop: 12, fontSize: 7, color: 'var(--lav)' }}>
-            ★ Chemistry base = shared traits × 20. Grows through filming.
+                <div style={{ marginTop: 10, fontSize: 7, color: 'var(--lav)' }}>
+                  ★ Chemistry grows through filming together. Revealed fully after production.
+                </div>
+              </div>
+            )
+          })() : (
+            <div style={{ fontSize: 8, color: 'var(--gray)', padding: '8px 0' }}>
+              No CP assigned for current production.
+            </div>
+          )}
+        </div>
+      )}
+      {!isLocked && !isFilming && (
+        <div className="panel" style={{ opacity: 0.55 }}>
+          <div className="panel-title">💕 CHEMISTRY</div>
+          <div style={{ fontSize: 7, color: 'var(--gray)', padding: '6px 0' }}>
+            Chemistry details are only visible while this actor is in an active production.
           </div>
         </div>
       )}

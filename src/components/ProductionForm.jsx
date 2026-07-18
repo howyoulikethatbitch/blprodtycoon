@@ -22,13 +22,24 @@ const DEFAULT_BUDGET = 1.0
 const BUDGET_MIN     = 0.5
 const BUDGET_MAX     = 2.5
 
+// 5.1: Pick 3 random title suggestions fresh on each component mount
+function pickRandomTitles() {
+  const shuffled = [...TITLE_POOL].sort(() => Math.random() - 0.5)
+  return shuffled.slice(0, 3)
+}
+
+// Fixed CP signing cost: 30% of average sign cost of both leads
+function fixedCpCost(lead1, lead2) {
+  if (!lead1 || !lead2) return 0
+  return Math.round(((lead1.signCost ?? 200) + (lead2.signCost ?? 200)) * 0.3)
+}
+
 export default function ProductionForm({ setScreen }) {
   const { state, dispatch } = useGame()
 
   // ── Form state ──────────────────────────────────────────────────────────────
   const [prodType,  setProdType]  = useState('series')
   const [title,     setTitle]     = useState('')
-  const [showSuggest, setShowSuggest] = useState(false)
   const [genre,     setGenre]     = useState('Romance')
   const [story,     setStory]     = useState('original')
   const [schedule,  setSchedule]  = useState('6m')
@@ -40,6 +51,10 @@ export default function ProductionForm({ setScreen }) {
   const [cpName,    setCpName]    = useState('')
   const [cpEdited,  setCpEdited]  = useState(false)
   const [showChem,  setShowChem]  = useState(true)
+  const [cpFixed,   setCpFixed]   = useState(false)  // 3.2: Fixed vs Unfixed CP
+
+  // 5.1: Randomized title suggestions (fresh on mount, never change during session)
+  const [titleSuggestions] = useState(pickRandomTitles)
 
   const titleRef = useRef(null)
 
@@ -95,21 +110,20 @@ export default function ProductionForm({ setScreen }) {
 
   // Cost & affordability
   const cost     = calcCost(prodType, budgetMult, schedule, castIds.length)
-  const canAfford = state.money >= cost
-
   const schedInfo  = SCHEDULES.find(s => s.id === schedule)
   const platInfo   = PLATFORMS.find(p => p.id === platform)
   const typeInfo   = PROD_TYPES[prodType]
 
-  // Title suggestions filtered by current input
-  const suggestions = useMemo(() => {
-    if (!title.trim()) return TITLE_POOL.slice(0, 6)
-    return TITLE_POOL.filter(t => t.toLowerCase().includes(title.toLowerCase())).slice(0, 6)
-  }, [title])
+  // 3.2: Fixed CP is only allowed if avg chemistry ≥ 20
+  const avgChem = lead1 && lead2 ? Math.round((chemValue) ) : 0
+  const fixedCpAllowed = lead1 && lead2 && avgChem >= 20
+  const fixedCpPrice   = fixedCpCost(lead1, lead2)
+  const totalCost      = cost + (cpFixed && fixedCpAllowed ? fixedCpPrice : 0)
+  const canAffordTotal = state.money >= totalCost
 
   function handleSubmit(e) {
     e.preventDefault()
-    if (!canAfford) { SFX.fail(); return }
+    if (!canAffordTotal) { SFX.fail(); return }
     if (!title.trim()) {
       SFX.fail()
       pushToast(dispatch, 'Please enter a title.', 'red')
@@ -136,16 +150,22 @@ export default function ProductionForm({ setScreen }) {
       leadIds:   castIds.slice(0, 2),
       cpName,
       weekStarted: state.week,
+      fixedCP:   cpFixed && fixedCpAllowed,
     })
 
     dispatch({ type: A.ADD_PRODUCTION, production: prod })
-    dispatch({ type: A.ADD_MONEY, amount: -cost })
+    dispatch({ type: A.ADD_MONEY, amount: -totalCost })
+
+    // Register Fixed CP pair if selected (3.2)
+    if (cpFixed && fixedCpAllowed && lead1 && lead2) {
+      dispatch({ type: A.ADD_FIXED_CP, pair: [lead1.id, lead2.id] })
+    }
 
     for (const id of castIds) {
       dispatch({ type: A.UPDATE_ACTOR, id, patch: { assignedTo: prod.id, status: 'filming' } })
     }
 
-    pushToast(dispatch, `"${prod.title}" production started!`, 'green')
+    pushToast(dispatch, `"${prod.title}" production started!${cpFixed && fixedCpAllowed ? ' 💕 Fixed CP registered!' : ''}`, 'green')
     setScreen('dashboard')
   }
 
@@ -156,32 +176,29 @@ export default function ProductionForm({ setScreen }) {
       <div className="panel">
         <div className="panel-title">🎬 NEW PRODUCTION</div>
 
-        <div className="field" style={{ position: 'relative' }}>
+        <div className="field">
           <label>PRODUCTION TITLE</label>
           <input
             ref={titleRef}
             type="text"
             value={title}
             maxLength={48}
-            onChange={e => { setTitle(e.target.value); setShowSuggest(true) }}
-            onFocus={() => setShowSuggest(true)}
-            onBlur={() => setTimeout(() => setShowSuggest(false), 150)}
-            placeholder="Enter title or pick a suggestion…"
+            onChange={e => setTitle(e.target.value)}
+            placeholder="Enter a title…"
             required
           />
-          {showSuggest && suggestions.length > 0 && (
-            <div style={styles.suggestBox}>
-              {suggestions.map(s => (
-                <button
-                  key={s} type="button"
-                  style={styles.suggestItem}
-                  onMouseDown={() => { setTitle(s); setShowSuggest(false) }}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* 5.1: Randomized suggestion chips — no dropdown, fresh on each visit */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
+            {titleSuggestions.map(s => (
+              <button
+                key={s} type="button"
+                style={styles.suggestChip}
+                onClick={() => { SFX.click(); setTitle(s) }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Type */}
@@ -217,10 +234,10 @@ export default function ProductionForm({ setScreen }) {
           </div>
         </div>
 
-        {/* Combo preview */}
+        {/* 5.3: Combo label shown, but multiplier hidden pre-production */}
         <div style={{ ...styles.comboBadge, borderColor: combo.color, color: combo.color }}>
           {combo.emoji} {prodType === 'series' ? 'Series' : prodType === 'movie' ? 'Movie' : 'Mini'} × {genre}: <strong>{combo.label}</strong>
-          <span style={{ color: 'var(--lav)', fontSize: 7, marginLeft: 6 }}>×{combo.mult} score</span>
+          <span style={{ color: 'var(--gray)', fontSize: 7, marginLeft: 6 }}>(multiplier revealed after production)</span>
         </div>
       </div>
 
@@ -312,6 +329,42 @@ export default function ProductionForm({ setScreen }) {
             placeholder="Auto-generated from lead names"
           />
         </div>
+
+        {/* 3.2: Fixed vs Unfixed CP toggle */}
+        {lead1 && lead2 && (
+          <div style={styles.cpTypeBox}>
+            <div style={{ fontSize: 7, color: 'var(--lav)', marginBottom: 6, letterSpacing: 1 }}>
+              CP CONTRACT TYPE
+            </div>
+            <div className="seg">
+              <button type="button"
+                className={!cpFixed ? 'sel' : ''}
+                onClick={() => { SFX.click(); setCpFixed(false) }}
+              >
+                🔓 Unfixed (free — can pair with others later)
+              </button>
+              <button type="button"
+                className={cpFixed ? 'sel' : ''}
+                onClick={() => { SFX.click(); if (fixedCpAllowed) setCpFixed(true) }}
+                disabled={!fixedCpAllowed}
+                title={!fixedCpAllowed ? `Chemistry must be ≥20 to lock a Fixed CP (current: ${avgChem})` : ''}
+              >
+                💕 Fixed CP {fixedCpAllowed ? `(−₩${fixedCpPrice.toLocaleString()})` : `(need chem ≥20)`}
+              </button>
+            </div>
+            {cpFixed && fixedCpAllowed && (
+              <div style={{ fontSize: 7, color: 'var(--pink)', marginTop: 6 }}>
+                💕 Fixed CPs are locked together for all future productions.
+                Chemistry must stay ≥20 or the contract breaks.
+              </div>
+            )}
+            {!fixedCpAllowed && (
+              <div style={{ fontSize: 7, color: 'var(--gray)', marginTop: 4 }}>
+                Chemistry {avgChem}/100 — need ≥20 to offer a Fixed CP contract.
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Production details ────────────────────────────────────────────── */}
@@ -426,19 +479,22 @@ export default function ProductionForm({ setScreen }) {
 
       {/* ── Cost preview ──────────────────────────────────────────────────── */}
       <div className="cost-preview">
-        <div>Type: {typeInfo?.label} · {typeInfo?.episodes} ep</div>
+        <div>Type: {typeInfo?.label} · {typeInfo?.episodes} ep{typeInfo?.episodes !== 1 ? 's' : ''}</div>
         <div>Schedule: {schedInfo?.label} ({schedInfo?.weeks}wk, q×{schedInfo?.qMult})</div>
         <div>Platform: {platInfo?.label} · Rating: {effectiveRating.toUpperCase()}</div>
         <div>Story: {STORY_TYPES.find(s => s.id === story)?.label}</div>
         <div>Budget: ×{budgetMult.toFixed(2)} · Cast: {castIds.length} actor{castIds.length !== 1 ? 's' : ''}</div>
-        {cpName && <div>CP: <span style={{ color: 'var(--pink)' }}>{cpName}</span></div>}
+        {cpName && <div>CP: <span style={{ color: 'var(--pink)' }}>{cpName}</span>{cpFixed && fixedCpAllowed ? ' 💕 FIXED' : ''}</div>}
+        {cpFixed && fixedCpAllowed && (
+          <div style={{ color: 'var(--pink)', fontSize: 7 }}>Fixed CP fee: {fmtMoney(fixedCpPrice)}</div>
+        )}
         <div style={{ borderTop: '1px dashed var(--gold)', marginTop: 6, paddingTop: 6 }}>
-          <span style={{ color: canAfford ? 'var(--gold)' : 'var(--red)', fontSize: 10 }}>
-            TOTAL: {fmtMoney(cost)}
+          <span style={{ color: canAffordTotal ? 'var(--gold)' : 'var(--red)', fontSize: 10 }}>
+            TOTAL: {fmtMoney(totalCost)}
           </span>
-          {!canAfford && (
+          {!canAffordTotal && (
             <span style={{ color: 'var(--red)', fontSize: 7, marginLeft: 8 }}>
-              (need {fmtMoney(cost - state.money)} more)
+              (need {fmtMoney(totalCost - state.money)} more)
             </span>
           )}
         </div>
@@ -450,7 +506,7 @@ export default function ProductionForm({ setScreen }) {
           type="submit"
           className="btn-primary"
           style={{ flex: 1, textAlign: 'center', fontSize: 11, padding: 16 }}
-          disabled={!canAfford || !lead1Id}
+          disabled={!canAffordTotal || !lead1Id}
         >
           🎬 GREENLIGHT!
         </button>
@@ -503,28 +559,21 @@ function LeadMini({ actor }) {
 }
 
 const styles = {
-  suggestBox: {
-    position:   'absolute',
-    top:        '100%',
-    left:       0, right: 0,
-    background: 'var(--bg-deep)',
-    border:     '2px solid var(--pink-dim)',
-    zIndex:     60,
-    maxHeight:  160,
-    overflowY:  'auto',
-  },
-  suggestItem: {
-    display:    'block',
-    width:      '100%',
-    textAlign:  'left',
-    fontSize:   8,
-    padding:    '8px 10px',
-    background: 'transparent',
-    border:     'none',
-    boxShadow:  'none',
+  suggestChip: {
+    fontSize:   7,
+    padding:    '5px 8px',
+    background: 'var(--bg-inset)',
+    border:     '1px solid var(--pink-dim)',
     color:      'var(--lav)',
     cursor:     'pointer',
-    borderBottom: '1px solid var(--shadow)',
+    boxShadow:  'none',
+    minHeight:  'auto',
+  },
+  cpTypeBox: {
+    marginTop:  10,
+    padding:    '10px 10px',
+    background: 'var(--bg-inset)',
+    border:     '2px solid var(--shadow)',
   },
   comboBadge: {
     marginTop:  10,

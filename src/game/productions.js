@@ -5,9 +5,9 @@
 
 // ─── Production types ─────────────────────────────────────────────────────────
 export const PROD_TYPES = {
-  mini_series: { label: 'Mini Series', icon: '📺', episodes: 3, baseCost: 5000  },
-  series:      { label: 'Series',      icon: '🎭', episodes: 4, baseCost: 9000  },
-  movie:       { label: 'Movie',       icon: '🎬', episodes: 1, baseCost: 18000 },
+  mini_series: { label: 'Mini Series', icon: '📺', episodes: 8,  baseCost: 5000  },
+  series:      { label: 'Series',      icon: '🎭', episodes: 12, baseCost: 9000  },
+  movie:       { label: 'Movie',       icon: '🎬', episodes: 1,  baseCost: 18000 },
 }
 
 // ─── Schedules (production duration & quality multiplier) ─────────────────────

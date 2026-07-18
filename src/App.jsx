@@ -13,6 +13,7 @@ import ActorRoster from './components/ActorRoster.jsx'
 import ActorProfile from './components/ActorProfile.jsx'
 import Settings from './components/Settings.jsx'
 import CompanyStatus from './components/CompanyStatus.jsx'
+import FreeAgentsPool from './components/FreeAgentsPool.jsx'
 import ModalSystem from './components/ModalSystem.jsx'
 import Confetti from './components/Confetti.jsx'
 import { setSfxEnabled } from './game/audio.js'
@@ -55,13 +56,14 @@ function GameApp() {
 
   const renderScreen = () => {
     switch (screen) {
-      case 'dashboard': return <Dashboard setScreen={setScreen} />
-      case 'produce':   return <ProductionForm setScreen={setScreen} />
-      case 'actors':    return <ActorRoster openProfile={openProfile} />
-      case 'profile':   return <ActorProfile actorId={profileActor} onBack={closeProfile} />
-      case 'company':   return <CompanyStatus setScreen={setScreen} />
-      case 'settings':  return <Settings />
-      default:          return <Dashboard setScreen={setScreen} />
+      case 'dashboard':    return <Dashboard setScreen={setScreen} />
+      case 'produce':      return <ProductionForm setScreen={setScreen} />
+      case 'actors':       return <ActorRoster openProfile={openProfile} />
+      case 'profile':      return <ActorProfile actorId={profileActor} onBack={closeProfile} />
+      case 'company':      return <CompanyStatus setScreen={setScreen} />
+      case 'freeagents':   return <FreeAgentsPool />
+      case 'settings':     return <Settings />
+      default:             return <Dashboard setScreen={setScreen} />
     }
   }
 

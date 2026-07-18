@@ -10,11 +10,12 @@ import { useWeekAdvance } from '../game/weekAdvance.js'
 import { SFX } from '../game/audio.js'
 
 const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard',      icon: '🏠', shortLabel: 'HOME' },
-  { id: 'produce',   label: 'New Production', icon: '🎬', shortLabel: 'MAKE' },
-  { id: 'actors',    label: 'Actors',         icon: '⭐', shortLabel: 'CAST' },
-  { id: 'company',   label: 'Company Status', icon: '🏢', shortLabel: 'CO'   },
-  { id: 'settings',  label: 'Settings',       icon: '⚙️', shortLabel: 'SET'  },
+  { id: 'dashboard',  label: 'Dashboard',      icon: '🏠', shortLabel: 'HOME' },
+  { id: 'produce',    label: 'New Production', icon: '🎬', shortLabel: 'MAKE' },
+  { id: 'actors',     label: 'Actors',         icon: '⭐', shortLabel: 'CAST' },
+  { id: 'freeagents', label: 'Free Agents',    icon: '🌟', shortLabel: 'POOL' },
+  { id: 'company',    label: 'Company Status', icon: '🏢', shortLabel: 'CO'   },
+  { id: 'settings',   label: 'Settings',       icon: '⚙️', shortLabel: 'SET'  },
 ]
 
 export default function Sidebar({ currentScreen, setScreen }) {

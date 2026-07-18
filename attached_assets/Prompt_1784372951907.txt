@@ -1,0 +1,179 @@
+PROMPT 1: Chemistry System Overhaul + Idle Actor Penalties + Starting Happiness
+
+Context: BL Production Tycoon is a turn-based production management webapp. 20 named pixel-art actors. Chemistry system exists between actors. Currently all actors deduct chemistry with each other regardless of production status. This needs fixing.
+
+Changes Required:
+
+3.1 Chemistry System — Scope & Visibility
+- Chemistry deductions should ONLY happen for actors who are CURRENTLY in an active production.
+- Actors NOT currently filming must have ZERO chemistry deductions with any other actor.
+- The chemistry panel/UI on actor profiles must be completely hidden when the actor is not in an active production.
+- When an actor IS in an active production, the chemistry panel should only display chemistry with their assigned CP partner, not with all other actors.
+- For actors who have never been assigned a CP, show "No CP assigned" in the chemistry section (when visible).
+
+3.2 CP Assignment — Fixed vs Unfixed
+- When assigning actors to a CP during production setup, the player must choose:
+  - Unfixed CP: Actors can be paired with different partners in future productions. No extra cost.
+  - Fixed CP: Actors are locked together and can ONLY be paired with each other in all future productions. This option is ONLY enabled if the average estimated chemistry of both actors is 20% or above.
+  - Fixed CP costs money (amount based on actor tier/popularity — use existing cost formulas).
+- Fixed CP Breakup: If a fixed CP's chemistry drops below 20%, trigger a warning event first giving the player a chance to fix it (through a special event or spending money). If not resolved, the fixed CP breaks up:
+  - Both actors become unfixed (individual).
+  - Consequences: reputation drop, loyalty drop, happiness drop (formulas based on existing systems).
+  - The breakup check happens at production/weekly review milestones, not continuously.
+
+3.3 Idle Actor Penalty System (Non-active actors)
+- Actors not in any production for 24 weeks or more start losing hidden happiness (the emoji system: happy → neutral → sad → angry).
+- The penalty ticks down gradually every 4 weeks after the 24-week threshold:
+  - Week 24: Happy → Neutral
+  - Week 28: Neutral → Sad
+  - Week 32: Sad → Angry
+- At week 36 or longer, hidden loyalty (0-100 stat, already exists) also starts dropping every 4 weeks.
+- When loyalty reaches 0, trigger a popup event: "(Actor name) is planning to leave / not satisfied with the company... If loyalty drops to 0, (actor name) will leave the company. Add new production now?"
+- If loyalty hits 0, the actor leaves the company and goes to the Free Agents Pool.
+- The actor stays angry until they get a new production or leave.
+- No chance of the actor coming back automatically — must be re-signed from the pool.
+
+
+3.4 Free Agents Pool — Ex-Actors + New Actors
+
+Context: The Free Agents Pool contains two types of actors: (1) ex-actors from the original 20 who left due to 0 loyalty, and (2) new actors not in the original 20 who can be signed for money. The 2× stat multiplier applies only to ex-actors from the original 20, not to new actors.
+
+Changes Required:
+
+Pool Composition
+- Type A — Ex-Actors (Original 20): Actors from the original 20 who left the company due to loyalty dropping to 0.
+- Type B — New Actors: Additional actors not in the original 20, not unlocked via company tiers, available for signing.
+
+Ex-Actor Rules (Type A)
+- When an original 20 actor leaves due to 0 loyalty, they go to the Free Agents Pool.
+- There is a cooldown/waiting period before a returned ex-actor reappears in the pool (Replit: decide duration).
+- Their skills, reputation, and popularity are 2× multiplied while in the pool.
+- Re-signing them costs more money than the original hiring cost of new actors (Replit: scale based on actors' tier and 2× boost).
+- Once re-signed, stats unfreeze and decay resumes normally.
+- If they are NOT re-signed and stayed on the pool for 24 weeks, they are reset from the game (disappear permanently).
+
+New Actor Rules (Type B)
+- Reserve auto-generate names (I will edit the names in the future)
+- New actors not in the original 20 are available in the pool for signing.
+- 5 new actors will be unlocked based on existing tier (rookie, rising star, popular, worldwide).
+- Once a tier is unlocked, each 5 actors will stay on the pool forever.
+- Their stats are normal (no 2× multiplier).
+- Signing cost is based on standard/fair rate on hiring cost formula
+- They start at "Happy" emoji state when first signed.
+- Their happiness, loyalty, and emoji state are frozen while in the pool until they were signed.
+- If they go idle for 24+ weeks, they return to the pool.
+- Second decay: If they return to the pool a second time, they are reset from the game (disappear permanently).
+- There is a cooldown/waiting period before a returned new actor reappears in the pool.
+
+Pool UI
+- Display both ex-actors and new actors in the Free Agents Pool tab.
+- Ex-actors: Show "Former: [Actor Name]" label, boosted stats, higher re-sign cost, and existed original portrait 
+- New actors: Show "New Talent" label (from other rival companies), normal stats, standard sign cost, placeholder portrait (silhouette or "?" until custom portraits are added on the future).
+- Each actor has a "Sign" or "Re-sign" button with the appropriate cost.
+
+Important
+- The 2× multiplier only applies to ex-actors from the original 20.
+- New actors do not get the 2× multiplier.
+- Both types can be signed/re-signed by paying money.
+- Both types start happy when first signed (ex-actors upon re-signing resume from frozen state, new actors start fresh at happy).
+
+3.5 Starting Happiness
+- All 20 actors start at "Happy" emoji state at Week 0 for new games.
+- This also applies to any future actors hired from the free agents pool or unlocked via company status tiers — they start happy when first acquired.
+
+---
+
+PROMPT 2: CP Event System (During & After Production)
+
+Context: New event system for CP actors to boost chemistry and reputation through social media and promotional activities. These are separate from existing random events.
+
+Changes Required:
+
+4.1 Event System Overview
+- CP events trigger automatically during and after production for actors who have formed a CP.
+- Events pop up as modal/popup events on "Next Week" (not every week, but often — Replit: decide percentage chance, roughly 30-50% per week when eligible).
+- Player has three choices: Accept, Negotiate, or Decline.
+  - Accept: Event proceeds. Outcome revealed later.
+  - Negotiate: Already exists in game — keep existing functionality.
+  - Decline: Chemistry decreases, reputation decreases (amount based on existing formulas, not excessive).
+
+4.2 During Production Events (Actor Requests)
+- These are initiated by CP actors (actor requests).
+- Examples: requesting to upload photos, videos, live streams, dance trends, singing covers, vlogs of them together on TikTok, Instagram, YouTube, etc.
+- Success/Failure: Random chance based on actors' respective skills (charisma, performance, social media presence — Replit: map event types to relevant skills). Success rate is not heavily skill-dependent — base 60% with small skill bonus.
+- Outcomes:
+  - Success: +Chemistry, +Actor Reputation
+  - Failure: -Chemistry, -Actor Reputation
+- If player declines: -Chemistry, -Actor Reputation (flat penalty, Replit: decide amount based on existing systems).
+
+4.3 After Production / Weekly Release Events (Company Managed)
+- These happen after production completes or during weekly episode releases.
+- Examples: posting behind-the-scenes content, OST live performances, ad promotions, fan meetings, etc.
+- Managed by the company — player still chooses accept/negotiate/decline.
+- Some events cost money (already exists, keep existing cost logic), some are free.
+- Success/Failure: Same random skill-based system as during-production events.
+- Outcomes:
+  - Success: +Chemistry, +Company Reputation
+  - Failure: -Chemistry, -Company Reputation
+- If player declines: -Chemistry, -Company Reputation.
+
+4.4 Event Display & Timing
+- Events are revealed later — player does not know success/failure odds before accepting.
+- During-production events only trigger while a production is in progress (weeks 1 to N for N-episode production).
+- After-production events only trigger after production completes or during designated weekly release weeks.
+- These events are completely separate from existing random events — do not modify existing event logic.
+
+---
+
+PROMPT 3: New Production Area — Title Randomization, Episode Counts, Genre Combo Hiding
+
+Context: The "New Production" tab needs adjustments to title suggestions, episode counts, and genre combo visibility.
+
+Changes Required:
+
+5.1 Title Suggestions — Randomization
+- Remove the current dropdown behavior where clicking the title field shows a static list of suggestions.
+- Replace with: Every time the player freshly navigates to the New Production tab (or any related "add new production" function), the grayed-out title suggestions are randomized from the existing preset list of BL-themed titles.
+- The suggestions should not be in a dropdown — display them as placeholder/randomized hints that change on each fresh visit.
+- Keep the existing title input field where the player can type their own title.
+
+5.2 Production Types — Updated Episode Counts
+- Change production type definitions:
+  - Mini Series: 3 episodes → 8 episodes
+  - Series: 4 episodes → 12 episodes
+  - Movie: 1 episode → 1 film
+- Update all related functionality:
+  - Weeks calculation: 8 episodes = 8 weeks, 12 episodes = 12 weeks, 1 film = 1 week (or existing film week logic).
+  - Weekly releases: Episode release schedule matches episode count (e.g., 8 episodes = 8 weekly releases).
+  - Production duration: Adjust existing formulas for filming time, revenue cycles, etc. to match new episode counts.
+- Do not change any other production mechanics (budget, revenue, genre scoring, etc.).
+
+5.3 Genre Combo Visibility — Pre-Production Hiding
+- Remove the pre-production tooltip/hint that displays combo multipliers in the genre selection UI (e.g., "Mini × Romance: Perfect ×1.5 score").
+- The post-production combo reveal (after the film is made, showing what combo was achieved and the multiplier) must remain exactly as it currently exists.
+- Players should select genre without knowing the combo multiplier until after production is complete.
+- Do not modify the combo calculation logic, scoring system, or post-production reveal animation/UI.
+
+---
+
+PROMPT 4: Summary of Existing Functionalities to Preserve
+
+DO NOT modify any of the following existing systems:
+- Genre combo calculation and scoring logic
+- Post-production combo reveal system
+- 4-evaluator review system
+- Existing random event system (non-CP events)
+- Actor skill system, reputation system, popularity system
+- Company status tier system (rookie, rising star, popular, worldwide actors)
+- Budget, revenue, and financial formulas
+- Pixel-art actor assets and naming
+- Existing "Negotiate" functionality in events
+- Existing cost logic for company-managed events
+- Any UI/UX not explicitly mentioned above
+- Game save/load system
+- Week progression and "Next Week" button logic
+- Existing production flow (pre-production → filming → post-production → release)
+
+---
+
+Deployment target: GitHub Pages via Replit (the codebase already has deploy.yml). Ensure all changes are compatible with static site deployment. DO NOT deploy here in Replit.

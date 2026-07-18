@@ -6,12 +6,14 @@
 import { useState } from 'react'
 import { useGame, A, pushToast, pushEventLog } from './state.jsx'
 import { tickProduction, calcRevenue, calcScore, popularityDeltaByPlatform } from './productions.js'
-import { weeklyActorRecovery, grantExp } from './actors.js'
+import { weeklyActorRecovery, grantExp, NEW_TALENT_POOL } from './actors.js'
 import { calcChemistryBonus, calcBondGrowth, applyBondDeltas, getChem } from './chemistry.js'
 import { evaluateProduction } from './evaluators.js'
-import { rollWeeklyEvents, rollActorEvent, runChemPulse } from './events.js'
+import { rollWeeklyEvents, rollActorEvent, runChemPulse, rollCpEvents } from './events.js'
 import { calcRank, computeNumericRank, playerScore } from './ranking.js'
 import { SFX, resumeAudio } from './audio.js'
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 
 export function useWeekAdvance() {
   const { state, dispatch } = useGame()
@@ -210,6 +212,90 @@ export function useWeekAdvance() {
       if (completedThisWeek.find(p => p.castIds.includes(actor.id))) continue
       const patch = weeklyActorRecovery(actor)
       dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch })
+
+      // ── 3.3 Loyalty drain — check after patch applied ────────────────────
+      const newLoyalty = patch.loyalty ?? actor.loyalty ?? 60
+      if (newLoyalty <= 0 && actor.status === 'available') {
+        const coolKey = `loyaltyZero_${actor.id}`
+        const lastWk  = state.flags?.[coolKey] ?? -999
+        if (week - lastWk >= 4) {
+          dispatch({ type: A.SET_FLAG, key: coolKey, value: week })
+          dispatch({
+            type: A.PUSH_MODAL,
+            modal: {
+              type: 'event',
+              data: {
+                label: `💔 LOYALTY CRISIS — ${actor.name.toUpperCase()}`,
+                message:
+                  `${actor.name} has been idle for ${actor.idleWeeks} weeks and their loyalty has hit zero! `
+                  + `"${actor.name} is planning to leave... If this continues, they will leave the company. Add a new production now?"\n\n`
+                  + `Act now or they will leave!`,
+                choices: [
+                  { label: '🎬 Commit to scheduling them soon (+loyalty)',
+                    effect: (s, d) => d({ type: A.UPDATE_ACTOR, id: actor.id,
+                      patch: { loyalty: 20, happiness: clamp((actor.happiness ?? 0) + 10, 0, 100) } }) },
+                  { label: `💸 Emergency bonus (−₩3,000, +loyalty)`,
+                    effect: (s, d) => {
+                      d({ type: A.ADD_MONEY, amount: -3000 })
+                      d({ type: A.UPDATE_ACTOR, id: actor.id,
+                        patch: { loyalty: 30, happiness: clamp((actor.happiness ?? 0) + 20, 0, 100) } })
+                    } },
+                  { label: `👋 Let ${actor.name} leave → Free Agents Pool`,
+                    effect: (s, d) => {
+                      // Move actor to free agents pool as ex-actor (Type A)
+                      const boostedSkills = {}
+                      for (const [k, v] of Object.entries(actor.skills ?? {})) {
+                        boostedSkills[k] = Math.min(100, Math.round(v * 2))
+                      }
+                      const resignCost = Math.round((actor.signCost ?? 200) * 3)
+                      d({ type: A.UPDATE_ACTOR, id: actor.id,
+                        patch: { signed: false, status: 'locked', loyalty: 0 } })
+                      d({ type: A.ADD_FREE_AGENT, entry: {
+                        poolId:           `ex_${actor.id}_${week}`,
+                        type:             'ex_actor',
+                        originalActorId:  actor.id,
+                        name:             actor.name,
+                        tier:             actor.tier,
+                        skills:           boostedSkills,
+                        characteristics:  actor.characteristics ?? [],
+                        signCost:         resignCost,
+                        happiness:        actor.happiness ?? 20,
+                        loyalty:          0,
+                        weeksInPool:      0,
+                        availableWeek:    week + 12,  // 12-week cooldown
+                        permanentlyGone:  false,
+                        idleReturnCount:  0,
+                      } })
+                      pushEventLog(d,
+                        `💔 ${actor.name} left the studio (loyalty=0) → Free Agents Pool`,
+                        'red', week,
+                      )
+                    } },
+                ],
+              },
+            },
+          })
+          pushEventLog(dispatch,
+            `⚠️ ${actor.name} loyalty at zero! Intervention needed.`, 'red', week,
+          )
+        }
+      }
+    }
+
+    // ── 5.1 Tick pool entries (weeksInPool++, remove ex-actors after 24 weeks) ─
+    if ((state.freeAgentsPool ?? []).length > 0) {
+      const updatedPool = (state.freeAgentsPool ?? [])
+        .map(e => ({ ...e, weeksInPool: (e.weeksInPool ?? 0) + 1 }))
+        .filter(e => {
+          if (e.permanentlyGone) return false
+          if (e.type === 'ex_actor' && e.weeksInPool >= 24) {
+            pushEventLog(dispatch,
+              `⌛ ${e.name} left the free agent pool permanently (24-week limit).`, 'red', week)
+            return false
+          }
+          return true
+        })
+      dispatch({ type: A.INIT_FREE_AGENTS, pool: updatedPool })
     }
 
     // ── 5.5 Numeric rank + tier unlocks ─────────────────────────────────────
@@ -314,6 +400,15 @@ export function useWeekAdvance() {
     for (const modal of pulse.modals) {
       const lbl = modal.data?.label ?? modal.data?.title ?? 'Chemistry Event'
       pushEventLog(dispatch, `[CHEM] ${lbl}`, 'pink', week)
+      dispatch({ type: A.PUSH_MODAL, modal })
+    }
+
+    // ── 7a2. CP events (Prompt 2) ─────────────────────────────────────────────
+    const cpEvents = rollCpEvents(state, week)
+    for (const { flagKey, modal } of cpEvents) {
+      dispatch({ type: A.SET_FLAG, key: flagKey, value: week })
+      const lbl = modal.data?.label ?? 'CP Event'
+      pushEventLog(dispatch, `[CP] ${lbl}`, 'pink', week)
       dispatch({ type: A.PUSH_MODAL, modal })
     }
 

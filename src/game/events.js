@@ -420,88 +420,295 @@ export function rollActorEvent(state) {
   return null
 }
 
+// ─── CP Event System (Prompt 2) ───────────────────────────────────────────────
+// During-production: actor requests (photos, lives, dances, covers, vlogs).
+// After-production: company-managed promos (BTS, OST, fan meets, ads).
+const DURING_PROD_EVENTS = [
+  { id: 'tiktok_dance',   label: '🕺 TIKTOK DANCE TREND',      skillKeys: ['dance','comedy'],   cost: 0 },
+  { id: 'ig_photos',      label: '📸 INSTAGRAM PHOTO DUMP',     skillKeys: ['visual','art'],     cost: 0 },
+  { id: 'youtube_vlog',   label: '🎥 YOUTUBE VLOG TOGETHER',    skillKeys: ['comedy','art'],     cost: 0 },
+  { id: 'singing_cover',  label: '🎵 SINGING COVER UPLOAD',     skillKeys: ['sing','visual'],    cost: 0 },
+  { id: 'live_stream',    label: '📡 LIVE STREAM SESSION',      skillKeys: ['comedy','visual'],  cost: 0 },
+]
+
+const AFTER_PROD_EVENTS = [
+  { id: 'bts_content',   label: '🎬 BEHIND-THE-SCENES DROP',   skillKeys: ['art','comedy'],     cost: 0    },
+  { id: 'ost_perf',      label: '🎤 OST LIVE PERFORMANCE',     skillKeys: ['sing','dance'],     cost: 1500 },
+  { id: 'fan_meeting',   label: '🎪 FAN MEETING EVENT',        skillKeys: ['visual','comedy'],  cost: 1500 },
+  { id: 'ad_promo',      label: '📢 AD PROMOTION CAMPAIGN',    skillKeys: ['visual','act'],     cost: 1000 },
+  { id: 'interview_pr',  label: '🗞️ JOINT INTERVIEW',         skillKeys: ['lang','comedy'],    cost: 0    },
+]
+
+function rollCpEventData(ev, a, b, isDuring) {
+  const avgSkill = ev.skillKeys.reduce((sum, k) => {
+    const aSkill = a.skills?.[k] ?? 30
+    const bSkill = b.skills?.[k] ?? 30
+    return sum + (aSkill + bSkill) / 2
+  }, 0) / ev.skillKeys.length
+  // Base 60% success + skill bonus up to 25%
+  const successChance = Math.min(0.85, 0.60 + (avgSkill / 100) * 0.25)
+
+  const chemDelta      = isDuring ? 8 : 5
+  const repDelta       = isDuring ? 4 : 0
+  const coRepDelta     = isDuring ? 0 : 5
+  const failChemDelta  = -5
+  const declineChemD   = -8
+  const declineRepD    = -3
+
+  return {
+    label: `${ev.label} — ${a.name} × ${b.name}`,
+    message:
+      (isDuring
+        ? `${a.name} and ${b.name} want to post ${ev.label.toLowerCase()} together. `
+          + `Fans are waiting! Will you greenlight this?`
+        : `Company promo opportunity: ${ev.label} featuring ${a.name} × ${b.name}.${ev.cost ? ` Cost: ₩${ev.cost.toLocaleString()}` : ' Free.'} Will you proceed?`)
+      + `\n\nOutcome will be revealed shortly.`,
+    choices: [
+      {
+        label: `✅ Accept${ev.cost ? ` (−₩${ev.cost.toLocaleString()})` : ''}`,
+        effect: (s, d) => {
+          if (ev.cost) d({ type: A.ADD_MONEY, amount: -ev.cost })
+          const success = Math.random() < successChance
+          if (success) {
+            // Update chemistry for both actors
+            const actorA = s.actors.find(x => x.id === a.id)
+            const actorB = s.actors.find(x => x.id === b.id)
+            if (actorA) {
+              d({ type: A.UPDATE_ACTOR, id: a.id, patch: {
+                chemistry_map: { ...(actorA.chemistry_map ?? {}), [b.id]: clamp((actorA.chemistry_map?.[b.id] ?? 0) + chemDelta, 0, 100) }
+              } })
+            }
+            if (actorB) {
+              d({ type: A.UPDATE_ACTOR, id: b.id, patch: {
+                chemistry_map: { ...(actorB.chemistry_map ?? {}), [a.id]: clamp((actorB.chemistry_map?.[a.id] ?? 0) + chemDelta, 0, 100) }
+              } })
+            }
+            if (isDuring) {
+              d({ type: A.UPDATE_ACTOR, id: a.id, patch: { fame: clamp((a.fame ?? 0) + repDelta * 100, 0, 999999) } })
+              d({ type: A.UPDATE_ACTOR, id: b.id, patch: { fame: clamp((b.fame ?? 0) + repDelta * 100, 0, 999999) } })
+            } else {
+              d({ type: A.ADD_REPUTATION, amount: coRepDelta })
+            }
+            d({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
+              title: `✨ ${ev.label} — SUCCESS!`,
+              message: `The content landed perfectly!\n\n+${chemDelta} chemistry · ${isDuring ? `+${repDelta} actor fame` : `+${coRepDelta} company rep`}`
+            } } })
+          } else {
+            // Failure
+            const actorA = s.actors.find(x => x.id === a.id)
+            const actorB = s.actors.find(x => x.id === b.id)
+            if (actorA) {
+              d({ type: A.UPDATE_ACTOR, id: a.id, patch: {
+                chemistry_map: { ...(actorA.chemistry_map ?? {}), [b.id]: clamp((actorA.chemistry_map?.[b.id] ?? 0) + failChemDelta, 0, 100) }
+              } })
+            }
+            if (actorB) {
+              d({ type: A.UPDATE_ACTOR, id: b.id, patch: {
+                chemistry_map: { ...(actorB.chemistry_map ?? {}), [a.id]: clamp((actorB.chemistry_map?.[a.id] ?? 0) + failChemDelta, 0, 100) }
+              } })
+            }
+            if (isDuring) {
+              d({ type: A.UPDATE_ACTOR, id: a.id, patch: { happiness: clamp((a.happiness ?? 70) - 8, 0, 100) } })
+              d({ type: A.UPDATE_ACTOR, id: b.id, patch: { happiness: clamp((b.happiness ?? 70) - 8, 0, 100) } })
+            } else {
+              d({ type: A.ADD_REPUTATION, amount: -3 })
+            }
+            d({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
+              title: `💔 ${ev.label} — FLOP`,
+              message: `The content didn't land as hoped.\n\n${failChemDelta} chemistry · ${isDuring ? '−8 actor happiness' : '−3 company rep'}`
+            } } })
+          }
+        },
+      },
+      {
+        label: '🤝 Negotiate',
+        effect: () => {}, // Keep existing negotiate flow — no extra logic
+      },
+      {
+        label: `❌ Decline`,
+        effect: (s, d) => {
+          const actorA = s.actors.find(x => x.id === a.id)
+          const actorB = s.actors.find(x => x.id === b.id)
+          if (actorA) {
+            d({ type: A.UPDATE_ACTOR, id: a.id, patch: {
+              chemistry_map: { ...(actorA.chemistry_map ?? {}), [b.id]: clamp((actorA.chemistry_map?.[b.id] ?? 0) + declineChemD, 0, 100) }
+            } })
+          }
+          if (actorB) {
+            d({ type: A.UPDATE_ACTOR, id: b.id, patch: {
+              chemistry_map: { ...(actorB.chemistry_map ?? {}), [a.id]: clamp((actorB.chemistry_map?.[a.id] ?? 0) + declineChemD, 0, 100) }
+            } })
+          }
+          if (isDuring) {
+            d({ type: A.ADD_REPUTATION, amount: declineRepD })
+          } else {
+            d({ type: A.ADD_REPUTATION, amount: declineRepD })
+          }
+        },
+      },
+    ],
+  }
+}
+
+// Returns array of CP event modals for this week. Called from weekAdvance.js.
+export function rollCpEvents(state, week) {
+  const modals = []
+  // 40% base chance per week to fire a CP event
+  if (Math.random() > 0.40) return modals
+
+  const activeProds = state.productions.filter(p => p.status === 'active')
+  if (!activeProds.length) return modals
+
+  // Collect all eligible CP pairs (filming or recently completed)
+  const duringPairs = []
+  const afterPairs  = []
+
+  for (const prod of activeProds) {
+    const leads = (prod.leadIds ?? []).map(id => state.actors.find(a => a.id === id)).filter(Boolean)
+    if (leads.length >= 2) {
+      if (prod.phase === 'filming') {
+        duringPairs.push({ a: leads[0], b: leads[1], prod })
+      } else if (prod.phase === 'releasing' || prod.phase === 'wrap') {
+        afterPairs.push({ a: leads[0], b: leads[1], prod })
+      }
+    }
+  }
+
+  const allPairs = [...duringPairs.map(p => ({ ...p, isDuring: true })),
+                    ...afterPairs.map(p => ({ ...p, isDuring: false }))]
+  if (!allPairs.length) return modals
+
+  const pair = allPairs[Math.floor(Math.random() * allPairs.length)]
+  const pool = pair.isDuring ? DURING_PROD_EVENTS : AFTER_PROD_EVENTS
+  const ev   = pool[Math.floor(Math.random() * pool.length)]
+
+  // 6-week cooldown per CP pair per event
+  const coolKey = `cpEvt_${ev.id}_${bondKey(pair.a.id, pair.b.id)}`
+  const lastWk  = state.flags?.[coolKey] ?? -999
+  if (week - lastWk < 6) return modals
+
+  modals.push({
+    flagKey: coolKey,
+    modal: {
+      type: 'event',
+      data: rollCpEventData(ev, pair.a, pair.b, pair.isDuring),
+    },
+  })
+  return modals
+}
+
 // ─── Chemistry Pulse — pure function, returns { modals, actions } ─────────────
 // Called every week advance. Returns action objects + modals (no direct dispatch).
+// 3.1: Chemistry deductions ONLY for actors in active productions.
 export function runChemPulse(state, week) {
   const modals  = []
   const actions = []
 
   const signed = state.actors.filter(a => a.signed)
 
-  // ── Pair checks ────────────────────────────────────────────────────────────
-  for (let i = 0; i < signed.length; i++) {
-    for (let j = i + 1; j < signed.length; j++) {
-      const a    = signed[i]
-      const b    = signed[j]
-      const chem = getChem(a, b.id)
-      const key  = bondKey(a.id, b.id)
+  // Build set of actor IDs currently in active productions
+  const activeProds = state.productions.filter(p => p.status === 'active')
+  const filmingActorIds = new Set(activeProds.flatMap(p => p.castIds ?? []))
 
-      const isFixed = (state.fixedCPs ?? []).some(
-        ([x, y]) => bondKey(x, y) === key
-      )
+  // ── Pair checks — only for actors currently filming together ───────────────
+  for (const prod of activeProds) {
+    const castIds = prod.castIds ?? []
+    const castActors = signed.filter(a => castIds.includes(a.id))
 
-      // Fixed CP + chem < 25 → breakup crisis
-      if (isFixed && chem < 25) {
-        const coolKey = `cpBreakup_${key}`
-        const lastWk  = state.flags?.[coolKey] ?? -999
-        if (week - lastWk >= 4) {
-          actions.push({ type: A.SET_FLAG, key: coolKey, value: week })
-          modals.push({
-            type: 'event',
-            data: {
-              label: '💔 CP BREAKUP CRISIS',
-              message:
-                `The chemistry between ${a.name} and ${b.name} has fallen critically low (${chem}). `
-                + `Their Fixed CP contract is at risk of dissolving.`,
-              choices: [
-                { label: '💰 Intensive bonding session (−₩1,500, +chemistry)',
-                  effect: (s, d) => {
-                    d({ type: A.ADD_MONEY, amount: -1500 })
-                    const newMap = { ...(a.chemistry_map ?? {}), [b.id]: clamp(chem + 20, 0, 100) }
-                    d({ type: A.UPDATE_ACTOR, id: a.id, patch: { chemistry_map: newMap } })
-                  } },
-                { label: '🔓 Dissolve the CP contract',
-                  effect: (s, d) => d({ type: A.REMOVE_FIXED_CP, pair: [a.id, b.id] }) },
-              ],
-            },
-          })
+    for (let i = 0; i < castActors.length; i++) {
+      for (let j = i + 1; j < castActors.length; j++) {
+        const a    = castActors[i]
+        const b    = castActors[j]
+        const chem = getChem(a, b.id)
+        const key  = bondKey(a.id, b.id)
+
+        const isFixed = (state.fixedCPs ?? []).some(
+          ([x, y]) => bondKey(x, y) === key
+        )
+
+        // Fixed CP + chem < 20 → breakup crisis (3.2 spec: <20%)
+        if (isFixed && chem < 20) {
+          const coolKey = `cpBreakup_${key}`
+          const lastWk  = state.flags?.[coolKey] ?? -999
+          if (week - lastWk >= 4) {
+            actions.push({ type: A.SET_FLAG, key: coolKey, value: week })
+            modals.push({
+              type: 'event',
+              data: {
+                label: '💔 CP BREAKUP CRISIS',
+                message:
+                  `The chemistry between ${a.name} and ${b.name} has fallen critically low (${chem}). `
+                  + `Their Fixed CP contract is at risk of dissolving.`,
+                choices: [
+                  { label: '💰 Intensive bonding session (−₩1,500, +chemistry)',
+                    effect: (s, d) => {
+                      d({ type: A.ADD_MONEY, amount: -1500 })
+                      const curA = s.actors.find(x => x.id === a.id)
+                      if (curA) {
+                        const newMap = { ...(curA.chemistry_map ?? {}), [b.id]: clamp(chem + 25, 0, 100) }
+                        d({ type: A.UPDATE_ACTOR, id: a.id, patch: { chemistry_map: newMap } })
+                      }
+                      const curB = s.actors.find(x => x.id === b.id)
+                      if (curB) {
+                        const newMap = { ...(curB.chemistry_map ?? {}), [a.id]: clamp(chem + 25, 0, 100) }
+                        d({ type: A.UPDATE_ACTOR, id: b.id, patch: { chemistry_map: newMap } })
+                      }
+                    } },
+                  { label: '🔓 Dissolve the CP contract (−rep −loyalty)',
+                    effect: (s, d) => {
+                      d({ type: A.REMOVE_FIXED_CP, pair: [a.id, b.id] })
+                      d({ type: A.ADD_REPUTATION, amount: -5 })
+                      d({ type: A.UPDATE_ACTOR, id: a.id, patch: {
+                        loyalty:   clamp((a.loyalty ?? 60) - 15, 0, 100),
+                        happiness: clamp((a.happiness ?? 70) - 10, 0, 100),
+                      } })
+                      d({ type: A.UPDATE_ACTOR, id: b.id, patch: {
+                        loyalty:   clamp((b.loyalty ?? 60) - 15, 0, 100),
+                        happiness: clamp((b.happiness ?? 70) - 10, 0, 100),
+                      } })
+                    } },
+                ],
+              },
+            })
+          }
+          continue
         }
-        continue
-      }
 
-      // chem ≥ 75 → endorsement deal (8-week cooldown)
-      if (chem >= 75) {
-        const coolKey = `chemHigh_${key}`
-        const lastWk  = state.flags?.[coolKey] ?? -999
-        if (week - lastWk >= 8) {
-          actions.push({ type: A.SET_FLAG, key: coolKey, value: week })
-          actions.push({ type: A.ADD_MONEY, amount: 1200 })
-          modals.push({
-            type: 'generic',
-            data: {
-              title: '💕 CP ENDORSEMENT DEAL!',
-              message:
-                `${a.name} × ${b.name} chemistry (${chem}) caught a brand's eye!\n\n`
-                + `Endorsement income: +₩1,200`,
-            },
-          })
+        // chem ≥ 75 → endorsement deal (8-week cooldown) — positive, keep for filming pairs
+        if (chem >= 75) {
+          const coolKey = `chemHigh_${key}`
+          const lastWk  = state.flags?.[coolKey] ?? -999
+          if (week - lastWk >= 8) {
+            actions.push({ type: A.SET_FLAG, key: coolKey, value: week })
+            actions.push({ type: A.ADD_MONEY, amount: 1200 })
+            modals.push({
+              type: 'generic',
+              data: {
+                title: '💕 CP ENDORSEMENT DEAL!',
+                message:
+                  `${a.name} × ${b.name} chemistry (${chem}) caught a brand's eye!\n\n`
+                  + `Endorsement income: +₩1,200`,
+              },
+            })
+          }
         }
-      // chem < 25 + not fixed → awkward rumours (6-week cooldown)
-      } else if (chem < 25 && !isFixed) {
-        const coolKey = `chemLow_${key}`
-        const lastWk  = state.flags?.[coolKey] ?? -999
-        if (week - lastWk >= 6) {
-          actions.push({ type: A.SET_FLAG, key: coolKey, value: week })
-          actions.push({ type: A.ADD_REPUTATION, amount: -2 })
-          modals.push({
-            type: 'generic',
-            data: {
-              title: '😬 AWKWARD CO-STARS',
-              message:
-                `${a.name} and ${b.name}'s chemistry (${chem}) is painfully low. `
-                + `Fans noticed the awkward interview — reputation −2.`,
-            },
-          })
+        // 3.1: Awkward rumours only for filming pairs (deduction)
+        else if (chem < 20 && !isFixed) {
+          const coolKey = `chemLow_${key}`
+          const lastWk  = state.flags?.[coolKey] ?? -999
+          if (week - lastWk >= 6) {
+            actions.push({ type: A.SET_FLAG, key: coolKey, value: week })
+            actions.push({ type: A.ADD_REPUTATION, amount: -2 })
+            modals.push({
+              type: 'generic',
+              data: {
+                title: '😬 AWKWARD ON-SET CO-STARS',
+                message:
+                  `${a.name} and ${b.name}'s on-set chemistry (${chem}) is painfully low. `
+                  + `The tension leaked to fans — reputation −2.`,
+              },
+            })
+          }
         }
       }
     }
