@@ -6,7 +6,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { useGame, A, pushToast } from '../game/state.jsx'
 import {
-  PROD_TYPES, SCHEDULES, PLATFORMS, RATINGS, GENRES, STORY_TYPES,
+  PROD_TYPES, SCHEDULES, PLATFORMS, RATINGS, GENRES, GENRE_EMOJI, STORY_TYPES,
   BUDGET_TIERS, TITLE_POOL, calcCost, createProduction,
   genCpName, getComboResult,
 } from '../game/productions.js'
@@ -51,7 +51,9 @@ export default function ProductionForm({ setScreen }) {
   const [cpName,    setCpName]    = useState('')
   const [cpEdited,  setCpEdited]  = useState(false)
   const [showChem,  setShowChem]  = useState(true)
-  const [cpFixed,   setCpFixed]   = useState(false)  // 3.2: Fixed vs Unfixed CP
+  const [cpFixed,       setCpFixed]       = useState(false)
+  const [showGenrePick, setShowGenrePick] = useState(false)  // genre select modal
+  const [showSlotMachine, setShowSlotMachine] = useState(false)  // random genre modal
 
   // 5.1: Randomized title suggestions (fresh on mount, never change during session)
   const [titleSuggestions] = useState(pickRandomTitles)
@@ -210,17 +212,42 @@ export default function ProductionForm({ setScreen }) {
         {/* Genre */}
         <div className="field">
           <label>GENRE</label>
-          <div className="seg" style={{ flexWrap: 'wrap' }}>
-            {GENRES.map(g => (
-              <button key={g} type="button"
-                className={genre === g ? 'sel' : ''}
-                onClick={() => { SFX.click(); setGenre(g) }}
-              >
-                {g}
-              </button>
-            ))}
+          {/* Selected genre display */}
+          <div style={styles.genreDisplay}>
+            <span style={{ fontSize: 16 }}>{GENRE_EMOJI[genre] ?? '🎬'}</span>
+            <span style={{ fontSize: 10, color: 'var(--white)', fontWeight: 'bold' }}>{genre}</span>
+          </div>
+          {/* Two action buttons */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button type="button" style={styles.genreBtn}
+              onClick={() => { SFX.click(); setShowGenrePick(true) }}
+            >
+              🎭 Select Genre
+            </button>
+            <button type="button" style={{ ...styles.genreBtn, background: 'var(--lav)', color: 'var(--bg-deep)' }}
+              onClick={() => { SFX.click(); setShowSlotMachine(true) }}
+            >
+              🎰 Random Genre
+            </button>
           </div>
         </div>
+
+        {/* Genre pick modal */}
+        {showGenrePick && (
+          <GenrePickModal
+            current={genre}
+            onSelect={g => { setGenre(g); setShowGenrePick(false); SFX.confirm() }}
+            onClose={() => setShowGenrePick(false)}
+          />
+        )}
+
+        {/* Slot machine modal */}
+        {showSlotMachine && (
+          <SlotMachineModal
+            onSelect={g => { setGenre(g); setShowSlotMachine(false); SFX.confirm() }}
+            onClose={() => setShowSlotMachine(false)}
+          />
+        )}
 
       </div>
 
@@ -541,7 +568,268 @@ function LeadMini({ actor }) {
   )
 }
 
+// ─── Genre Pick Modal ─────────────────────────────────────────────────────────
+function GenrePickModal({ current, onSelect, onClose }) {
+  return (
+    <div style={modalStyles.overlay} onClick={onClose}>
+      <div style={modalStyles.box} onClick={e => e.stopPropagation()}>
+        <div style={modalStyles.title}>🎭 SELECT GENRE</div>
+        <div style={modalStyles.grid}>
+          {GENRES.map(g => (
+            <button
+              key={g}
+              type="button"
+              style={{
+                ...modalStyles.genreCard,
+                ...(current === g ? modalStyles.genreCardSel : {}),
+              }}
+              onClick={() => onSelect(g)}
+            >
+              <span style={{ fontSize: 20, display: 'block', marginBottom: 4 }}>
+                {GENRE_EMOJI[g] ?? '🎬'}
+              </span>
+              <span style={{ fontSize: 7, color: current === g ? 'var(--bg-deep)' : 'var(--white)' }}>
+                {g}
+              </span>
+            </button>
+          ))}
+        </div>
+        <button type="button" style={modalStyles.closeBtn} onClick={onClose}>✕ CANCEL</button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Slot Machine Modal ───────────────────────────────────────────────────────
+function SlotMachineModal({ onSelect, onClose }) {
+  const [spinning,    setSpinning]    = React.useState(false)
+  const [landed,      setLanded]      = React.useState(null)
+  const [displayIdx,  setDisplayIdx]  = React.useState(0)
+  const intervalRef = React.useRef(null)
+
+  function spin() {
+    if (spinning) return
+    setLanded(null)
+    setSpinning(true)
+
+    let tick = 0
+    const totalTicks = 28 + Math.floor(Math.random() * 10)  // 28–37 ticks
+    let delay = 60
+
+    function nextTick() {
+      setDisplayIdx(i => (i + 1) % GENRES.length)
+      tick++
+      if (tick >= totalTicks) {
+        // Land on a random genre
+        const winner = GENRES[Math.floor(Math.random() * GENRES.length)]
+        setDisplayIdx(GENRES.indexOf(winner))
+        setLanded(winner)
+        setSpinning(false)
+        return
+      }
+      // Slow down near the end
+      if (tick > totalTicks - 8) delay = 80 + (tick - (totalTicks - 8)) * 40
+      intervalRef.current = setTimeout(nextTick, delay)
+    }
+    intervalRef.current = setTimeout(nextTick, delay)
+  }
+
+  React.useEffect(() => {
+    spin()
+    return () => clearTimeout(intervalRef.current)
+  }, [])
+
+  const displayGenre = GENRES[displayIdx] ?? GENRES[0]
+
+  return (
+    <div style={modalStyles.overlay} onClick={!spinning ? onClose : undefined}>
+      <div style={modalStyles.box} onClick={e => e.stopPropagation()}>
+        <div style={modalStyles.title}>🎰 RANDOM GENRE</div>
+
+        {/* Slot window */}
+        <div style={modalStyles.slotWindow}>
+          <div style={{
+            fontSize: 40,
+            transition: spinning ? 'none' : 'transform 0.3s',
+            filter: spinning ? 'blur(1px)' : 'none',
+          }}>
+            {GENRE_EMOJI[displayGenre] ?? '🎬'}
+          </div>
+          <div style={{
+            fontSize: 12,
+            color: landed ? 'var(--gold)' : 'var(--lav)',
+            marginTop: 8,
+            letterSpacing: 2,
+            fontWeight: 'bold',
+            minHeight: 20,
+            transition: 'color 0.2s',
+          }}>
+            {spinning ? displayGenre : (landed ?? displayGenre)}
+          </div>
+          {landed && (
+            <div style={{ fontSize: 7, color: 'var(--green)', marginTop: 6, letterSpacing: 1 }}>
+              ✨ LANDED!
+            </div>
+          )}
+        </div>
+
+        {/* Spinning strip preview */}
+        <div style={modalStyles.slotStrip}>
+          {GENRES.slice(displayIdx, displayIdx + 5).concat(GENRES.slice(0, Math.max(0, 5 - (GENRES.length - displayIdx)))).map((g, i) => (
+            <span key={i} style={{
+              fontSize: 16,
+              opacity: i === 0 ? 1 : 0.3 - i * 0.04,
+              transition: 'opacity 0.1s',
+            }}>
+              {GENRE_EMOJI[g] ?? '🎬'}
+            </span>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+          <button type="button" style={modalStyles.spinBtn}
+            onClick={spin} disabled={spinning}
+          >
+            {spinning ? '⏳ SPINNING…' : '🎰 SPIN AGAIN'}
+          </button>
+          {landed && (
+            <button type="button" style={modalStyles.acceptBtn}
+              onClick={() => onSelect(landed)}
+            >
+              ✅ USE {landed.toUpperCase()}
+            </button>
+          )}
+        </div>
+        {!spinning && (
+          <button type="button" style={modalStyles.closeBtn} onClick={onClose}>✕ CANCEL</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const modalStyles = {
+  overlay: {
+    position:       'fixed',
+    inset:          0,
+    background:     'rgba(0,0,0,0.82)',
+    zIndex:         200,
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  box: {
+    background:  'var(--bg-deep)',
+    border:      '3px solid var(--pink)',
+    padding:     '20px 18px',
+    maxWidth:    380,
+    width:       '94%',
+    maxHeight:   '85vh',
+    overflowY:   'auto',
+    boxShadow:   '4px 4px 0 #8A2B52',
+    display:     'flex',
+    flexDirection: 'column',
+    alignItems:  'center',
+    gap:         10,
+  },
+  title: {
+    fontSize:    11,
+    color:       'var(--pink)',
+    letterSpacing: 2,
+    fontWeight:  'bold',
+    marginBottom: 4,
+  },
+  grid: {
+    display:             'grid',
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    gap:                 8,
+    width:               '100%',
+  },
+  genreCard: {
+    padding:     '10px 4px',
+    background:  'var(--bg-inset)',
+    border:      '2px solid var(--shadow)',
+    cursor:      'pointer',
+    display:     'flex',
+    flexDirection: 'column',
+    alignItems:  'center',
+    minHeight:   'auto',
+    transition:  'border-color 0.15s',
+  },
+  genreCardSel: {
+    background:  'var(--pink)',
+    border:      '2px solid var(--gold)',
+  },
+  closeBtn: {
+    marginTop:   8,
+    fontSize:    7,
+    padding:     '5px 14px',
+    background:  'var(--bg-inset)',
+    border:      '2px solid var(--gray)',
+    color:       'var(--gray)',
+    cursor:      'pointer',
+    boxShadow:   'none',
+    minHeight:   'auto',
+  },
+  slotWindow: {
+    background:  'var(--bg-inset)',
+    border:      '3px solid var(--gold)',
+    padding:     '20px 40px',
+    textAlign:   'center',
+    minWidth:    180,
+  },
+  slotStrip: {
+    display:     'flex',
+    gap:         8,
+    alignItems:  'center',
+    padding:     '4px 0',
+  },
+  spinBtn: {
+    fontSize:    8,
+    padding:     '8px 14px',
+    background:  'var(--lav)',
+    color:       'var(--bg-deep)',
+    border:      'none',
+    boxShadow:   '2px 2px 0 #4a3a8a',
+    cursor:      'pointer',
+    minHeight:   'auto',
+  },
+  acceptBtn: {
+    fontSize:    8,
+    padding:     '8px 14px',
+    background:  'var(--green)',
+    color:       'var(--bg-deep)',
+    border:      'none',
+    boxShadow:   '2px 2px 0 #1a5a2a',
+    cursor:      'pointer',
+    minHeight:   'auto',
+    fontWeight:  'bold',
+  },
+}
+
 const styles = {
+  genreDisplay: {
+    display:     'flex',
+    alignItems:  'center',
+    gap:         10,
+    padding:     '10px 12px',
+    background:  'var(--bg-inset)',
+    border:      '2px solid var(--pink-dim)',
+    marginTop:   6,
+  },
+  genreBtn: {
+    flex:        1,
+    fontSize:    8,
+    padding:     '9px 10px',
+    background:  'var(--pink)',
+    color:       'var(--bg-deep)',
+    border:      'none',
+    boxShadow:   '2px 2px 0 #8A2B52',
+    cursor:      'pointer',
+    minHeight:   'auto',
+    fontWeight:  'bold',
+    letterSpacing: 1,
+  },
   suggestChip: {
     fontSize:   7,
     padding:    '5px 8px',

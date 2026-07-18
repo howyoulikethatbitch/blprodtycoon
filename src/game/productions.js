@@ -31,7 +31,34 @@ export const RATINGS = [
 ]
 
 // ─── Genres ───────────────────────────────────────────────────────────────────
-export const GENRES = ['Romance', 'Comedy', 'Slice of Life', 'School', 'Office']
+export const GENRES = [
+  'Romance', 'Comedy', 'Slice of Life', 'School', 'Office',
+  'Action', 'Drama', 'Fantasy', 'Horror', 'Mystery',
+  'Thriller', 'Historical', 'Sci-Fi', 'Sports', 'Crime',
+  'Music', 'Idol', 'Psychological', 'Omegaverse',
+]
+
+export const GENRE_EMOJI = {
+  Romance:       '💕',
+  Comedy:        '😂',
+  'Slice of Life':'🌸',
+  School:        '📚',
+  Office:        '💼',
+  Action:        '⚔️',
+  Drama:         '🎭',
+  Fantasy:       '🧙',
+  Horror:        '👻',
+  Mystery:       '🔍',
+  Thriller:      '😱',
+  Historical:    '🏯',
+  'Sci-Fi':      '🚀',
+  Sports:        '⚽',
+  Crime:         '🔫',
+  Music:         '🎵',
+  Idol:          '🌟',
+  Psychological: '🧠',
+  Omegaverse:    '🐺',
+}
 
 // ─── Story origin ─────────────────────────────────────────────────────────────
 export const STORY_TYPES = [
@@ -62,10 +89,65 @@ export function genCpName(name1, name2) {
 }
 
 // ─── Genre × Type combo system ────────────────────────────────────────────────
+// Existing 5 genres unchanged. New genres follow same tier: 1.5=PERFECT, 1.0=GOOD, 0.6=BAD FIT
 const COMBO_TABLE = {
-  mini_series: { Romance: 1.5, Comedy: 1.5, School: 1.5, 'Slice of Life': 1.0, Office: 0.6 },
-  series:      { Romance: 1.5, Office: 1.5, Comedy:  1.0, 'Slice of Life': 1.0, School: 0.6 },
-  movie:       { Romance: 1.5, 'Slice of Life': 1.5, School: 1.0, Comedy: 1.0, Office: 0.6 },
+  mini_series: {
+    // ── Original 5 (unchanged) ──
+    Romance: 1.5, Comedy: 1.5, School: 1.5, 'Slice of Life': 1.0, Office: 0.6,
+    // ── New genres ──
+    Action:        1.0,  // action works in any format
+    Drama:         1.0,
+    Fantasy:       1.0,
+    Horror:        1.5,  // horror miniseries hit hard
+    Mystery:       1.5,  // tight mystery perfect for short run
+    Thriller:      1.0,
+    Historical:    0.6,  // historical needs long runtime & budget
+    'Sci-Fi':      1.0,
+    Sports:        1.5,  // underdog sport arcs suit mini
+    Crime:         1.5,  // crime anthologies thrive as mini
+    Music:         1.5,  // music biopics & idol arcs suit mini
+    Idol:          1.5,  // idol stories shine in compact format
+    Psychological: 1.5,  // slow-burn tension perfect for mini
+    Omegaverse:    1.5,  // fan-favorite; best in tight format
+  },
+  series: {
+    // ── Original 5 (unchanged) ──
+    Romance: 1.5, Office: 1.5, Comedy: 1.0, 'Slice of Life': 1.0, School: 0.6,
+    // ── New genres ──
+    Action:        1.5,  // action series are prestige TV
+    Drama:         1.5,  // dramas shine in long format
+    Fantasy:       1.5,  // world-building needs full series
+    Horror:        1.0,
+    Mystery:       1.5,  // season-long mysteries are gripping
+    Thriller:      1.5,  // slow-burn thriller = binge gold
+    Historical:    1.5,  // historical epics need long runtime
+    'Sci-Fi':      1.5,  // sci-fi lore needs room to breathe
+    Sports:        1.0,
+    Crime:         1.5,  // procedural crime thrives as series
+    Music:         1.0,
+    Idol:          1.5,  // idol journey suits a full season
+    Psychological: 1.5,
+    Omegaverse:    1.0,
+  },
+  movie: {
+    // ── Original 5 (unchanged) ──
+    Romance: 1.5, 'Slice of Life': 1.5, School: 1.0, Comedy: 1.0, Office: 0.6,
+    // ── New genres ──
+    Action:        1.5,  // action movies are box office gold
+    Drama:         1.0,
+    Fantasy:       1.0,
+    Horror:        1.5,  // horror films are a classic format
+    Mystery:       1.0,
+    Thriller:      1.5,  // thriller films build great tension
+    Historical:    1.0,
+    'Sci-Fi':      1.5,  // sci-fi spectacle needs the big screen
+    Sports:        1.0,
+    Crime:         1.0,
+    Music:         1.0,
+    Idol:          0.6,  // idol story too short for full arc in film
+    Psychological: 1.0,
+    Omegaverse:    0.6,  // too niche & complex for film format
+  },
 }
 
 export function getComboResult(type, genre) {
