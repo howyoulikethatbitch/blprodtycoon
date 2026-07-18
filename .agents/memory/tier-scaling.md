@@ -1,26 +1,40 @@
 ---
 name: Tier scaling system
-description: How the Prompt-8 tier-based balance system is wired across the codebase.
+description: How the tier-based difficulty system is wired — now rank-based (Prompt 1), not week-based.
 ---
 
 # Tier scaling system
 
 ## Rule
-Game difficulty scales by current week (not company rank) via `getGameTier(week)` from `src/game/tiers.js`. The four tiers are: Rookie (0–19), Rising Star (20–49), Popular (50–99), Worldwide (100+).
+Game difficulty scales by **numeric industry rank** (not week) via `getGameTierByRank(numericRank)` from `src/game/tiers.js`. Thresholds match actor tier unlock ranks exactly.
 
-**Why:** Prompt 8 spec — early game should be forgiving, late game challenging but fair.
+**Why:** Prompt 1 — tier difficulty should match the effort required to climb industry rank. Players who climb slowly stay in easier tiers longer, which is fair.
 
 **How to apply:**
-- `getGameTier(week)` → returns tier config object with all balance params
-- `getNextGameTier(week)` → returns next tier config (or null at Worldwide)
-- Tier is read at the top of `advanceWeek()` in weekAdvance.js and threaded through all sub-calls
-- To add new tier-scaled parameters, add the field to each entry in `GAME_TIERS` in tiers.js
+- `getGameTierByRank(numericRank)` → tier config (Rookie rank>39, Rising 25–39, Popular 10–24, Worldwide ≤9)
+- `getNextGameTierByRank(numericRank)` → next tier config (or null at Worldwide)
+- `getNextTierRankThreshold(numericRank)` → rank number needed to reach next tier (for TopBar display)
+- Use `state.numericRank ?? 50` everywhere — old `getGameTier(week)` still exists for backward compat but should not be used in new code
+- `getGameTier(week)` remains exported but is superseded
 
 ## Key wiring points
-- **events.js**: CP event frequency (cpEventFreq), decline penalties, free:paid ratio, CP breakup threshold — all read from tier
-- **actors.js**: `weeklyActorTick(actor, tier)` — idle happiness/loyalty thresholds and tick rate from tier; filming gives +5 loyalty/week; tracks activeFilmingWeeks and wasHappyBeforeIdle for happiness recovery
-- **productions.js**: `calcCost(..., costMod)` and `calcRevenue(..., revenueMod)` accept optional tier multipliers
-- **evaluators.js / critics.js**: `runAllCritics(..., tier)` applies reviewStarBonus and repLossCap
-- **weekAdvance.js**: computes `tier = getGameTier(week)` at start; passes to all sub-calls; handles emergency save at loyalty ≤ 10 (flag: loyaltyEmergency_<actorId>); adds reputation repair events (30% after rep loss); applies resignCostMult to ex-actor resign cost
-- **ProductionForm.jsx**: reads `getGameTier(state.week)` and passes `productionCostMod` to `calcCost`; shows tier info in cost preview
-- **TopBar.jsx**: renders `TierStat` component showing current tier label, color, and weeks until next tier
+- **weekAdvance.js**: `const tier = getGameTierByRank(state.numericRank ?? 50)` at top of advanceWeek
+- **events.js**: `rollCpEvents` and `runChemPulse` use `getGameTierByRank(state.numericRank ?? 50)`
+- **TopBar.jsx**: shows current tier label + "need rank #N" for next tier
+- **ProductionForm.jsx**: reads `getGameTierByRank(state.numericRank ?? 50)` for cost/revenue display
+
+## Tier unlock (Prompt 2): actor auto-sign
+When numeric rank crosses threshold (≤39/≤24/≤9), all actors of that tier are automatically signed for free via UPDATE_ACTOR (no cost, no "pay to sign" modal). A celebration modal lists the new actors' names. Function `autoSignTier(tierName, emoji, rankNum)` in weekAdvance.js handles this — checks `!state.unlockedTiers.includes(tierName)` to prevent re-firing.
+
+## Other key decisions
+- CP events always succeed on Accept (Prompt 8 — kept from previous session)
+- Negotiate option removed from all CP events (Prompt 6.2)
+- +happiness to both CP actors on Accept (Prompt 6.1)
+- Genre reuse penalty: −15%/−25% on score (Prompt 4)
+- Actor happiness ±δ after production based on grade (Prompt 3): S+15, A+10, B+6, C0, D−6, F−12
+- Budget custom max: 3.0 (was 2.5) — Prompt 3
+- Grade labels: F Terrible, D Bad, C Neutral, B Good, A Great, S Perfect — Prompt 3
+- Sponsorship event gated at money ≤ 50,000 — Prompt 6.4
+- comp_fixed_cp event only shows for actors with no existing fixed CP — Prompt 6.3
+- 7 tricky events with ⚠️ badge; 30% routing in rollWeeklyEvents — Prompt 6.5
+- CP auto-fill in ProductionForm: selecting a lead with a fixedCP auto-fills partner with 🔒 badge — Prompt 5

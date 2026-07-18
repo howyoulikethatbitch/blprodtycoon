@@ -93,13 +93,45 @@ export const GAME_TIERS = [
   },
 ]
 
-/** Returns the tier config for the given game week. */
+/** Returns the tier config for the given game week (legacy — week-based). */
 export function getGameTier(week) {
   return GAME_TIERS.find(t => week >= t.minWeek && week <= t.maxWeek) ?? GAME_TIERS[0]
 }
 
-/** Returns the next tier config (or null if at max tier). */
+/** Returns the next tier config by week (or null if at max tier). */
 export function getNextGameTier(week) {
   const idx = GAME_TIERS.findIndex(t => week >= t.minWeek && week <= t.maxWeek)
   return idx >= 0 && idx < GAME_TIERS.length - 1 ? GAME_TIERS[idx + 1] : null
+}
+
+/**
+ * Prompt 1: Rank-based tier lookup.
+ * Tier progression difficulty now mirrors industry ranking milestones:
+ *   Rookie     → rank 40–50  (rank > 39)
+ *   Rising Star→ rank 25–39  (rank ≤ 39)
+ *   Popular    → rank 10–24  (rank ≤ 24)
+ *   Worldwide  → rank 1–9    (rank ≤  9)
+ * Matches TIER_UNLOCK_RANK in actors.js exactly.
+ */
+export function getGameTierByRank(numericRank) {
+  if (numericRank <= 9)  return GAME_TIERS[3]  // Worldwide
+  if (numericRank <= 24) return GAME_TIERS[2]  // Popular
+  if (numericRank <= 39) return GAME_TIERS[1]  // Rising Star
+  return GAME_TIERS[0]                          // Rookie
+}
+
+/** Returns the next tier config by rank, or null at Worldwide. */
+export function getNextGameTierByRank(numericRank) {
+  const current = getGameTierByRank(numericRank)
+  const idx     = GAME_TIERS.findIndex(t => t.id === current.id)
+  return idx >= 0 && idx < GAME_TIERS.length - 1 ? GAME_TIERS[idx + 1] : null
+}
+
+/** Numeric rank threshold at which the next tier unlocks (for TopBar display). */
+export function getNextTierRankThreshold(numericRank) {
+  const thresholds = [39, 24, 9]  // Rookie→Rising, Rising→Popular, Popular→Worldwide
+  if (numericRank <= 9)  return null  // already at max
+  if (numericRank <= 24) return 9
+  if (numericRank <= 39) return 24
+  return 39
 }

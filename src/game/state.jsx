@@ -17,6 +17,8 @@ export const INITIAL_STATE = {
   numericRank:   50,
   awards:        0,
   unlockedTiers: ['Rookie'],
+  // Prompt 4: genre unlock system — default unlocked, expand by production grade
+  unlockedGenres: ['Romance', 'School', 'Office'],
   actors:        [],
   productions:   [],
   history:       [],
@@ -76,6 +78,8 @@ export const A = {
   REMOVE_FREE_AGENT:  'REMOVE_FREE_AGENT',
   UPDATE_FREE_AGENT:  'UPDATE_FREE_AGENT',
   INIT_FREE_AGENTS:   'INIT_FREE_AGENTS',
+  // Prompt 4: genre unlock system
+  UNLOCK_GENRES:      'UNLOCK_GENRES',
 }
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -121,6 +125,13 @@ function gameReducer(state, action) {
     case A.UNLOCK_TIER:
       if (state.unlockedTiers.includes(action.tier)) return state
       return { ...state, unlockedTiers: [...state.unlockedTiers, action.tier] }
+
+    case A.UNLOCK_GENRES: {
+      const current  = state.unlockedGenres ?? ['Romance', 'School', 'Office']
+      const incoming = (action.genres ?? []).filter(g => !current.includes(g))
+      if (!incoming.length) return state
+      return { ...state, unlockedGenres: [...current, ...incoming] }
+    }
 
     case A.SET_ACTORS:
       return { ...state, actors: action.actors }

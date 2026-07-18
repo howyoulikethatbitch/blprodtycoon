@@ -8,9 +8,9 @@ import { useGame, A, pushToast } from '../game/state.jsx'
 import {
   PROD_TYPES, SCHEDULES, PLATFORMS, RATINGS, GENRES, GENRE_EMOJI, STORY_TYPES,
   BUDGET_TIERS, TITLE_POOL, calcCost, createProduction,
-  genCpName, getComboResult,
+  genCpName, getComboResult, DEFAULT_GENRES,
 } from '../game/productions.js'
-import { getGameTier } from '../game/tiers.js'
+import { getGameTierByRank } from '../game/tiers.js'
 import { calcChemistryBonus, chemTier, getChem } from '../game/chemistry.js'
 import { canAssign, moodEmoji } from '../game/actors.js'
 import { fmtMoney } from '../game/ranking.js'
@@ -21,7 +21,7 @@ const BASE = import.meta.env.BASE_URL
 
 const DEFAULT_BUDGET = 1.0
 const BUDGET_MIN     = 0.5
-const BUDGET_MAX     = 2.5
+const BUDGET_MAX     = 3.0  // Prompt 3: increased from 2.5
 
 // 5.1: Pick 3 random title suggestions fresh on each component mount
 function pickRandomTitles() {
@@ -77,6 +77,49 @@ export default function ProductionForm({ setScreen }) {
     }
   }, [lead1Id, lead2Id, cpEdited])
 
+  // Prompt 5: CP auto-fill — when a lead with a fixed CP is selected,
+  // automatically fill the partner slot.
+  const [lead2FixedLocked, setLead2FixedLocked] = useState(false)
+  const [lead1FixedLocked, setLead1FixedLocked] = useState(false)
+
+  function findFixedPartner(actorId) {
+    if (!actorId) return null
+    const id = Number(actorId)
+    for (const [x, y] of (state.fixedCPs ?? [])) {
+      if (x === id) return y
+      if (y === id) return x
+    }
+    return null
+  }
+
+  function handleLead1Change(v) {
+    SFX.click()
+    setLead1Id(v)
+    setCpEdited(false)
+    setLead1FixedLocked(false)
+    const partner = findFixedPartner(v)
+    if (partner) {
+      setLead2Id(String(partner))
+      setLead2FixedLocked(true)
+    } else {
+      setLead2FixedLocked(false)
+    }
+  }
+
+  function handleLead2Change(v) {
+    SFX.click()
+    setLead2Id(v)
+    setCpEdited(false)
+    setLead2FixedLocked(false)
+    const partner = findFixedPartner(v)
+    if (partner) {
+      setLead1Id(String(partner))
+      setLead1FixedLocked(true)
+    } else {
+      setLead1FixedLocked(false)
+    }
+  }
+
   // Cast: leads + any additional from the cast pool
   const castIds = useMemo(() => {
     const ids = []
@@ -111,8 +154,8 @@ export default function ProductionForm({ setScreen }) {
   // Combo preview
   const combo = getComboResult(prodType, genre)
 
-  // Prompt 8: apply tier production cost modifier
-  const gameTier = getGameTier(state.week)
+  // Prompt 1: tier now rank-based
+  const gameTier = getGameTierByRank(state.numericRank ?? 50)
 
   // Cost & affordability
   const cost     = calcCost(prodType, budgetMult, schedule, castIds.length, gameTier.productionCostMod)
@@ -242,6 +285,7 @@ export default function ProductionForm({ setScreen }) {
             current={genre}
             onSelect={g => { setGenre(g); setShowGenrePick(false); SFX.confirm() }}
             onClose={() => setShowGenrePick(false)}
+            unlockedGenres={state.unlockedGenres ?? DEFAULT_GENRES}
           />
         )}
 
@@ -250,6 +294,7 @@ export default function ProductionForm({ setScreen }) {
           <SlotMachineModal
             onSelect={g => { setGenre(g); setShowSlotMachine(false); SFX.confirm() }}
             onClose={() => setShowSlotMachine(false)}
+            unlockedGenres={state.unlockedGenres ?? DEFAULT_GENRES}
           />
         )}
 
@@ -260,21 +305,23 @@ export default function ProductionForm({ setScreen }) {
         <div className="panel-title">⭐ LEADS & CHEMISTRY</div>
 
         <div style={styles.leadsRow}>
-          {/* Lead 1 */}
+          {/* Lead 1 — Prompt 5: auto-filled if lead2 has a fixed CP */}
           <LeadDropdown
-            label="LEAD 1"
+            label={lead1FixedLocked ? 'LEAD 1 🔒 Fixed' : 'LEAD 1'}
             value={lead1Id}
-            onChange={v => { SFX.click(); setLead1Id(v); setCpEdited(false) }}
+            onChange={handleLead1Change}
             actors={availableActors}
             excludeId={Number(lead2Id)}
+            locked={lead1FixedLocked}
           />
-          {/* Lead 2 */}
+          {/* Lead 2 — Prompt 5: auto-filled if lead1 has a fixed CP */}
           <LeadDropdown
-            label="LEAD 2"
+            label={lead2FixedLocked ? 'LEAD 2 🔒 Fixed' : 'LEAD 2'}
             value={lead2Id}
-            onChange={v => { SFX.click(); setLead2Id(v); setCpEdited(false) }}
+            onChange={handleLead2Change}
             actors={availableActors}
             excludeId={Number(lead1Id)}
+            locked={lead2FixedLocked}
           />
         </div>
 
@@ -486,7 +533,7 @@ export default function ProductionForm({ setScreen }) {
             onChange={e => setBudgetMult(Number(e.target.value))}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7, color: 'var(--lav)' }}>
-            <span>×0.5 (min)</span><span>×2.5 (blockbuster)</span>
+            <span>×0.5 (min)</span><span>×3.0 (blockbuster)</span>
           </div>
         </div>
       </div>
@@ -540,15 +587,19 @@ export default function ProductionForm({ setScreen }) {
 }
 
 // ─── Lead actor dropdown ──────────────────────────────────────────────────────
-function LeadDropdown({ label, value, onChange, actors, excludeId }) {
+// Prompt 5: `locked` shows a 🔒 Fixed badge and disables the dropdown
+function LeadDropdown({ label, value, onChange, actors, excludeId, locked }) {
   const filtered = actors.filter(a => a.id !== excludeId)
   return (
     <div style={styles.leadDropWrap}>
-      <label style={{ fontSize: 7, color: 'var(--lav)', letterSpacing: 1 }}>{label}</label>
+      <label style={{ fontSize: 7, color: locked ? 'var(--pink)' : 'var(--lav)', letterSpacing: 1 }}>
+        {label}
+      </label>
       <select
         value={value}
-        onChange={e => onChange(e.target.value)}
-        style={{ fontSize: 8, width: '100%' }}
+        onChange={e => !locked && onChange(e.target.value)}
+        disabled={locked}
+        style={{ fontSize: 8, width: '100%', opacity: locked ? 0.85 : 1 }}
       >
         <option value="">— Select —</option>
         {filtered.map(a => (
@@ -557,6 +608,11 @@ function LeadDropdown({ label, value, onChange, actors, excludeId }) {
           </option>
         ))}
       </select>
+      {locked && (
+        <div style={{ fontSize: 6, color: 'var(--pink)', marginTop: 2 }}>
+          🔒 Fixed CP partner — locked
+        </div>
+      )}
     </div>
   )
 }
@@ -576,28 +632,38 @@ function LeadMini({ actor }) {
 }
 
 // ─── Genre Pick Modal ─────────────────────────────────────────────────────────
-function GenrePickModal({ current, onSelect, onClose }) {
+// Prompt 4: only shows unlocked genres; locked genres shown dimmed with 🔒
+function GenrePickModal({ current, onSelect, onClose, unlockedGenres }) {
+  const unlocked = unlockedGenres ?? DEFAULT_GENRES
   return (
     <div style={modalStyles.overlay} onClick={onClose}>
       <div style={modalStyles.box} onClick={e => e.stopPropagation()}>
         <div style={modalStyles.title}>🎭 SELECT GENRE</div>
+        <div style={{ fontSize: 7, color: 'var(--lav)', textAlign: 'center', marginBottom: 8 }}>
+          {unlocked.length}/{GENRES.length} genres unlocked · Complete productions to unlock more
+        </div>
         <div style={modalStyles.grid}>
-          {GENRES.map(g => (
+          {GENRES.map(g => {
+            const isUnlocked = unlocked.includes(g)
+            return (
             <button
               key={g}
               type="button"
+              disabled={!isUnlocked}
               style={{
                 ...modalStyles.genreCard,
                 ...(current === g ? modalStyles.genreCardSel : {}),
+                opacity: isUnlocked ? 1 : 0.35,
+                cursor:  isUnlocked ? 'pointer' : 'not-allowed',
               }}
-              onClick={() => onSelect(g)}
+              onClick={() => isUnlocked && onSelect(g)}
             >
               <span style={{ fontSize: 20, display: 'block', marginBottom: 4 }}>
                 {GENRE_EMOJI[g] ?? '🎬'}
               </span>
               <span style={{
                 fontSize:    7,
-                color:       current === g ? 'var(--bg-deep)' : 'var(--white)',
+                color:       current === g ? 'var(--bg-deep)' : isUnlocked ? 'var(--white)' : 'var(--gray)',
                 lineHeight:  1.3,
                 wordBreak:   'break-word',
                 overflowWrap:'break-word',
@@ -605,10 +671,11 @@ function GenrePickModal({ current, onSelect, onClose }) {
                 maxWidth:    '100%',
                 display:     'block',
               }}>
-                {g}
+                {isUnlocked ? g : `🔒 ${g}`}
               </span>
             </button>
-          ))}
+            )
+          })}
         </div>
         <button type="button" style={modalStyles.closeBtn} onClick={onClose}>✕ CANCEL</button>
       </div>
@@ -617,7 +684,9 @@ function GenrePickModal({ current, onSelect, onClose }) {
 }
 
 // ─── Slot Machine Modal ───────────────────────────────────────────────────────
-function SlotMachineModal({ onSelect, onClose }) {
+// Prompt 4: only cycles through unlocked genres
+function SlotMachineModal({ onSelect, onClose, unlockedGenres }) {
+  const pool = (unlockedGenres ?? DEFAULT_GENRES).filter(g => GENRES.includes(g))
   const [spinning,    setSpinning]    = React.useState(false)
   const [landed,      setLanded]      = React.useState(null)
   const [displayIdx,  setDisplayIdx]  = React.useState(0)
@@ -633,12 +702,12 @@ function SlotMachineModal({ onSelect, onClose }) {
     let delay = 60
 
     function nextTick() {
-      setDisplayIdx(i => (i + 1) % GENRES.length)
+      setDisplayIdx(i => (i + 1) % pool.length)
       tick++
       if (tick >= totalTicks) {
-        // Land on a random genre
-        const winner = GENRES[Math.floor(Math.random() * GENRES.length)]
-        setDisplayIdx(GENRES.indexOf(winner))
+        // Land on a random unlocked genre
+        const winner = pool[Math.floor(Math.random() * pool.length)]
+        setDisplayIdx(pool.indexOf(winner))
         setLanded(winner)
         setSpinning(false)
         return
@@ -655,7 +724,7 @@ function SlotMachineModal({ onSelect, onClose }) {
     return () => clearTimeout(intervalRef.current)
   }, [])
 
-  const displayGenre = GENRES[displayIdx] ?? GENRES[0]
+  const displayGenre = pool[displayIdx] ?? pool[0] ?? 'Romance'
 
   return (
     <div style={modalStyles.overlay} onClick={!spinning ? onClose : undefined}>
@@ -689,9 +758,9 @@ function SlotMachineModal({ onSelect, onClose }) {
           )}
         </div>
 
-        {/* Spinning strip preview */}
+        {/* Spinning strip preview — only unlocked genres */}
         <div style={modalStyles.slotStrip}>
-          {GENRES.slice(displayIdx, displayIdx + 5).concat(GENRES.slice(0, Math.max(0, 5 - (GENRES.length - displayIdx)))).map((g, i) => (
+          {pool.slice(displayIdx, displayIdx + 5).concat(pool.slice(0, Math.max(0, 5 - (pool.length - displayIdx)))).map((g, i) => (
             <span key={i} style={{
               fontSize: 16,
               opacity: i === 0 ? 1 : 0.3 - i * 0.04,

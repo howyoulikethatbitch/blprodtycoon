@@ -5,7 +5,7 @@
  */
 import { A } from './state.jsx'
 import { getChem, bondKey } from './chemistry.js'
-import { getGameTier } from './tiers.js'
+import { getGameTierByRank } from './tiers.js'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
@@ -34,6 +34,8 @@ const COMPANY_EVENTS = [
     id: 'comp_sponsorship',
     weight: 4,
     label: '💼 BRAND SPONSORSHIP',
+    // Prompt 6.4: only fires if studio money ≤ 50,000
+    condition: s => s.money <= 50000,
     makeData: () => ({
       message:
         'A lifestyle brand wants to sponsor your studio. Easy money — no strings attached.',
@@ -134,30 +136,31 @@ const COMPANY_EVENTS = [
     id: 'comp_fixed_cp',
     weight: 2,
     label: '💕 CP CONTRACT OFFER',
+    // Prompt 6.3: only for actors who do NOT already have any fixed CP partner
     condition: s => {
-      const signed = s.actors.filter(a => a.signed)
-      for (let i = 0; i < signed.length; i++) {
-        for (let j = i + 1; j < signed.length; j++) {
-          if (getChem(signed[i], signed[j].id) >= 75) return true
+      const signed   = s.actors.filter(a => a.signed)
+      const fixedIds = new Set((s.fixedCPs ?? []).flat())
+      const free     = signed.filter(a => !fixedIds.has(a.id))
+      for (let i = 0; i < free.length; i++) {
+        for (let j = i + 1; j < free.length; j++) {
+          if (getChem(free[i], free[j].id) >= 75) return true
         }
       }
       return false
     },
     makeData: (s) => {
-      const signed = s.actors.filter(a => a.signed)
+      const signed   = s.actors.filter(a => a.signed)
+      const fixedIds = new Set((s.fixedCPs ?? []).flat())
+      const free     = signed.filter(a => !fixedIds.has(a.id))
       let bestPair = null, bestChem = 0
-      for (let i = 0; i < signed.length; i++) {
-        for (let j = i + 1; j < signed.length; j++) {
-          const c = getChem(signed[i], signed[j].id)
-          if (c > bestChem) { bestChem = c; bestPair = [signed[i], signed[j]] }
+      for (let i = 0; i < free.length; i++) {
+        for (let j = i + 1; j < free.length; j++) {
+          const c = getChem(free[i], free[j].id)
+          if (c > bestChem) { bestChem = c; bestPair = [free[i], free[j]] }
         }
       }
       if (!bestPair) return null
       const [a, b] = bestPair
-      const alreadyFixed = (s.fixedCPs ?? []).some(
-        ([x, y]) => bondKey(x, y) === bondKey(a.id, b.id)
-      )
-      if (alreadyFixed) return null
       return {
         message:
           `Management is pushing for a Fixed CP contract between ${a.name} and ${b.name} `
@@ -169,6 +172,190 @@ const COMPANY_EVENTS = [
         ],
       }
     },
+  },
+]
+
+// ─── Tricky Events (Prompt 6.5 — 30% of all events, ⚠️ badge, mixed outcomes) ──
+const TRICKY_COMPANY_EVENTS = [
+  {
+    id: 'tricky_viral_stunt',
+    weight: 3,
+    label: '⚠️ VIRAL STUNT OFFER',
+    makeData: () => ({
+      badge: '⚠️ RISKY CHOICE',
+      message:
+        'A media agency offers a viral marketing stunt. It\'ll spike fan attention but the content is edgy and divisive.',
+      choices: [
+        { label: '✅ Accept (+500K pop, −8 rep)',
+          effect: (s, d) => {
+            d({ type: A.SET_POPULARITY, value: s.popularity + 500000 })
+            d({ type: A.ADD_REPUTATION, amount: -8 })
+          } },
+        { label: '❌ Decline (+3 rep, no pop)',
+          effect: (s, d) => d({ type: A.ADD_REPUTATION, amount: 3 }) },
+      ],
+    }),
+  },
+  {
+    id: 'tricky_budget_raid',
+    weight: 3,
+    label: '⚠️ BUDGET REALLOCATION',
+    makeData: () => ({
+      badge: '⚠️ RISKY CHOICE',
+      message:
+        'Finance suggests raiding the equipment reserve for quick cash. '
+        + 'Good for funds but industry insiders will notice.',
+      choices: [
+        { label: '✅ Accept (+₩5,000, −6 rep)',
+          effect: (s, d) => {
+            d({ type: A.ADD_MONEY,      amount: 5000 })
+            d({ type: A.ADD_REPUTATION, amount: -6 })
+          } },
+        { label: '❌ Decline — pay for proper audit (−₩1,500, +4 rep)',
+          effect: (s, d) => {
+            d({ type: A.ADD_MONEY,      amount: -1500 })
+            d({ type: A.ADD_REPUTATION, amount: 4 })
+          } },
+      ],
+    }),
+  },
+  {
+    id: 'tricky_rival_alliance',
+    weight: 2,
+    label: '⚠️ RIVAL ALLIANCE OFFER',
+    condition: s => s.reputation >= 15,
+    makeData: () => ({
+      badge: '⚠️ RISKY CHOICE',
+      message:
+        'A rival studio proposes a co-branding deal. '
+        + 'It boosts your reputation but also elevates the competition.',
+      choices: [
+        { label: '✅ Accept (+6 rep, rival also gains +10 score)',
+          effect: (s, d) => {
+            d({ type: A.ADD_REPUTATION, amount: 6 })
+          } },
+        { label: '❌ Decline (+10K pop from counter-marketing)',
+          effect: (s, d) => {
+            d({ type: A.SET_POPULARITY, value: s.popularity + 10000 })
+          } },
+      ],
+    }),
+  },
+  {
+    id: 'tricky_fan_demand',
+    weight: 3,
+    label: '⚠️ EXTREME FAN DEMAND',
+    condition: s => s.actors.some(a => a.signed),
+    makeData: (s) => {
+      const actor = s.actors.filter(a => a.signed)[0]
+      if (!actor) return null
+      return {
+        badge: '⚠️ RISKY CHOICE',
+        message:
+          `Fans are demanding ${actor.name} do a solo event ASAP. `
+          + `Accepting pushes them hard — great for pop but rough on happiness.`,
+        choices: [
+          { label: `✅ Push ${actor.name} (+30K pop, −12 happiness)`,
+            effect: (s2, d) => {
+              d({ type: A.SET_POPULARITY, value: s2.popularity + 30000 })
+              d({ type: A.UPDATE_ACTOR, id: actor.id,
+                  patch: { happiness: clamp((actor.happiness ?? 70) - 12, 0, 100) } })
+            } },
+          { label: `❌ Protect ${actor.name} (+8 happiness, no pop)`,
+            effect: (s2, d) => {
+              d({ type: A.UPDATE_ACTOR, id: actor.id,
+                  patch: { happiness: clamp((actor.happiness ?? 70) + 8, 0, 100) } })
+            } },
+        ],
+      }
+    },
+  },
+  {
+    id: 'tricky_controversial_shoot',
+    weight: 2,
+    label: '⚠️ CONTROVERSIAL PHOTOSHOOT',
+    makeData: () => ({
+      badge: '⚠️ RISKY CHOICE',
+      message:
+        'A top magazine offers a provocative cover shoot. '
+        + 'Great money but the community is divided on the concept.',
+      choices: [
+        { label: '✅ Accept (+₩4,000, +200K pop, −5 rep)',
+          effect: (s, d) => {
+            d({ type: A.ADD_MONEY,      amount: 4000 })
+            d({ type: A.SET_POPULARITY, value: s.popularity + 200000 })
+            d({ type: A.ADD_REPUTATION, amount: -5 })
+          } },
+        { label: '❌ Decline (+4 rep from principled refusal)',
+          effect: (s, d) => d({ type: A.ADD_REPUTATION, amount: 4 }) },
+      ],
+    }),
+  },
+  {
+    id: 'tricky_hidden_romance',
+    weight: 2,
+    label: '⚠️ HIDDEN RELATIONSHIP RUMOUR',
+    condition: s => {
+      const signed = s.actors.filter(a => a.signed)
+      return signed.length >= 2
+    },
+    makeData: (s) => {
+      const signed = s.actors.filter(a => a.signed)
+      if (signed.length < 2) return null
+      const a = signed[0], b = signed[1]
+      return {
+        badge: '⚠️ RISKY CHOICE',
+        message:
+          `Tabloids claim ${a.name} and ${b.name} are secretly dating. `
+          + `Confirming thrills fans but strains their professional loyalty.`,
+        choices: [
+          { label: `✅ Confirm (+chem, +100K pop, −10 loyalty each)`,
+            effect: (s2, d) => {
+              d({ type: A.SET_POPULARITY, value: s2.popularity + 100000 })
+              const curA = s2.actors.find(x => x.id === a.id)
+              const curB = s2.actors.find(x => x.id === b.id)
+              if (curA) d({ type: A.UPDATE_ACTOR, id: a.id, patch: {
+                loyalty: clamp((curA.loyalty ?? 60) - 10, 0, 100),
+                chemistry_map: { ...(curA.chemistry_map ?? {}), [b.id]: clamp((curA.chemistry_map?.[b.id] ?? 0) + 15, 0, 100) },
+              } })
+              if (curB) d({ type: A.UPDATE_ACTOR, id: b.id, patch: {
+                loyalty: clamp((curB.loyalty ?? 60) - 10, 0, 100),
+                chemistry_map: { ...(curB.chemistry_map ?? {}), [a.id]: clamp((curB.chemistry_map?.[a.id] ?? 0) + 15, 0, 100) },
+              } })
+            } },
+          { label: `❌ Deny (+loyalty each, −50K pop)`,
+            effect: (s2, d) => {
+              d({ type: A.SET_POPULARITY, value: Math.max(0, s2.popularity - 50000) })
+              const curA = s2.actors.find(x => x.id === a.id)
+              const curB = s2.actors.find(x => x.id === b.id)
+              if (curA) d({ type: A.UPDATE_ACTOR, id: a.id, patch: { loyalty: clamp((curA.loyalty ?? 60) + 10, 0, 100) } })
+              if (curB) d({ type: A.UPDATE_ACTOR, id: b.id, patch: { loyalty: clamp((curB.loyalty ?? 60) + 10, 0, 100) } })
+            } },
+        ],
+      }
+    },
+  },
+  {
+    id: 'tricky_awards_gamble',
+    weight: 2,
+    label: '⚠️ AWARDS CAMPAIGN GAMBLE',
+    condition: s => s.history.length > 0 && s.money >= 5000,
+    makeData: () => ({
+      badge: '⚠️ RISKY CHOICE',
+      message:
+        'An awards strategist offers a guaranteed nomination campaign — costly but high impact. '
+        + 'Decline and use that money internally instead.',
+      choices: [
+        { label: '✅ Launch campaign (−₩5,000, +10 rep, +1 award nomination)',
+          effect: (s, d) => {
+            d({ type: A.ADD_MONEY,      amount: -5000 })
+            d({ type: A.ADD_REPUTATION, amount: 10 })
+            d({ type: A.ADD_AWARD,      amount: 1 })
+          } },
+        { label: '❌ Save the money (+₩5,000 stays, +2 rep from studio discipline)',
+          effect: (s, d) => d({ type: A.ADD_REPUTATION, amount: 2 }) },
+      ],
+    }),
   },
 ]
 
@@ -491,19 +678,18 @@ function rollCpEventData(ev, a, b, isDuring, tier) {
       + `\n\nThis will always succeed — results guaranteed!`,
     choices: [
       {
+        // Accept — always succeeds; Prompt 6.1: +happiness to both actors
         label: `✅ Accept${ev.cost ? ` (−₩${ev.cost.toLocaleString()})` : ''}`,
-        effect: (s, d) => applySuccess(s, d, ev.cost ?? 0),
+        effect: (s, d) => {
+          applySuccess(s, d, ev.cost ?? 0)
+          // Prompt 6.1: happiness boost on good CP event outcome
+          const curA = s.actors.find(x => x.id === a.id)
+          const curB = s.actors.find(x => x.id === b.id)
+          if (curA) d({ type: A.UPDATE_ACTOR, id: a.id, patch: { happiness: clamp((curA.happiness ?? 70) + 10, 0, 100) } })
+          if (curB) d({ type: A.UPDATE_ACTOR, id: b.id, patch: { happiness: clamp((curB.happiness ?? 70) + 10, 0, 100) } })
+        },
       },
-      {
-        label: negotiateCost < (ev.cost ?? 0)
-          ? `🤝 Negotiate (−₩${negotiateCost.toLocaleString()} · tier discount)`
-          : negotiateCost > (ev.cost ?? 0)
-            ? `🤝 Negotiate (−₩${negotiateCost.toLocaleString()} · premium)`
-            : ev.cost
-              ? `🤝 Negotiate (−₩${negotiateCost.toLocaleString()})`
-              : '🤝 Negotiate (free)',
-        effect: (s, d) => applySuccess(s, d, negotiateCost),
-      },
+      // Prompt 6.2: Negotiate option REMOVED — Accept / Decline only
       {
         label: `❌ Decline${declineChemD < 0 || declineRepD < 0
           ? ` (${declineChemD < 0 ? `${declineChemD} chem` : ''}${declineChemD < 0 && declineRepD < 0 ? ', ' : ''}${declineRepD < 0 ? `${declineRepD} rep` : ''})`
@@ -534,9 +720,10 @@ function rollCpEventData(ev, a, b, isDuring, tier) {
 
 // Returns array of CP event modals for this week. Called from weekAdvance.js.
 // Prompt 8: frequency scales by tier; always succeed; free:paid ratio by tier.
+// Prompt 1: tier now derived from numericRank (not week).
 export function rollCpEvents(state, week) {
   const modals = []
-  const tier = getGameTier(week)
+  const tier = getGameTierByRank(state.numericRank ?? 50)
 
   // Tier-scaled event frequency
   if (Math.random() > tier.cpEventFreq) return modals
@@ -619,8 +806,8 @@ export function runChemPulse(state, week) {
           ([x, y]) => bondKey(x, y) === key
         )
 
-        // Fixed CP + chem below tier threshold → breakup crisis (Prompt 8: scales by tier)
-        const breakupThreshold = getGameTier(week).cpBreakupThreshold
+        // Fixed CP + chem below tier threshold → breakup crisis (Prompt 1/8: rank-based tier)
+        const breakupThreshold = getGameTierByRank(state.numericRank ?? 50).cpBreakupThreshold
         if (isFixed && chem < breakupThreshold) {
           const coolKey = `cpBreakup_${key}`
           const lastWk  = state.flags?.[coolKey] ?? -999
@@ -777,6 +964,7 @@ export function runChemPulse(state, week) {
 
 // ─── Company event roller ─────────────────────────────────────────────────────
 // Returns array of modal objects (may be empty).
+// Prompt 6.5: 30% of events are tricky (⚠️ badge, mixed outcomes).
 // weekAdvance.js should dispatch SET_FLAG 'lastCompanyEvent' if any event fires.
 export function rollWeeklyEvents(state) {
   // 1-3 week cooldown between company events
@@ -787,13 +975,28 @@ export function rollWeeklyEvents(state) {
   // 35% weekly chance
   if (Math.random() > 0.35) return []
 
-  const eligible = COMPANY_EVENTS.filter(e => !e.condition || e.condition(state))
-  if (!eligible.length) return []
+  // Route: 30% → tricky events, 70% → standard events
+  const useTricky = Math.random() < 0.30
+  const pool = useTricky
+    ? TRICKY_COMPANY_EVENTS.filter(e => !e.condition || e.condition(state))
+    : COMPANY_EVENTS.filter(e => !e.condition || e.condition(state))
 
-  const totalWeight = eligible.reduce((s, e) => s + e.weight, 0)
+  if (!pool.length) {
+    // Fall back to the other pool if chosen pool is empty
+    const fallback = useTricky
+      ? COMPANY_EVENTS.filter(e => !e.condition || e.condition(state))
+      : TRICKY_COMPANY_EVENTS.filter(e => !e.condition || e.condition(state))
+    if (!fallback.length) return []
+    const fEv = fallback[Math.floor(Math.random() * fallback.length)]
+    const fData = fEv.makeData(state)
+    if (!fData) return []
+    return [{ type: 'event', data: { label: fEv.label, ...fData } }]
+  }
+
+  const totalWeight = pool.reduce((s, e) => s + e.weight, 0)
   const roll        = Math.random() * totalWeight
   let acc = 0
-  for (const ev of eligible) {
+  for (const ev of pool) {
     acc += ev.weight
     if (roll < acc) {
       const makeData = ev.makeData(state)

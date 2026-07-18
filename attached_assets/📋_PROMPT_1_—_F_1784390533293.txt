@@ -1,0 +1,114 @@
+PROMPT 1: Rank & Tier Difficulty Adjustment
+
+Current issue: Too easy to reach higher company tiers/ranks.
+
+Required change:
+- Adjust tier progression difficulty to match the pace of industry ranking climb (#51 to #1).
+- If industry ranking takes X weeks to climb one rank, tier progression should take roughly the same effort/pace.
+- Do not change industry ranking system itself — only tie tier unlock requirements to industry ranking milestones so they feel equivalently challenging.
+
+---
+
+PROMPT 2: Industry Ranking — Actor Unlock Flow
+
+Current issue: At rank #39 (Rising Star actors unlocked), a modal asks "pay to sign or pass this week." Choosing "pass" still locks them in the Actors tab.
+
+Required changes:
+- Remove the "pay to sign" option entirely.
+- When a specific rank is reached (e.g., #39 for Rising Star actors), display a celebration modal: "5 new actors unlocked and automatically signed to your company!" with actor names/portraits.
+- These actors are immediately available in the roster — no signing cost, no pass option.
+- Modal appears once upon reaching the rank threshold, then never again.
+- If player dismisses modal without reading, actors are still unlocked.
+
+---
+
+PROMPT 3: Critique Review — Rating System (F/D/C/B/A/S)
+
+Current: Generic review system.
+
+Required changes:
+- Replace review tiers with letter grades: F (Terrible), D (Bad), C (Neutral), B (Good), A (Great), S (Perfect).
+- Overall production performance must calculate from these existing factors:
+  - Actor skills (genre-linked skills)
+  - Chemistry between CP actors
+  - Genre combo multipliers
+  - Story type: Original (60% weight), Adaptation (40% weight)
+  - Schedule: 3M (×0.8 quality), 6M (×1.0 quality), 12M (×1.3 quality)
+  - Platform: TV (wide reach), Streaming (niche reach)
+  - Content rating: PG, PG-13, R
+  - Budget: Min (×0.5), Standard (×1.0), Max (×2.0), Custom (×0.5–×3.0) — increase custom max from 2.5 to 3.0
+  - Average episode ratings
+  - Evaluator ratings
+  - During and after production events
+- Replit: create formula balancing all these inputs into F/D/C/B/A/S output.
+- Review grade affects: reputation, money, fan growth, actor happiness.
+- Display final grade prominently in post-production review screen.
+
+---
+
+PROMPT 4: Genre System — Unlock by Rating
+
+Current issue: All genres unlocked from start. Reusing same genre has no penalty.
+
+Required changes:
+
+Default unlocked: Romance, School, Office
+
+Unlock tiers by production grade:
+
+Grade	Unlocked Genres	
+F	None (keep defaults)	
+D	Comedy, Slice of Life	
+C	Action, Drama	
+B	Music, Mystery, Sports	
+A	Horror, Thriller, Crime, Fantasy	
+S	Historical, Sci-Fi, Idol, Psychological, Omegaverse	
+
+- Reusing penalty: Using the same genre consecutively (or too frequently) triggers bad conditions: worse reviews, lower rating, reputation drop, etc. Replit: create decay formula.
+- Random genre only randomizes from currently unlocked/default genres — never locked ones.
+- Genre combo reveal after production stays unchanged.
+
+Full genre list (19 total):
+Romance, Comedy, Slice of Life, School, Office, Fantasy, Horror, Mystery, Thriller, Historical, Sci-Fi, Action, Sports, Music, Idol, Supernatural, Omegaverse, Drama, Crime, Psychological
+
+---
+
+PROMPT 5: CP System — Auto-Fill Co-CP Partner
+
+Required change:
+- When selecting Lead 1 from dropdown, if that actor has a fixed CP, automatically fill Lead 2 with their fixed partner (locked, non-editable).
+- When selecting Lead 2 from dropdown, if that actor has a fixed CP, automatically fill Lead 1 with their fixed partner.
+- If actor has no CP or unfixed CP, no auto-fill — both dropdowns remain independent.
+- Visual indicator: fixed CP auto-filled slots show a "🔒 Fixed" badge.
+
+---
+
+PROMPT 6: Events System — Overhaul
+
+6.1 Happiness recovery on good outcomes
+- Add +happiness to actors when player accepts events with good conditions.
+- Applies to: CP events, solo events, high-rated productions (B/A/S), etc.
+- Replit: create happiness bonus formula based on event type and outcome.
+
+6.2 Remove Negotiate option
+- Change all event modals from Accept / Negotiate / Decline to Accept / Decline only.
+- Remove negotiate functionality entirely from event system.
+- Keep existing Accept/Decline logic, adjust penalties/bonuses accordingly.
+
+6.3 Remove invalid CP formation events
+- If two actors are already a fixed CP, do not show events suggesting they can form a CP with other actors.
+- Only show CP formation events for: actors with no CP, or actors with unfixed CPs.
+
+6.4 Sponsorship Event — Money Threshold
+- Sponsorship events only appear if company money is 50,000 or below.
+- If money is above 50,000, sponsorship events do not trigger.
+- Exact threshold: ≤50,000 = can trigger, >50,000 = never trigger.
+
+6.5 Tricky Events (30% chance)
+- Add new "tricky choice" events where both Accept and Decline have mixed outcomes:
+  - Example: Accept = +chemistry but -reputation, Decline = +reputation but -chemistry
+  - Example: Accept = +money but -actor happiness, Decline = +happiness but -money
+- Occurrence rate: 30% of all events.
+- Remaining 70%: Standard events — 40% good conditions, 30% bad conditions.
+- Tricky events display a ⚠️ "Risky Choice" badge in the modal.
+- Replit: create 5-10 tricky event templates with balanced trade-offs.

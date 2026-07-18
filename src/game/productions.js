@@ -35,29 +35,40 @@ export const GENRES = [
   'Romance', 'Comedy', 'Slice of Life', 'School', 'Office',
   'Action', 'Drama', 'Fantasy', 'Horror', 'Mystery',
   'Thriller', 'Historical', 'Sci-Fi', 'Sports', 'Crime',
-  'Music', 'Idol', 'Psychological', 'Omegaverse',
+  'Music', 'Idol', 'Psychological', 'Omegaverse', 'Supernatural',
 ]
 
+// Prompt 4: default genres + what each grade unlocks (cumulative)
+export const DEFAULT_GENRES   = ['Romance', 'School', 'Office']
+export const GENRE_UNLOCK_BY_GRADE = {
+  D: ['Comedy', 'Slice of Life'],
+  C: ['Action', 'Drama'],
+  B: ['Music', 'Mystery', 'Sports', 'Supernatural'],
+  A: ['Horror', 'Thriller', 'Crime', 'Fantasy'],
+  S: ['Historical', 'Sci-Fi', 'Idol', 'Psychological', 'Omegaverse'],
+}
+
 export const GENRE_EMOJI = {
-  Romance:       '💕',
-  Comedy:        '😂',
+  Romance:        '💕',
+  Comedy:         '😂',
   'Slice of Life':'🌸',
-  School:        '📚',
-  Office:        '💼',
-  Action:        '⚔️',
-  Drama:         '🎭',
-  Fantasy:       '🧙',
-  Horror:        '👻',
-  Mystery:       '🔍',
-  Thriller:      '😱',
-  Historical:    '🏯',
-  'Sci-Fi':      '🚀',
-  Sports:        '⚽',
-  Crime:         '🔫',
-  Music:         '🎵',
-  Idol:          '🌟',
-  Psychological: '🧠',
-  Omegaverse:    '🐺',
+  School:         '📚',
+  Office:         '💼',
+  Action:         '⚔️',
+  Drama:          '🎭',
+  Fantasy:        '🧙',
+  Horror:         '👻',
+  Mystery:        '🔍',
+  Thriller:       '😱',
+  Historical:     '🏯',
+  'Sci-Fi':       '🚀',
+  Sports:         '⚽',
+  Crime:          '🔫',
+  Music:          '🎵',
+  Idol:           '🌟',
+  Psychological:  '🧠',
+  Omegaverse:     '🐺',
+  Supernatural:   '🌙',
 }
 
 // ─── Story origin ─────────────────────────────────────────────────────────────

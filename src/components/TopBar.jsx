@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useGame, A } from '../game/state.jsx'
 import { fmtMoney, fmtPop, calcRank } from '../game/ranking.js'
 import { SFX } from '../game/audio.js'
-import { getGameTier, getNextGameTier } from '../game/tiers.js'
+import { getGameTierByRank, getNextGameTierByRank, getNextTierRankThreshold } from '../game/tiers.js'
 
 // Ease-out cubic
 function easeOut(t) { return 1 - Math.pow(1 - t, 3) }
@@ -68,9 +68,10 @@ export default function TopBar() {
   }
 
   // ── Rank, tier & last-saved ───────────────────────────────────────────────
-  const rank      = calcRank(state.reputation, state.popularity)
-  const gameTier  = getGameTier(state.week)
-  const nextTier  = getNextGameTier(state.week)
+  const rank         = calcRank(state.reputation, state.popularity)
+  const gameTier     = getGameTierByRank(state.numericRank ?? 50)
+  const nextTierData = getNextGameTierByRank(state.numericRank ?? 50)
+  const nextThresh   = getNextTierRankThreshold(state.numericRank ?? 50)
   const savedTime = state.lastSaved
     ? new Date(state.lastSaved).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : null
@@ -111,7 +112,7 @@ export default function TopBar() {
         <Stat label="POP"  value={fmtPop(state.popularity)} color="var(--blue)" />
         <Stat label="RANK" value={rank.id}                  color={rank.color} small />
         <Stat label="WK"   value={state.week}               color="var(--lav)"  />
-        <TierStat tier={gameTier} nextTier={nextTier} week={state.week} />
+        <TierStat tier={gameTier} nextThresh={nextThresh} numericRank={state.numericRank ?? 50} />
       </div>
     </header>
   )
@@ -126,9 +127,8 @@ function Stat({ label, value, color, small }) {
   )
 }
 
-// Tier display: shows current tier and weeks until next tier
-function TierStat({ tier, nextTier, week }) {
-  const weeksLeft = nextTier ? nextTier.minWeek - week : null
+// Tier display: shows current tier and rank needed for next tier
+function TierStat({ tier, nextThresh, numericRank }) {
   const tierColors = {
     rookie:    'var(--lav)',
     rising:    'var(--blue)',
@@ -137,15 +137,17 @@ function TierStat({ tier, nextTier, week }) {
   }
   const color = tierColors[tier.id] ?? 'var(--lav)'
   return (
-    <div style={{ ...styles.statWrap, minWidth: 58 }}>
+    <div style={{ ...styles.statWrap, minWidth: 60 }}>
       <span style={styles.statLbl}>TIER</span>
       <span style={{ ...styles.statVal, color, fontSize: 8, whiteSpace: 'nowrap' }}>
         {tier.label}
       </span>
-      {weeksLeft !== null && (
-        <span style={{ fontSize: 5, color: 'var(--gray)', marginTop: 1 }}>
-          {weeksLeft}wk→next
+      {nextThresh !== null ? (
+        <span style={{ fontSize: 5, color: 'var(--gray)', marginTop: 1, whiteSpace: 'nowrap' }}>
+          need rank #{nextThresh}
         </span>
+      ) : (
+        <span style={{ fontSize: 5, color: 'var(--gold)', marginTop: 1 }}>✦ MAX</span>
       )}
     </div>
   )

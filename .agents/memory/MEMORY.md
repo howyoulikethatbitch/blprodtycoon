@@ -1,1 +1,2 @@
-- [Tier scaling system](tier-scaling.md) — game-week-based tier in src/game/tiers.js; all balance params centralised there, imported by events/actors/productions/evaluators/weekAdvance/TopBar/ProductionForm.
+- [Tier scaling system](tier-scaling.md) — rank-based tier in src/game/tiers.js; all balance params centralised there, imported by events/actors/productions/evaluators/weekAdvance/TopBar/ProductionForm.
+- [Genre unlock system](genre-unlock.md) — genres gated by production grade; unlockedGenres in state; GENRE_UNLOCK_BY_GRADE in productions.js; reuse penalty in weekAdvance.js.
