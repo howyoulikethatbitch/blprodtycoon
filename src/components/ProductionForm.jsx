@@ -187,18 +187,6 @@ export default function ProductionForm({ setScreen }) {
             placeholder="Enter a title…"
             required
           />
-          {/* 5.1: Randomized suggestion chips — no dropdown, fresh on each visit */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
-            {titleSuggestions.map(s => (
-              <button
-                key={s} type="button"
-                style={styles.suggestChip}
-                onClick={() => { SFX.click(); setTitle(s) }}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Type */}
@@ -234,11 +222,6 @@ export default function ProductionForm({ setScreen }) {
           </div>
         </div>
 
-        {/* 5.3: Combo label shown, but multiplier hidden pre-production */}
-        <div style={{ ...styles.comboBadge, borderColor: combo.color, color: combo.color }}>
-          {combo.emoji} {prodType === 'series' ? 'Series' : prodType === 'movie' ? 'Movie' : 'Mini'} × {genre}: <strong>{combo.label}</strong>
-          <span style={{ color: 'var(--gray)', fontSize: 7, marginLeft: 6 }}>(multiplier revealed after production)</span>
-        </div>
       </div>
 
       {/* ── Leads & CP name ───────────────────────────────────────────────── */}
