@@ -1,0 +1,10 @@
+﻿2026-07-18T05:27:39.7997785Z ##[group]Run npm run build
+2026-07-18T05:27:39.7998027Z [36;1mnpm run build[0m
+2026-07-18T05:27:39.8028899Z shell: /usr/bin/bash -e {0}
+2026-07-18T05:27:39.8029114Z ##[endgroup]
+2026-07-18T05:27:39.8780429Z 
+2026-07-18T05:27:39.8780964Z > bl-production-tycoon@1.0.0 build
+2026-07-18T05:27:39.8781203Z > vite build
+2026-07-18T05:27:39.8781356Z 
+2026-07-18T05:27:39.8808099Z sh: 1: vite: not found
+2026-07-18T05:27:39.8857217Z ##[error]Process completed with exit code 127.

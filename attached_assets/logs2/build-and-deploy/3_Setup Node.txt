@@ -1,0 +1,30 @@
+﻿2026-07-18T05:26:24.7461074Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-18T05:26:24.7462553Z ##[group]Run actions/setup-node@v4
+2026-07-18T05:26:24.7462766Z with:
+2026-07-18T05:26:24.7462927Z   node-version: 20
+2026-07-18T05:26:24.7463084Z   cache: npm
+2026-07-18T05:26:24.7463273Z   always-auth: false
+2026-07-18T05:26:24.7463433Z   check-latest: false
+2026-07-18T05:26:24.7465240Z   token: ***
+2026-07-18T05:26:24.7465394Z ##[endgroup]
+2026-07-18T05:26:24.8683206Z Attempting to download 20...
+2026-07-18T05:26:24.8757359Z (node:2119) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-18T05:26:24.8757925Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-18T05:26:25.4661709Z Acquiring 20.20.2 - x64 from https://github.com/actions/node-versions/releases/download/20.20.2-23521894959/node-20.20.2-linux-x64.tar.gz
+2026-07-18T05:26:25.9151610Z Extracting ...
+2026-07-18T05:26:25.9230027Z [command]/usr/bin/tar xz --strip 1 --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/2db528fb-e34a-4b17-90cf-eac91d87af12 -f /home/runner/work/_temp/8067909d-d215-4a0a-8824-a988dc9d189f
+2026-07-18T05:26:26.7097592Z Adding to the cache ...
+2026-07-18T05:26:28.6534456Z ##[group]Environment details
+2026-07-18T05:26:28.8284817Z node: v20.20.2
+2026-07-18T05:26:28.8285151Z npm: 10.8.2
+2026-07-18T05:26:28.8285321Z yarn: 1.22.22
+2026-07-18T05:26:28.8285775Z ##[endgroup]
+2026-07-18T05:26:28.8298915Z [command]/opt/hostedtoolcache/node/20.20.2/x64/bin/npm config get cache
+2026-07-18T05:26:28.9008086Z /home/runner/.npm
+2026-07-18T05:26:29.0349391Z Cache hit for: node-cache-Linux-x64-npm-f0fafe3676f90551c3d6fc589d010f5b8a0b32f430905bd89e3ae639ef2c35e3
+2026-07-18T05:26:29.0415117Z (node:2119) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-07-18T05:26:29.2354625Z Received 673 of 673 (100.0%), 0.0 MBs/sec
+2026-07-18T05:26:29.2354968Z Cache Size: ~0 MB (673 B)
+2026-07-18T05:26:29.2371685Z [command]/usr/bin/tar -xf /home/runner/work/_temp/49dcc1c0-b676-44af-85c5-21b5ecc1e0cf/cache.tzst -P -C /home/runner/work/blprodtycoon/blprodtycoon --use-compress-program unzstd
+2026-07-18T05:26:29.2413791Z Cache restored successfully
+2026-07-18T05:26:29.2416540Z Cache restored from key: node-cache-Linux-x64-npm-f0fafe3676f90551c3d6fc589d010f5b8a0b32f430905bd89e3ae639ef2c35e3
