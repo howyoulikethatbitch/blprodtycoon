@@ -10,6 +10,7 @@ import {
   BUDGET_TIERS, TITLE_POOL, calcCost, createProduction,
   genCpName, getComboResult,
 } from '../game/productions.js'
+import { getGameTier } from '../game/tiers.js'
 import { calcChemistryBonus, chemTier, getChem } from '../game/chemistry.js'
 import { canAssign, moodEmoji } from '../game/actors.js'
 import { fmtMoney } from '../game/ranking.js'
@@ -110,8 +111,11 @@ export default function ProductionForm({ setScreen }) {
   // Combo preview
   const combo = getComboResult(prodType, genre)
 
+  // Prompt 8: apply tier production cost modifier
+  const gameTier = getGameTier(state.week)
+
   // Cost & affordability
-  const cost     = calcCost(prodType, budgetMult, schedule, castIds.length)
+  const cost     = calcCost(prodType, budgetMult, schedule, castIds.length, gameTier.productionCostMod)
   const schedInfo  = SCHEDULES.find(s => s.id === schedule)
   const platInfo   = PLATFORMS.find(p => p.id === platform)
   const typeInfo   = PROD_TYPES[prodType]
@@ -494,6 +498,9 @@ export default function ProductionForm({ setScreen }) {
         <div>Platform: {platInfo?.label} · Rating: {effectiveRating.toUpperCase()}</div>
         <div>Story: {STORY_TYPES.find(s => s.id === story)?.label}</div>
         <div>Budget: ×{budgetMult.toFixed(2)} · Cast: {castIds.length} actor{castIds.length !== 1 ? 's' : ''}</div>
+        <div style={{ fontSize: 7, color: 'var(--lav)' }}>
+          Tier: {gameTier.label} · Cost ×{gameTier.productionCostMod.toFixed(2)} · Rev ×{gameTier.revenueMod.toFixed(2)}
+        </div>
         {cpName && <div>CP: <span style={{ color: 'var(--pink)' }}>{cpName}</span>{cpFixed && fixedCpAllowed ? ' 💕 FIXED' : ''}</div>}
         {cpFixed && fixedCpAllowed && (
           <div style={{ color: 'var(--pink)', fontSize: 7 }}>Fixed CP fee: {fmtMoney(fixedCpPrice)}</div>
@@ -588,7 +595,16 @@ function GenrePickModal({ current, onSelect, onClose }) {
               <span style={{ fontSize: 20, display: 'block', marginBottom: 4 }}>
                 {GENRE_EMOJI[g] ?? '🎬'}
               </span>
-              <span style={{ fontSize: 7, color: current === g ? 'var(--bg-deep)' : 'var(--white)' }}>
+              <span style={{
+                fontSize:    7,
+                color:       current === g ? 'var(--bg-deep)' : 'var(--white)',
+                lineHeight:  1.3,
+                wordBreak:   'break-word',
+                overflowWrap:'break-word',
+                textAlign:   'center',
+                maxWidth:    '100%',
+                display:     'block',
+              }}>
                 {g}
               </span>
             </button>
@@ -746,15 +762,17 @@ const modalStyles = {
     width:               '100%',
   },
   genreCard: {
-    padding:     '10px 4px',
-    background:  'var(--bg-inset)',
-    border:      '2px solid var(--shadow)',
-    cursor:      'pointer',
-    display:     'flex',
+    padding:       '10px 4px',
+    background:    'var(--bg-inset)',
+    border:        '2px solid var(--shadow)',
+    cursor:        'pointer',
+    display:       'flex',
     flexDirection: 'column',
-    alignItems:  'center',
-    minHeight:   'auto',
-    transition:  'border-color 0.15s',
+    alignItems:    'center',
+    justifyContent:'center',
+    minHeight:     'auto',
+    transition:    'border-color 0.15s',
+    textAlign:     'center',
   },
   genreCardSel: {
     background:  'var(--pink)',

@@ -1,0 +1,75 @@
+PROMPT 1: Tier-Based Balance System Overhaul
+
+Context: The game currently feels too punishing with excessive deductions across chemistry, happiness, loyalty, reputation, and money. Implement a company tier-based scaling system so early game is forgiving and late game is challenging but fair.
+
+---
+
+8.1 Tier Definitions & Scaling Table
+
+System	Rookie (Weeks 0–20)	Rising Star (Weeks 20–50)	Popular (Weeks 50–100)	Worldwide (Weeks 100+)	
+CP event frequency	50% / week	45% / week	40% / week	35% / week	
+CP event outcome	Always succeed	Always succeed	Always succeed	Always succeed	
+Event decline — chemistry penalty	None	-5	-10	-15	
+Event decline — reputation penalty	None	-5	-10	-15	
+Idle happiness threshold	40 weeks	32 weeks	28 weeks	24 weeks	
+Idle loyalty threshold	56 weeks	48 weeks	42 weeks	36 weeks	
+Penalty tick rate (after threshold)	Every 8 weeks	Every 6 weeks	Every 5 weeks	Every 4 weeks	
+Money event ratio (free:paid)	80:20	70:30	60:40	50:50	
+Production cost modifier	-30%	-15%	Base (0%)	+10%	
+Revenue modifier	+20%	+10%	Base (0%)	Base (0%)	
+Review reputation cap (max loss per review)	-5	-10	-15	-20	
+Review distribution (% good or better)	70%	60%	50%	40%	
+Fixed CP breakup threshold	5%	10%	15%	20%	
+Free agents re-sign cost	Base	+25%	+50%	+100%	
+Negotiate cost modifier	-50%	-25%	Base (0%)	+25%	
+
+---
+
+8.2 CP Event System Changes
+- Remove success/failure chance entirely. All CP events (during production + after production/weekly releases) always succeed if the player accepts.
+- Event frequency scales by tier (see table above).
+- Decline penalties scale by tier. At Rookie, declining has zero penalty — teaches mechanics without punishment.
+
+---
+
+8.3 Idle Actor Penalty Changes
+- Happiness recovery: Casting an idle actor in a new production instantly resets happiness to Neutral. If they were Happy before going idle, they return to Happy after 4 consecutive weeks in active production.
+- Loyalty recovery: +5 loyalty per week while in active production.
+- Emergency save event: When an actor's loyalty drops to 10, trigger a one-time popup: "(Actor name) is considering leaving. Start an emergency production now to retain them?" If accepted, the player can immediately cast them in a new production for free (no production slot cost, but normal filming costs apply). If declined or ignored, they leave at 0 loyalty as before.
+- Penalty tick rate slows at lower tiers (see table).
+
+---
+
+8.4 Money / Financial Changes
+- Production costs scale by tier modifier (see table).
+- Revenue scales by tier modifier (see table).
+- Event cost ratio (free vs paid) scales by tier (see table).
+- Negotiate costs scale by tier (see table).
+
+---
+
+8.5 Critic Review / Reputation Changes
+- Cap reputation loss per review at the tier value (see table). No single review can drop reputation more than the cap.
+- Review distribution shifts toward positive at lower tiers (see table).
+- Reputation repair events: After any review that causes reputation loss, 30% chance next week to trigger a free repair event (charity work, apology interview, fan meeting, etc.). Accepting always restores +10 to +20 reputation. Declining has no penalty.
+
+---
+
+8.6 Fixed CP Breakup Threshold
+- Threshold scales by tier (see table). At Rookie, fixed CPs only break up at 5% chemistry — very hard to reach. At Worldwide, back to 20%.
+- Warning event before breakup still applies at all tiers.
+
+---
+
+8.7 Free Agents Pool Cost
+- Re-signing ex-actors from original 20 scales by tier (see table).
+- New actors from pool use standard signing cost regardless of tier.
+
+---
+
+8.8 Implementation Notes
+- All tier thresholds are based on current game week, not cumulative weeks played.
+- If a player drops back down a tier (e.g., company status decreases), penalties scale down accordingly.
+- Display current tier and next tier threshold somewhere in the UI (top bar or company profile).
+- Do not modify existing combo formulas, genre systems, actor skills, or core production flow.
+- Ensure all existing functionalities (post-production combo reveal, evaluator reviews, 20-actor roster, etc.) continue working exactly as before — only the penalty values and frequencies change.

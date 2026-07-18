@@ -1,0 +1,7 @@
+PROMPT 2: Genre Title Text Fitting
+
+Fix genre title text display in the Select Genre modal:
+
+- Ensure all genre title texts fit properly within each genre selection box/container.
+- Adjust font size, box width/height, text wrapping, or padding so no genre title overflows or gets cut off.
+- Keep the modal layout clean and consistent with existing pixel-art aesthetic.

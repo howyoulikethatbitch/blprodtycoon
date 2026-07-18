@@ -1,9 +1,11 @@
 /**
  * events.js — Company events, actor events, chemistry pulse
  * Prompt 6: 7 company events, 10 actor event types, weekly chemistry pulse
+ * Prompt 8: tier-based CP frequency, always-succeed, decline penalties, breakup threshold
  */
 import { A } from './state.jsx'
 import { getChem, bondKey } from './chemistry.js'
+import { getGameTier } from './tiers.js'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
@@ -439,21 +441,45 @@ const AFTER_PROD_EVENTS = [
   { id: 'interview_pr',  label: '🗞️ JOINT INTERVIEW',         skillKeys: ['lang','comedy'],    cost: 0    },
 ]
 
-function rollCpEventData(ev, a, b, isDuring) {
-  const avgSkill = ev.skillKeys.reduce((sum, k) => {
-    const aSkill = a.skills?.[k] ?? 30
-    const bSkill = b.skills?.[k] ?? 30
-    return sum + (aSkill + bSkill) / 2
-  }, 0) / ev.skillKeys.length
-  // Base 60% success + skill bonus up to 25%
-  const successChance = Math.min(0.85, 0.60 + (avgSkill / 100) * 0.25)
+// Prompt 8: CP events always succeed when accepted. Decline penalties scale by tier.
+function rollCpEventData(ev, a, b, isDuring, tier) {
+  const chemDelta   = isDuring ? 8 : 5
+  const repDelta    = isDuring ? 4 : 0
+  const coRepDelta  = isDuring ? 0 : 5
 
-  const chemDelta      = isDuring ? 8 : 5
-  const repDelta       = isDuring ? 4 : 0
-  const coRepDelta     = isDuring ? 0 : 5
-  const failChemDelta  = -5
-  const declineChemD   = -8
-  const declineRepD    = -3
+  // Tier-scaled decline penalties (None at Rookie)
+  const declineChemD = tier.declineChemPenalty
+  const declineRepD  = tier.declineRepPenalty
+
+  // Negotiate cost: base event cost × tier modifier
+  const negotiateCost = ev.cost ? Math.round(ev.cost * tier.negotiateMod) : 0
+
+  // Shared success effect (always triggers on Accept or Negotiate)
+  function applySuccess(s, d, paidCost) {
+    if (paidCost) d({ type: A.ADD_MONEY, amount: -paidCost })
+    const actorA = s.actors.find(x => x.id === a.id)
+    const actorB = s.actors.find(x => x.id === b.id)
+    if (actorA) {
+      d({ type: A.UPDATE_ACTOR, id: a.id, patch: {
+        chemistry_map: { ...(actorA.chemistry_map ?? {}), [b.id]: clamp((actorA.chemistry_map?.[b.id] ?? 0) + chemDelta, 0, 100) }
+      } })
+    }
+    if (actorB) {
+      d({ type: A.UPDATE_ACTOR, id: b.id, patch: {
+        chemistry_map: { ...(actorB.chemistry_map ?? {}), [a.id]: clamp((actorB.chemistry_map?.[a.id] ?? 0) + chemDelta, 0, 100) }
+      } })
+    }
+    if (isDuring) {
+      d({ type: A.UPDATE_ACTOR, id: a.id, patch: { fame: clamp((a.fame ?? 0) + repDelta * 100, 0, 999999) } })
+      d({ type: A.UPDATE_ACTOR, id: b.id, patch: { fame: clamp((b.fame ?? 0) + repDelta * 100, 0, 999999) } })
+    } else {
+      d({ type: A.ADD_REPUTATION, amount: coRepDelta })
+    }
+    d({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
+      title: `✨ ${ev.label} — SUCCESS!`,
+      message: `The content landed perfectly!\n\n+${chemDelta} chemistry · ${isDuring ? `+${repDelta} actor fame` : `+${coRepDelta} company rep`}`,
+    } } })
+  }
 
   return {
     label: `${ev.label} — ${a.name} × ${b.name}`,
@@ -462,86 +488,42 @@ function rollCpEventData(ev, a, b, isDuring) {
         ? `${a.name} and ${b.name} want to post ${ev.label.toLowerCase()} together. `
           + `Fans are waiting! Will you greenlight this?`
         : `Company promo opportunity: ${ev.label} featuring ${a.name} × ${b.name}.${ev.cost ? ` Cost: ₩${ev.cost.toLocaleString()}` : ' Free.'} Will you proceed?`)
-      + `\n\nOutcome will be revealed shortly.`,
+      + `\n\nThis will always succeed — results guaranteed!`,
     choices: [
       {
         label: `✅ Accept${ev.cost ? ` (−₩${ev.cost.toLocaleString()})` : ''}`,
+        effect: (s, d) => applySuccess(s, d, ev.cost ?? 0),
+      },
+      {
+        label: negotiateCost < (ev.cost ?? 0)
+          ? `🤝 Negotiate (−₩${negotiateCost.toLocaleString()} · tier discount)`
+          : negotiateCost > (ev.cost ?? 0)
+            ? `🤝 Negotiate (−₩${negotiateCost.toLocaleString()} · premium)`
+            : ev.cost
+              ? `🤝 Negotiate (−₩${negotiateCost.toLocaleString()})`
+              : '🤝 Negotiate (free)',
+        effect: (s, d) => applySuccess(s, d, negotiateCost),
+      },
+      {
+        label: `❌ Decline${declineChemD < 0 || declineRepD < 0
+          ? ` (${declineChemD < 0 ? `${declineChemD} chem` : ''}${declineChemD < 0 && declineRepD < 0 ? ', ' : ''}${declineRepD < 0 ? `${declineRepD} rep` : ''})`
+          : ' (no penalty)'}`,
         effect: (s, d) => {
-          if (ev.cost) d({ type: A.ADD_MONEY, amount: -ev.cost })
-          const success = Math.random() < successChance
-          if (success) {
-            // Update chemistry for both actors
+          if (declineChemD !== 0) {
             const actorA = s.actors.find(x => x.id === a.id)
             const actorB = s.actors.find(x => x.id === b.id)
             if (actorA) {
               d({ type: A.UPDATE_ACTOR, id: a.id, patch: {
-                chemistry_map: { ...(actorA.chemistry_map ?? {}), [b.id]: clamp((actorA.chemistry_map?.[b.id] ?? 0) + chemDelta, 0, 100) }
+                chemistry_map: { ...(actorA.chemistry_map ?? {}), [b.id]: clamp((actorA.chemistry_map?.[b.id] ?? 0) + declineChemD, 0, 100) }
               } })
             }
             if (actorB) {
               d({ type: A.UPDATE_ACTOR, id: b.id, patch: {
-                chemistry_map: { ...(actorB.chemistry_map ?? {}), [a.id]: clamp((actorB.chemistry_map?.[a.id] ?? 0) + chemDelta, 0, 100) }
+                chemistry_map: { ...(actorB.chemistry_map ?? {}), [a.id]: clamp((actorB.chemistry_map?.[a.id] ?? 0) + declineChemD, 0, 100) }
               } })
             }
-            if (isDuring) {
-              d({ type: A.UPDATE_ACTOR, id: a.id, patch: { fame: clamp((a.fame ?? 0) + repDelta * 100, 0, 999999) } })
-              d({ type: A.UPDATE_ACTOR, id: b.id, patch: { fame: clamp((b.fame ?? 0) + repDelta * 100, 0, 999999) } })
-            } else {
-              d({ type: A.ADD_REPUTATION, amount: coRepDelta })
-            }
-            d({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
-              title: `✨ ${ev.label} — SUCCESS!`,
-              message: `The content landed perfectly!\n\n+${chemDelta} chemistry · ${isDuring ? `+${repDelta} actor fame` : `+${coRepDelta} company rep`}`
-            } } })
-          } else {
-            // Failure
-            const actorA = s.actors.find(x => x.id === a.id)
-            const actorB = s.actors.find(x => x.id === b.id)
-            if (actorA) {
-              d({ type: A.UPDATE_ACTOR, id: a.id, patch: {
-                chemistry_map: { ...(actorA.chemistry_map ?? {}), [b.id]: clamp((actorA.chemistry_map?.[b.id] ?? 0) + failChemDelta, 0, 100) }
-              } })
-            }
-            if (actorB) {
-              d({ type: A.UPDATE_ACTOR, id: b.id, patch: {
-                chemistry_map: { ...(actorB.chemistry_map ?? {}), [a.id]: clamp((actorB.chemistry_map?.[a.id] ?? 0) + failChemDelta, 0, 100) }
-              } })
-            }
-            if (isDuring) {
-              d({ type: A.UPDATE_ACTOR, id: a.id, patch: { happiness: clamp((a.happiness ?? 70) - 8, 0, 100) } })
-              d({ type: A.UPDATE_ACTOR, id: b.id, patch: { happiness: clamp((b.happiness ?? 70) - 8, 0, 100) } })
-            } else {
-              d({ type: A.ADD_REPUTATION, amount: -3 })
-            }
-            d({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
-              title: `💔 ${ev.label} — FLOP`,
-              message: `The content didn't land as hoped.\n\n${failChemDelta} chemistry · ${isDuring ? '−8 actor happiness' : '−3 company rep'}`
-            } } })
           }
-        },
-      },
-      {
-        label: '🤝 Negotiate',
-        effect: () => {}, // Keep existing negotiate flow — no extra logic
-      },
-      {
-        label: `❌ Decline`,
-        effect: (s, d) => {
-          const actorA = s.actors.find(x => x.id === a.id)
-          const actorB = s.actors.find(x => x.id === b.id)
-          if (actorA) {
-            d({ type: A.UPDATE_ACTOR, id: a.id, patch: {
-              chemistry_map: { ...(actorA.chemistry_map ?? {}), [b.id]: clamp((actorA.chemistry_map?.[b.id] ?? 0) + declineChemD, 0, 100) }
-            } })
-          }
-          if (actorB) {
-            d({ type: A.UPDATE_ACTOR, id: b.id, patch: {
-              chemistry_map: { ...(actorB.chemistry_map ?? {}), [a.id]: clamp((actorB.chemistry_map?.[a.id] ?? 0) + declineChemD, 0, 100) }
-            } })
-          }
-          if (isDuring) {
-            d({ type: A.ADD_REPUTATION, amount: declineRepD })
-          } else {
+          if (declineRepD !== 0) {
             d({ type: A.ADD_REPUTATION, amount: declineRepD })
           }
         },
@@ -551,10 +533,13 @@ function rollCpEventData(ev, a, b, isDuring) {
 }
 
 // Returns array of CP event modals for this week. Called from weekAdvance.js.
+// Prompt 8: frequency scales by tier; always succeed; free:paid ratio by tier.
 export function rollCpEvents(state, week) {
   const modals = []
-  // 40% base chance per week to fire a CP event
-  if (Math.random() > 0.40) return modals
+  const tier = getGameTier(week)
+
+  // Tier-scaled event frequency
+  if (Math.random() > tier.cpEventFreq) return modals
 
   const activeProds = state.productions.filter(p => p.status === 'active')
   if (!activeProds.length) return modals
@@ -579,8 +564,16 @@ export function rollCpEvents(state, week) {
   if (!allPairs.length) return modals
 
   const pair = allPairs[Math.floor(Math.random() * allPairs.length)]
-  const pool = pair.isDuring ? DURING_PROD_EVENTS : AFTER_PROD_EVENTS
-  const ev   = pool[Math.floor(Math.random() * pool.length)]
+
+  // Tier-scaled free:paid ratio — prefer free events at lower tiers
+  let pool = pair.isDuring ? DURING_PROD_EVENTS : AFTER_PROD_EVENTS
+  const freePool = pool.filter(e => !e.cost)
+  const paidPool = pool.filter(e =>  e.cost)
+  if (freePool.length && paidPool.length) {
+    pool = Math.random() < tier.freePaidRatio ? freePool : paidPool
+  }
+
+  const ev = pool[Math.floor(Math.random() * pool.length)]
 
   // 6-week cooldown per CP pair per event
   const coolKey = `cpEvt_${ev.id}_${bondKey(pair.a.id, pair.b.id)}`
@@ -591,7 +584,7 @@ export function rollCpEvents(state, week) {
     flagKey: coolKey,
     modal: {
       type: 'event',
-      data: rollCpEventData(ev, pair.a, pair.b, pair.isDuring),
+      data: rollCpEventData(ev, pair.a, pair.b, pair.isDuring, tier),
     },
   })
   return modals
@@ -626,8 +619,9 @@ export function runChemPulse(state, week) {
           ([x, y]) => bondKey(x, y) === key
         )
 
-        // Fixed CP + chem < 20 → breakup crisis (3.2 spec: <20%)
-        if (isFixed && chem < 20) {
+        // Fixed CP + chem below tier threshold → breakup crisis (Prompt 8: scales by tier)
+        const breakupThreshold = getGameTier(week).cpBreakupThreshold
+        if (isFixed && chem < breakupThreshold) {
           const coolKey = `cpBreakup_${key}`
           const lastWk  = state.flags?.[coolKey] ?? -999
           if (week - lastWk >= 4) {
@@ -637,7 +631,7 @@ export function runChemPulse(state, week) {
               data: {
                 label: '💔 CP BREAKUP CRISIS',
                 message:
-                  `The chemistry between ${a.name} and ${b.name} has fallen critically low (${chem}). `
+                  `The chemistry between ${a.name} and ${b.name} has fallen critically low (${chem}, threshold: ${breakupThreshold}). `
                   + `Their Fixed CP contract is at risk of dissolving.`,
                 choices: [
                   { label: '💰 Intensive bonding session (−₩1,500, +chemistry)',

@@ -254,9 +254,10 @@ function scoreSocial(prod, castActors, chemValue, baseScore) {
  * @param {Array}  castActors
  * @param {number} chemValue  0–100
  * @param {number} baseScore  0–100 (from calcScore)
+ * @param {object} [tier]     game tier config from getGameTier() — for rep cap & distribution
  * @returns {object}
  */
-export function runAllCritics(production, castActors, chemValue, baseScore) {
+export function runAllCritics(production, castActors, chemValue, baseScore, tier) {
   const critics = [
     scoreMedia   (production, castActors, chemValue, baseScore),
     scoreIndustry(production, castActors, chemValue, baseScore),
@@ -264,12 +265,18 @@ export function runAllCritics(production, castActors, chemValue, baseScore) {
     scoreSocial  (production, castActors, chemValue, baseScore),
   ]
 
-  const avgStars = critics.reduce((s, c) => s + c.stars, 0) / critics.length
+  // Prompt 8: apply tier star bonus to shift distribution toward positive at lower tiers
+  const starBonus = tier?.reviewStarBonus ?? 0
+  const rawAvg = critics.reduce((s, c) => s + c.stars, 0) / critics.length
+  const avgStars = Math.min(5, rawAvg + starBonus)
   const finalScore = Math.round((avgStars / 5) * 100)
 
   // Rep delta per spec: (avg - 3) × 8 × rating modifier
   const ratingMod = production.rating === 'pg' ? 1.1 : production.rating === 'r' ? 0.85 : 1.0
-  const repDelta  = Math.round((avgStars - 3) * 8 * ratingMod)
+  const rawRepDelta = Math.round((avgStars - 3) * 8 * ratingMod)
+  // Prompt 8: cap rep loss per review at the tier value (negative cap)
+  const repLossCap = tier?.repLossCap ?? -20
+  const repDelta   = rawRepDelta < 0 ? Math.max(rawRepDelta, repLossCap) : rawRepDelta
 
   const awarded     = avgStars >= 4.5
   const controversy = critics.find(c => c.id === 'social')?.stars <= 2

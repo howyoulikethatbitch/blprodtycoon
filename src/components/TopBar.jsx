@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useGame, A } from '../game/state.jsx'
 import { fmtMoney, fmtPop, calcRank } from '../game/ranking.js'
 import { SFX } from '../game/audio.js'
+import { getGameTier, getNextGameTier } from '../game/tiers.js'
 
 // Ease-out cubic
 function easeOut(t) { return 1 - Math.pow(1 - t, 3) }
@@ -66,8 +67,10 @@ export default function TopBar() {
     if (e.key === 'Escape') setRenaming(false)
   }
 
-  // ── Rank & last-saved ──────────────────────────────────────────────────────
+  // ── Rank, tier & last-saved ───────────────────────────────────────────────
   const rank      = calcRank(state.reputation, state.popularity)
+  const gameTier  = getGameTier(state.week)
+  const nextTier  = getNextGameTier(state.week)
   const savedTime = state.lastSaved
     ? new Date(state.lastSaved).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : null
@@ -108,6 +111,7 @@ export default function TopBar() {
         <Stat label="POP"  value={fmtPop(state.popularity)} color="var(--blue)" />
         <Stat label="RANK" value={rank.id}                  color={rank.color} small />
         <Stat label="WK"   value={state.week}               color="var(--lav)"  />
+        <TierStat tier={gameTier} nextTier={nextTier} week={state.week} />
       </div>
     </header>
   )
@@ -118,6 +122,31 @@ function Stat({ label, value, color, small }) {
     <div style={styles.statWrap}>
       <span style={styles.statLbl}>{label}</span>
       <span style={{ ...styles.statVal, color, fontSize: small ? 8 : 11 }}>{value}</span>
+    </div>
+  )
+}
+
+// Tier display: shows current tier and weeks until next tier
+function TierStat({ tier, nextTier, week }) {
+  const weeksLeft = nextTier ? nextTier.minWeek - week : null
+  const tierColors = {
+    rookie:    'var(--lav)',
+    rising:    'var(--blue)',
+    popular:   'var(--pink)',
+    worldwide: 'var(--gold)',
+  }
+  const color = tierColors[tier.id] ?? 'var(--lav)'
+  return (
+    <div style={{ ...styles.statWrap, minWidth: 58 }}>
+      <span style={styles.statLbl}>TIER</span>
+      <span style={{ ...styles.statVal, color, fontSize: 8, whiteSpace: 'nowrap' }}>
+        {tier.label}
+      </span>
+      {weeksLeft !== null && (
+        <span style={{ fontSize: 5, color: 'var(--gray)', marginTop: 1 }}>
+          {weeksLeft}wk→next
+        </span>
+      )}
     </div>
   )
 }

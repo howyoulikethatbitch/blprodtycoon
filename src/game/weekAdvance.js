@@ -2,6 +2,7 @@
  * weekAdvance.js — Custom hook: NEXT WEEK logic
  * Prompt 5: passes castActors + chemValue to evaluateProduction,
  *           handles awards dispatch and controversy modal.
+ * Prompt 8: tier-based scaling throughout.
  */
 import { useState } from 'react'
 import { useGame, A, pushToast, pushEventLog } from './state.jsx'
@@ -12,6 +13,7 @@ import { evaluateProduction } from './evaluators.js'
 import { rollWeeklyEvents, rollActorEvent, runChemPulse, rollCpEvents } from './events.js'
 import { calcRank, computeNumericRank, playerScore } from './ranking.js'
 import { SFX, resumeAudio } from './audio.js'
+import { getGameTier } from './tiers.js'
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 
@@ -26,6 +28,7 @@ export function useWeekAdvance() {
     setAdvancing(true)
 
     const week = state.week
+    const tier = getGameTier(week)
 
     // ── 1. Tick productions ───────────────────────────────────────────────────
     const completedThisWeek = []
@@ -99,6 +102,7 @@ export function useWeekAdvance() {
       const revenue    = calcRevenue(
         adjBase, prod.budget ?? 1.0, prod.type,
         state.reputation, prod.platform ?? 'tv', comboMult,
+        tier.revenueMod,     // Prompt 8: tier revenue modifier
       )
 
       // Four-critics evaluation
@@ -109,6 +113,7 @@ export function useWeekAdvance() {
         reputation: state.reputation,
         castActors,
         chemValue,
+        tier,                // Prompt 8: pass tier for rep cap & distribution
       })
 
       const finalScore = evalResult.score
@@ -162,6 +167,36 @@ export function useWeekAdvance() {
         )
       }
 
+      // ── Prompt 8: Reputation repair event (30% chance after rep loss) ─────
+      if (evalResult.repDelta < 0 && Math.random() < 0.30) {
+        const repGain = 10 + Math.floor(Math.random() * 11) // +10 to +20
+        const repairEvents = [
+          { label: '💝 CHARITY DRIVE', desc: 'Your studio organises a surprise charity stream.' },
+          { label: '🙏 PUBLIC APOLOGY', desc: 'Your studio issues a heartfelt public statement.' },
+          { label: '🤝 FAN MEET', desc: 'An unannounced fan meeting wins the crowd back.' },
+          { label: '💌 LETTER TO FANS', desc: 'A personal letter from the leads goes viral.' },
+        ]
+        const evt = repairEvents[Math.floor(Math.random() * repairEvents.length)]
+        dispatch({
+          type: A.PUSH_MODAL,
+          modal: {
+            type: 'event',
+            data: {
+              label: `🌟 REPUTATION REPAIR — ${evt.label}`,
+              message:
+                `${evt.desc} The public response has been overwhelmingly positive.\n\n`
+                + `Accept to restore +${repGain} reputation (free).`,
+              choices: [
+                { label: `✅ Accept (+${repGain} rep, free)`,
+                  effect: (s, d) => d({ type: A.ADD_REPUTATION, amount: repGain }) },
+                { label: '❌ Decline (no penalty)', effect: () => {} },
+              ],
+            },
+          },
+        })
+        pushEventLog(dispatch, `🌟 Reputation repair opportunity after "${prod.title}" review.`, 'pink', week)
+      }
+
       // ── Controversy (social critic ≤ 2) ───────────────────────────────────
       if (evalResult.controversy) {
         dispatch({
@@ -210,11 +245,51 @@ export function useWeekAdvance() {
     for (const actor of state.actors) {
       if (!actor.signed) continue
       if (completedThisWeek.find(p => p.castIds.includes(actor.id))) continue
-      const patch = weeklyActorRecovery(actor)
+      // Prompt 8: pass tier to weeklyActorTick for threshold scaling
+      const patch = weeklyActorRecovery(actor, tier)
       dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch })
 
+      // ── Prompt 8: Emergency save event at loyalty ≤ 10 (one-time) ────────
+      const prevLoyalty = actor.loyalty ?? 60
+      const newLoyalty  = patch.loyalty ?? prevLoyalty
+      if (prevLoyalty > 10 && newLoyalty <= 10 && actor.status === 'available') {
+        const coolKey = `loyaltyEmergency_${actor.id}`
+        if (!state.flags?.[coolKey]) {
+          dispatch({ type: A.SET_FLAG, key: coolKey, value: week })
+          dispatch({
+            type: A.PUSH_MODAL,
+            modal: {
+              type: 'event',
+              data: {
+                label: `⚠️ EMERGENCY SAVE — ${actor.name.toUpperCase()}`,
+                message:
+                  `${actor.name} is considering leaving. Loyalty has fallen critically low!\n\n`
+                  + `Start an emergency production now to retain them? `
+                  + `If accepted, they can be immediately cast in a new production for free (no production slot cost; normal filming costs apply).`,
+                choices: [
+                  { label: '🎬 Emergency production — cast them immediately (free slot)',
+                    effect: (s, d) => {
+                      d({ type: A.UPDATE_ACTOR, id: actor.id,
+                        patch: { loyalty: clamp((actor.loyalty ?? 10) + 20, 0, 100) } })
+                      d({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
+                        title: `✅ ${actor.name} — EMERGENCY RETAINED`,
+                        message:
+                          `${actor.name} agrees to stay! Cast them in a new production before next week to keep them.\n\n`
+                          + `Loyalty restored to ${clamp((actor.loyalty ?? 10) + 20, 0, 100)}.`,
+                      } } })
+                    } },
+                  { label: '👋 Decline — they will leave at 0 loyalty',
+                    effect: () => {} },
+                ],
+              },
+            },
+          })
+          pushEventLog(dispatch,
+            `⚠️ EMERGENCY: ${actor.name} loyalty critically low — intervention needed!`, 'red', week)
+        }
+      }
+
       // ── 3.3 Loyalty drain — check after patch applied ────────────────────
-      const newLoyalty = patch.loyalty ?? actor.loyalty ?? 60
       if (newLoyalty <= 0 && actor.status === 'available') {
         const coolKey = `loyaltyZero_${actor.id}`
         const lastWk  = state.flags?.[coolKey] ?? -999
@@ -247,7 +322,9 @@ export function useWeekAdvance() {
                       for (const [k, v] of Object.entries(actor.skills ?? {})) {
                         boostedSkills[k] = Math.min(100, Math.round(v * 2))
                       }
-                      const resignCost = Math.round((actor.signCost ?? 200) * 3)
+                      // Prompt 8: resign cost scales by tier for original 20 actors
+                      const baseCost = Math.round((actor.signCost ?? 200) * 3)
+                      const resignCost = Math.round(baseCost * (tier.resignCostMult ?? 1.0))
                       d({ type: A.UPDATE_ACTOR, id: actor.id,
                         patch: { signed: false, status: 'locked', loyalty: 0 } })
                       d({ type: A.ADD_FREE_AGENT, entry: {

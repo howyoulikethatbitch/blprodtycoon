@@ -58,9 +58,10 @@ export function criticQuote(grade) {
  * @param {Array}  args.castActors   — actor objects
  * @param {number} args.chemValue    — lead pair chemistry 0-100
  */
-export function evaluateProduction({ production, score, revenue, reputation, castActors = [], chemValue = 0 }) {
+export function evaluateProduction({ production, score, revenue, reputation, castActors = [], chemValue = 0, tier }) {
   // Run the four critics — they derive their stars from baseScore
-  const critiqueResult = runAllCritics(production, castActors, chemValue, score)
+  // Prompt 8: pass tier for rep cap & distribution bonus
+  const critiqueResult = runAllCritics(production, castActors, chemValue, score, tier)
 
   // The critic average is the authoritative final score
   const finalScore = critiqueResult.finalScore

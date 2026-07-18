@@ -1,0 +1,1 @@
+- [Tier scaling system](tier-scaling.md) — game-week-based tier in src/game/tiers.js; all balance params centralised there, imported by events/actors/productions/evaluators/weekAdvance/TopBar/ProductionForm.

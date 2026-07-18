@@ -255,43 +255,62 @@ export function canAssign(actor) {
 }
 
 // ─── Weekly actor tick (called on NEXT WEEK) ──────────────────────────────────
-// 3.3: Idle actors lose happiness after 24 weeks; loyalty after 36 weeks.
-export function weeklyActorTick(actor) {
+// Prompt 8: idle thresholds and tick rate scale by game tier.
+// tier: result of getGameTier(week) — pass from weekAdvance.
+export function weeklyActorTick(actor, tier) {
+  // Use tier values or sensible defaults (Popular-tier if no tier provided)
+  const happThreshold  = tier?.idleHappinessThreshold ?? 28
+  const loyThreshold   = tier?.idleLoyaltyThreshold   ?? 42
+  const tickRate       = tier?.penaltyTickRate         ?? 5
+
   const patch = {}
 
   if (actor.status === 'filming') {
+    // Slight happiness drain while working hard
     patch.happiness = clamp((actor.happiness ?? 70) - 2, 0, 100)
+    // Prompt 8: +5 loyalty per week while in active production
+    patch.loyalty = clamp((actor.loyalty ?? 60) + 5, 0, 100)
+    // Track consecutive filming weeks for "return to Happy" mechanic
+    patch.activeFilmingWeeks = (actor.activeFilmingWeeks ?? 0) + 1
+    // If actor was Happy before going idle, restore to Happy after 4 filming weeks
+    if (actor.wasHappyBeforeIdle && (actor.activeFilmingWeeks ?? 0) >= 4) {
+      patch.happiness = Math.max(patch.happiness ?? 0, 80)
+      patch.wasHappyBeforeIdle = false
+    }
   } else if (actor.status === 'resting') {
     patch.happiness = clamp((actor.happiness ?? 70) + 5, 0, 100)
     patch.idleWeeks = 0
+    patch.activeFilmingWeeks = 0
   } else if (actor.status === 'available') {
     const idle = (actor.idleWeeks ?? 0) + 1
     patch.idleWeeks = idle
+    patch.activeFilmingWeeks = 0
     let h = actor.happiness ?? 70
     let l = actor.loyalty ?? 60
 
-    // ── Idle happiness penalty (3.3) ──────────────────────────────────────
-    if (idle < 24) {
-      // Gentle drift to neutral before threshold
-      if (idle >= 8) h = clamp(h - 1, 0, 100)
+    // ── Idle happiness penalty — thresholds scale by tier ─────────────────
+    const ph1 = happThreshold               // gentle drift starts here
+    const ph2 = Math.round(happThreshold * 0.8)  // force Neutral
+    const ph3 = Math.round(happThreshold * 0.7)  // force Sad
+    // ph4 = ph3+ → force Angry
+
+    if (idle < ph2) {
+      if (idle >= Math.round(ph1 * 0.3)) h = clamp(h - 1, 0, 100)
       h = clamp(h + (h > 62 ? -0.4 : 0.4), 0, 100)
-    } else if (idle < 28) {
-      // Week 24+: Force to Neutral (≥50 → 60 max)
+    } else if (idle < ph3) {
       h = clamp(h, 0, 62)
       h = clamp(h - 1, 0, 100)
-    } else if (idle < 32) {
-      // Week 28+: Force to Sad (≥25 but <50)
+    } else if (idle < happThreshold) {
       h = clamp(h, 0, 45)
       h = clamp(h - 1, 0, 100)
     } else {
-      // Week 32+: Force to Angry (<25), stays angry
       h = clamp(h, 0, 22)
       h = clamp(h - 0.5, 0, 100)
     }
     patch.happiness = Math.round(h)
 
-    // ── Idle loyalty drain (3.3) — starts at week 36+, every 4 weeks ──────
-    if (idle >= 36 && (idle - 36) % 4 === 0) {
+    // ── Idle loyalty drain — threshold + tick rate scale by tier ──────────
+    if (idle >= loyThreshold && (idle - loyThreshold) % tickRate === 0) {
       l = clamp(l - 8, 0, 100)
       patch.loyalty = Math.round(l)
     }

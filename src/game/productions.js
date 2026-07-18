@@ -165,18 +165,20 @@ export const BUDGET_TIERS = [
 ]
 
 // ─── Cost formula ─────────────────────────────────────────────────────────────
-export function calcCost(type, budgetMult, scheduleId, castSize) {
+// costMod: tier-based production cost modifier (default 1.0 = no change)
+export function calcCost(type, budgetMult, scheduleId, castSize, costMod = 1.0) {
   const t = PROD_TYPES[type]
   const s = SCHEDULES.find(sc => sc.id === scheduleId)
   if (!t || !s) return 0
   const base     = t.baseCost * budgetMult
   const weekCost = base * 0.055 * s.weeks
   const castCost = castSize * 1500 * budgetMult
-  return Math.round(base + weekCost + castCost)
+  return Math.round((base + weekCost + castCost) * costMod)
 }
 
 // ─── Revenue formula ──────────────────────────────────────────────────────────
-export function calcRevenue(score, budgetMult, type, reputation, platform, comboMult = 1.0) {
+// revenueMod: tier-based revenue modifier (default 1.0 = no change)
+export function calcRevenue(score, budgetMult, type, reputation, platform, comboMult = 1.0, revenueMod = 1.0) {
   const t  = PROD_TYPES[type]
   const pf = PLATFORMS.find(p => p.id === platform)
   if (!t) return 0
@@ -184,7 +186,7 @@ export function calcRevenue(score, budgetMult, type, reputation, platform, combo
   const scoreMult   = Math.pow(score / 100, 1.3)
   const repBonus    = 1 + reputation / 200
   const platMult    = pf?.revMult ?? 1.0
-  return Math.round(baseRevenue * scoreMult * repBonus * platMult * comboMult)
+  return Math.round(baseRevenue * scoreMult * repBonus * platMult * comboMult * revenueMod)
 }
 
 // ─── Score formula ────────────────────────────────────────────────────────────
