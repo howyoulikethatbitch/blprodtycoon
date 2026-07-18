@@ -11,6 +11,7 @@ export default function TitleScreen() {
   const { dispatch } = useGame()
   const [phase, setPhase]             = useState('title')   // 'title' | 'newgame' | 'settings'
   const [companyName, setCompanyName] = useState('Studio Sakura')
+  const [startYear, setStartYear]     = useState(2024)
   const [blink, setBlink]             = useState(true)
   const [hasSave, setHasSave]         = useState(false)
   const [fading, setFading]           = useState(false)
@@ -51,6 +52,7 @@ export default function TitleScreen() {
       dispatch({
         type: A.START_GAME,
         companyName: companyName.trim() || 'Studio Sakura',
+        startYear:   Math.max(2020, startYear || 2024),
         actors,
       })
     }, 400)
@@ -97,6 +99,20 @@ export default function TitleScreen() {
                 placeholder="Studio Sakura"
                 style={{ fontSize: 10 }}
               />
+            </div>
+            <div className="field">
+              <label>START YEAR</label>
+              <input
+                type="number"
+                value={startYear}
+                min={2020}
+                step={1}
+                onChange={e => setStartYear(Math.max(2020, Number(e.target.value) || 2020))}
+                style={{ fontSize: 10 }}
+              />
+              <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 4 }}>
+                Minimum year: 2020 · 1 year = 52 weeks · Cannot be changed after starting.
+              </div>
             </div>
             <div style={styles.startRow}>
               <button type="submit" className="btn-primary" style={styles.bigBtn}>

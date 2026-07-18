@@ -263,7 +263,7 @@ export function scoreToStars(score) {
 export function createProduction({
   type, title, genre, budget, schedule,
   platform, rating, story, castIds, leadIds,
-  cpName, weekStarted,
+  cpName, weekStarted, weekScheduled,
 }) {
   const s = SCHEDULES.find(sc => sc.id === schedule) ?? SCHEDULES[1]
   const t = PROD_TYPES[type]
@@ -292,7 +292,8 @@ export function createProduction({
     viewerCount:      0,
     comboResult:      null,       // computed at wrap
     scandal:          false,
-    weekStarted:      weekStarted ?? null,
+    weekStarted:      weekStarted   ?? null,
+    weekScheduled:    weekScheduled ?? null,  // global week when filming actually begins
   }
 }
 

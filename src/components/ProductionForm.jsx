@@ -38,6 +38,12 @@ function fixedCpCost(lead1, lead2) {
 export default function ProductionForm({ setScreen }) {
   const { state, dispatch } = useGame()
 
+  // ── Year / week calculations (Prompt 1 — Start Year System) ─────────────────
+  const startYear        = state.startYear ?? 2024
+  const currentYear      = startYear + Math.floor((state.week - 1) / 52)
+  const weekInYear       = ((state.week - 1) % 52) + 1           // 1–52 within current year
+  const yearStartGlobal  = (currentYear - startYear) * 52 + 1    // global week of year start
+
   // ── Form state ──────────────────────────────────────────────────────────────
   const [prodType,  setProdType]  = useState('series')
   const [title,     setTitle]     = useState('')
@@ -55,6 +61,9 @@ export default function ProductionForm({ setScreen }) {
   const [cpFixed,       setCpFixed]       = useState(false)
   const [showGenrePick, setShowGenrePick] = useState(false)  // genre select modal
   const [showSlotMachine, setShowSlotMachine] = useState(false)  // random genre modal
+
+  // Prompt 2 — Year Lineup: start week within the current year (1–52)
+  const [startWeekInYear, setStartWeekInYear] = useState(weekInYear)
 
   // 5.1: Randomized title suggestions (fresh on mount, never change during session)
   const [titleSuggestions] = useState(pickRandomTitles)
@@ -94,28 +103,42 @@ export default function ProductionForm({ setScreen }) {
 
   function handleLead1Change(v) {
     SFX.click()
-    setLead1Id(v)
     setCpEdited(false)
-    setLead1FixedLocked(false)
     const partner = findFixedPartner(v)
     if (partner) {
+      // Fixed CP: fill both slots, lock lead2
+      setLead1Id(v)
+      setLead1FixedLocked(false)
       setLead2Id(String(partner))
       setLead2FixedLocked(true)
     } else {
+      // No fixed CP: if lead2 was previously auto-locked, reset it
+      setLead1Id(v)
+      setLead1FixedLocked(false)
+      if (lead2FixedLocked) {
+        setLead2Id('')
+      }
       setLead2FixedLocked(false)
     }
   }
 
   function handleLead2Change(v) {
     SFX.click()
-    setLead2Id(v)
     setCpEdited(false)
-    setLead2FixedLocked(false)
     const partner = findFixedPartner(v)
     if (partner) {
+      // Fixed CP: fill both slots, lock lead1
+      setLead2Id(v)
+      setLead2FixedLocked(false)
       setLead1Id(String(partner))
       setLead1FixedLocked(true)
     } else {
+      // No fixed CP: if lead1 was previously auto-locked, reset it
+      setLead2Id(v)
+      setLead2FixedLocked(false)
+      if (lead1FixedLocked) {
+        setLead1Id('')
+      }
       setLead1FixedLocked(false)
     }
   }
@@ -163,6 +186,22 @@ export default function ProductionForm({ setScreen }) {
   const platInfo   = PLATFORMS.find(p => p.id === platform)
   const typeInfo   = PROD_TYPES[prodType]
 
+  // ── Prompt 2: Year Lineup validation ─────────────────────────────────────
+  const schedWeeks       = schedInfo?.weeks ?? 12
+  // Clamp startWeekInYear to valid range whenever schedule changes
+  const clampedStart     = Math.max(weekInYear, Math.min(startWeekInYear, 52))
+  const lineupEndWeek    = clampedStart + schedWeeks - 1   // last week used in year
+  const canFitInYear     = lineupEndWeek <= 52
+  const minScheduleWeeks = 12  // 3M is shortest
+  const anySlotLeft      = weekInYear + minScheduleWeeks - 1 <= 52
+
+  // Global week when filming actually begins (converts year-relative → global)
+  const weekScheduled = yearStartGlobal + clampedStart - 1
+
+  // ── Prompt 3: Genre reuse warning ────────────────────────────────────────
+  const recentGenres  = (state.history ?? []).slice(-2).map(h => h.genre).filter(Boolean)
+  const isGenreReused = recentGenres.includes(genre)
+
   // 3.2: Fixed CP is only allowed if avg chemistry ≥ 20
   const avgChem = lead1 && lead2 ? Math.round((chemValue) ) : 0
   const fixedCpAllowed = lead1 && lead2 && avgChem >= 20
@@ -183,6 +222,12 @@ export default function ProductionForm({ setScreen }) {
       pushToast(dispatch, 'Select at least one lead actor.', 'red')
       return
     }
+    // Prompt 2: Year lineup validation
+    if (!canFitInYear) {
+      SFX.fail()
+      pushToast(dispatch, 'Not enough weeks left this year. Choose an earlier start week or shorter schedule.', 'red')
+      return
+    }
 
     SFX.confirm()
 
@@ -198,7 +243,8 @@ export default function ProductionForm({ setScreen }) {
       castIds,
       leadIds:   castIds.slice(0, 2),
       cpName,
-      weekStarted: state.week,
+      weekStarted:   state.week,
+      weekScheduled: weekScheduled,
       fixedCP:   cpFixed && fixedCpAllowed,
     })
 
@@ -220,6 +266,53 @@ export default function ProductionForm({ setScreen }) {
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+      {/* ── Year Line-Up Panel (Prompt 2) ─────────────────────────────────── */}
+      <div className="panel">
+        <div className="panel-title">📅 {currentYear} LINE-UP PRODUCTION</div>
+
+        {/* Week summary */}
+        <div style={styles.lineupSummary}>
+          <span style={{ color: 'var(--lav)' }}>Year Week</span>
+          <span style={{ color: 'var(--white)', fontWeight: 'bold' }}>{weekInYear} / 52</span>
+          <span style={{ color: 'var(--lav)' }}>Used</span>
+          <span style={{ color: 'var(--pink)', fontWeight: 'bold' }}>
+            {/* Count weeks occupied by scheduled/filming productions this year */}
+            {(() => {
+              let used = 0
+              for (const p of state.productions) {
+                if (!p.weekScheduled) continue
+                const pStartInYear = p.weekScheduled - yearStartGlobal + 1
+                if (pStartInYear < 1 || pStartInYear > 52) continue
+                const pWeeks = SCHEDULES.find(s => s.id === p.schedule)?.weeks ?? 0
+                used += Math.min(pWeeks, 52 - pStartInYear + 1)
+              }
+              return used
+            })()} wk
+          </span>
+          <span style={{ color: 'var(--lav)' }}>Remaining</span>
+          <span style={{ color: anySlotLeft ? 'var(--green)' : 'var(--red)', fontWeight: 'bold' }}>
+            {52 - weekInYear + 1} wk
+          </span>
+        </div>
+
+        {/* 52-week timeline */}
+        <LineupTimeline
+          weekInYear={weekInYear}
+          productions={state.productions}
+          yearStartGlobal={yearStartGlobal}
+          previewStart={anySlotLeft ? clampedStart : null}
+          previewWeeks={schedWeeks}
+          onWeekClick={w => { if (w >= weekInYear) setStartWeekInYear(w) }}
+        />
+
+        {/* Insufficient weeks warning */}
+        {!anySlotLeft && (
+          <div style={styles.lineupError}>
+            Insufficient weeks remaining this year. Wait for next year to schedule new productions.
+          </div>
+        )}
+      </div>
 
       {/* ── Title ─────────────────────────────────────────────────────────── */}
       <div className="panel">
@@ -277,6 +370,13 @@ export default function ProductionForm({ setScreen }) {
               🎰 Random Genre
             </button>
           </div>
+
+          {/* Prompt 3: Genre reuse warning */}
+          {isGenreReused && (
+            <div style={styles.genreWarn}>
+              ⚠️ Reusing this genre may result in lower ratings and reputation.
+            </div>
+          )}
         </div>
 
         {/* Genre pick modal */}
@@ -465,6 +565,44 @@ export default function ProductionForm({ setScreen }) {
           </div>
         </div>
 
+        {/* Prompt 2: Start week selector */}
+        {anySlotLeft && (
+          <div className="field">
+            <label>START WEEK IN {currentYear}</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button type="button"
+                onClick={() => { SFX.click(); setStartWeekInYear(w => Math.max(weekInYear, w - 1)) }}
+                style={styles.weekStepBtn}
+              >◀</button>
+              <div style={styles.weekDisplay}>
+                Week {clampedStart}
+              </div>
+              <button type="button"
+                onClick={() => { SFX.click(); setStartWeekInYear(w => Math.min(52, w + 1)) }}
+                style={styles.weekStepBtn}
+              >▶</button>
+              <input
+                type="number"
+                min={weekInYear}
+                max={52}
+                value={clampedStart}
+                onChange={e => setStartWeekInYear(Math.max(weekInYear, Math.min(52, Number(e.target.value) || weekInYear)))}
+                style={{ width: 50, fontSize: 8, padding: '4px 6px' }}
+              />
+            </div>
+            {/* Year boundary validation */}
+            {canFitInYear ? (
+              <div style={{ fontSize: 7, color: 'var(--green)', marginTop: 4 }}>
+                ✓ Wk {clampedStart} → Wk {lineupEndWeek} · {schedWeeks} weeks · fits this year
+              </div>
+            ) : (
+              <div style={{ fontSize: 7, color: 'var(--red)', marginTop: 4 }}>
+                ✕ Not enough weeks left this year. Choose an earlier start week or shorter schedule.
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Platform */}
         <div className="field">
           <label>PLATFORM</label>
@@ -570,9 +708,10 @@ export default function ProductionForm({ setScreen }) {
           type="submit"
           className="btn-primary"
           style={{ flex: 1, textAlign: 'center', fontSize: 11, padding: 16 }}
-          disabled={!canAffordTotal || !lead1Id}
+          disabled={!canAffordTotal || !lead1Id || !canFitInYear || !anySlotLeft}
+          title={!anySlotLeft ? 'Insufficient weeks remaining this year.' : !canFitInYear ? 'Schedule exceeds year boundary.' : ''}
         >
-          🎬 GREENLIGHT!
+          {anySlotLeft ? '🎬 ADD TO LINE-UP!' : '⛔ INSUFFICIENT WEEKS'}
         </button>
         <button type="button"
           onClick={() => { SFX.click(); setScreen('dashboard') }}
@@ -583,6 +722,89 @@ export default function ProductionForm({ setScreen }) {
       </div>
 
     </form>
+  )
+}
+
+// ─── Year Lineup Timeline (Prompt 2) ──────────────────────────────────────────
+// 52-block calendar showing which weeks are occupied by productions this year.
+// Clicking an empty available week sets the start week.
+const PROD_COLORS = [
+  '#FF6B9D', '#6BC5FF', '#FFD700', '#90EE90', '#DA70D6',
+  '#FFA07A', '#87CEEB', '#DDA0DD', '#98FB98', '#F0E68C',
+]
+function LineupTimeline({ weekInYear, productions, yearStartGlobal, previewStart, previewWeeks, onWeekClick }) {
+  // Build a map of week (1–52) → production info
+  const weekMap = {}
+  productions.forEach((p, idx) => {
+    if (!p.weekScheduled) return
+    const startInYear = p.weekScheduled - yearStartGlobal + 1
+    if (startInYear < 1 || startInYear > 52) return
+    const schedWeeks = SCHEDULES.find(s => s.id === p.schedule)?.weeks ?? 0
+    const color = PROD_COLORS[idx % PROD_COLORS.length]
+    for (let w = startInYear; w < startInYear + schedWeeks && w <= 52; w++) {
+      weekMap[w] = { color, title: p.title, phase: p.phase ?? 'filming' }
+    }
+  })
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ fontSize: 6, color: 'var(--lav)', letterSpacing: 1, marginBottom: 4 }}>
+        52-WEEK YEAR CALENDAR · Click an empty slot to set start week
+      </div>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(13, 1fr)',
+        gap: 2,
+      }}>
+        {Array.from({ length: 52 }, (_, i) => {
+          const w = i + 1
+          const occ = weekMap[w]
+          const isPast = w < weekInYear
+          const isPreview = !occ && previewStart !== null && w >= previewStart && w < previewStart + previewWeeks
+          const isCurrentWeek = w === weekInYear
+
+          let bg = 'var(--bg-inset)'
+          let border = '1px solid var(--shadow)'
+          let cursor = 'default'
+
+          if (occ) {
+            bg = occ.color
+            border = `1px solid ${occ.color}`
+          } else if (isPreview) {
+            bg = 'rgba(255,215,0,0.25)'
+            border = '1px solid var(--gold)'
+          } else if (isPast) {
+            bg = 'rgba(255,255,255,0.04)'
+          } else {
+            cursor = 'pointer'
+          }
+
+          return (
+            <div
+              key={w}
+              title={occ ? `${occ.title} (${occ.phase})` : isPast ? `Week ${w} — passed` : `Week ${w} — click to start here`}
+              onClick={() => !occ && !isPast && onWeekClick(w)}
+              style={{
+                height: 12,
+                background: bg,
+                border: isCurrentWeek ? '2px solid var(--white)' : border,
+                cursor,
+                opacity: isPast ? 0.35 : 1,
+                transition: 'background 0.1s',
+                position: 'relative',
+              }}
+            />
+          )
+        })}
+      </div>
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 6, color: 'var(--lav)', flexWrap: 'wrap' }}>
+        <span>▪ <span style={{ background: 'var(--bg-inset)', padding: '0 3px' }}>Empty</span></span>
+        <span>▪ <span style={{ background: 'rgba(255,215,0,0.25)', padding: '0 3px', color: 'var(--gold)' }}>Preview</span></span>
+        <span>▪ Colored = scheduled production</span>
+        <span>▪ White border = current week</span>
+      </div>
+    </div>
   )
 }
 
@@ -976,5 +1198,55 @@ const styles = {
     background: 'rgba(255,107,157,0.15)',
     border:     '1px solid var(--pink-dim)',
     color:      'var(--pink)',
+  },
+  lineupSummary: {
+    display:        'grid',
+    gridTemplateColumns: 'auto auto auto auto auto auto',
+    gap:            '4px 10px',
+    alignItems:     'center',
+    fontSize:       7,
+    marginBottom:   10,
+    padding:        '6px 8px',
+    background:     'var(--bg-inset)',
+    border:         '1px solid var(--shadow)',
+  },
+  lineupError: {
+    fontSize:    7,
+    color:       'var(--red)',
+    marginTop:   8,
+    padding:     '6px 8px',
+    background:  'rgba(255,80,80,0.08)',
+    border:      '1px solid var(--red)',
+  },
+  genreWarn: {
+    fontSize:    7,
+    color:       'var(--gold)',
+    marginTop:   6,
+    padding:     '6px 8px',
+    background:  'rgba(255,215,0,0.08)',
+    border:      '1px solid rgba(255,215,0,0.3)',
+    display:     'flex',
+    alignItems:  'center',
+    gap:         4,
+  },
+  weekStepBtn: {
+    fontSize:    8,
+    padding:     '5px 10px',
+    background:  'var(--bg-inset)',
+    border:      '2px solid var(--shadow)',
+    color:       'var(--lav)',
+    cursor:      'pointer',
+    minHeight:   'auto',
+    boxShadow:   'none',
+  },
+  weekDisplay: {
+    fontSize:    9,
+    color:       'var(--white)',
+    fontFamily:  'inherit',
+    background:  'var(--bg-inset)',
+    border:      '2px solid var(--gold)',
+    padding:     '4px 10px',
+    minWidth:    60,
+    textAlign:   'center',
   },
 }

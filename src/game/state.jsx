@@ -9,6 +9,7 @@ import { generateRivals } from './ranking.js'
 export const INITIAL_STATE = {
   started:       false,
   companyName:   'Studio Sakura',
+  startYear:     2024,
   week:          1,
   money:         50000,
   reputation:    10,
@@ -91,7 +92,8 @@ function gameReducer(state, action) {
         ...state,
         started:     true,
         companyName: action.companyName ?? state.companyName,
-        actors:      action.actors     ?? state.actors,
+        startYear:   action.startYear   ?? state.startYear ?? 2024,
+        actors:      action.actors      ?? state.actors,
         rivals:      state.rivals?.length ? state.rivals : generateRivals(),
       }
 
@@ -289,6 +291,7 @@ function gameReducer(state, action) {
       return {
         ...action.saveData,
         started:        true,
+        startYear:      action.saveData.startYear      ?? 2024,
         eventLog:       action.saveData.eventLog       ?? [],
         fixedCPs:       action.saveData.fixedCPs       ?? [],
         freeAgentsPool: action.saveData.freeAgentsPool ?? [],

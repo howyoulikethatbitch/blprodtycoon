@@ -39,6 +39,8 @@ export function useWeekAdvance() {
 
     for (const prod of state.productions) {
       if (prod.status !== 'active') continue
+      // Prompt 1 (Year Lineup): skip productions not yet at their scheduled start week
+      if (prod.weekScheduled && week < prod.weekScheduled) continue
       const patch = tickProduction(prod)
       dispatch({ type: A.UPDATE_PRODUCTION, id: prod.id, patch })
 

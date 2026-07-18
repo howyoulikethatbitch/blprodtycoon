@@ -67,6 +67,10 @@ export default function TopBar() {
     if (e.key === 'Escape') setRenaming(false)
   }
 
+  // ── Year computation ─────────────────────────────────────────────────────
+  const startYear  = state.startYear ?? 2024
+  const currentYear = startYear + Math.floor((state.week - 1) / 52)
+
   // ── Rank, tier & last-saved ───────────────────────────────────────────────
   const rank         = calcRank(state.reputation, state.popularity)
   const gameTier     = getGameTierByRank(state.numericRank ?? 50)
@@ -100,6 +104,7 @@ export default function TopBar() {
             <span style={styles.editHint}>✏️</span>
           </button>
         )}
+        <div style={styles.yearBadge}>{currentYear}</div>
         {savedTime && (
           <div style={styles.savedHint}>saved {savedTime}</div>
         )}
@@ -207,6 +212,14 @@ const styles = {
     width:      110,
     minHeight:  'auto',
     fontFamily: 'inherit',
+  },
+  yearBadge: {
+    fontSize:    8,
+    color:       'var(--gold)',
+    fontFamily:  'inherit',
+    letterSpacing: 1,
+    marginTop:   2,
+    textShadow:  '0 0 8px rgba(255,215,0,0.5)',
   },
   savedHint: {
     fontSize:    6,
