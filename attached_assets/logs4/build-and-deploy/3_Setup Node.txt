@@ -1,0 +1,16 @@
+﻿2026-07-18T05:40:09.7243200Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-18T05:40:09.7245231Z ##[group]Run actions/setup-node@v4
+2026-07-18T05:40:09.7245508Z with:
+2026-07-18T05:40:09.7245707Z   node-version: 22
+2026-07-18T05:40:09.7245926Z   always-auth: false
+2026-07-18T05:40:09.7246176Z   check-latest: false
+2026-07-18T05:40:09.7248508Z   token: ***
+2026-07-18T05:40:09.7248715Z ##[endgroup]
+2026-07-18T05:40:09.9261969Z Found in cache @ /opt/hostedtoolcache/node/22.23.1/x64
+2026-07-18T05:40:09.9294639Z (node:2297) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-18T05:40:09.9296191Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-18T05:40:09.9297463Z ##[group]Environment details
+2026-07-18T05:40:13.2802363Z node: v22.23.1
+2026-07-18T05:40:13.2802960Z npm: 10.9.8
+2026-07-18T05:40:13.2803307Z yarn: 1.22.22
+2026-07-18T05:40:13.2804379Z ##[endgroup]

@@ -1,0 +1,73 @@
+﻿2026-07-18T05:40:07.9163789Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-18T05:40:07.9172097Z ##[group]Run actions/checkout@v4
+2026-07-18T05:40:07.9172635Z with:
+2026-07-18T05:40:07.9172946Z   repository: howyoulikethatbitch/blprodtycoon
+2026-07-18T05:40:07.9175859Z   token: ***
+2026-07-18T05:40:07.9176144Z   ssh-strict: true
+2026-07-18T05:40:07.9176412Z   ssh-user: git
+2026-07-18T05:40:07.9176691Z   persist-credentials: true
+2026-07-18T05:40:07.9177000Z   clean: true
+2026-07-18T05:40:07.9177270Z   sparse-checkout-cone-mode: true
+2026-07-18T05:40:07.9177586Z   fetch-depth: 1
+2026-07-18T05:40:07.9177857Z   fetch-tags: false
+2026-07-18T05:40:07.9178167Z   show-progress: true
+2026-07-18T05:40:07.9178423Z   lfs: false
+2026-07-18T05:40:07.9178660Z   submodules: false
+2026-07-18T05:40:07.9178990Z   set-safe-directory: true
+2026-07-18T05:40:07.9179535Z ##[endgroup]
+2026-07-18T05:40:08.0225768Z Syncing repository: howyoulikethatbitch/blprodtycoon
+2026-07-18T05:40:08.0227559Z ##[group]Getting Git version info
+2026-07-18T05:40:08.0228089Z Working directory is '/home/runner/work/blprodtycoon/blprodtycoon'
+2026-07-18T05:40:08.0228768Z [command]/usr/bin/git version
+2026-07-18T05:40:08.1628131Z git version 2.54.0
+2026-07-18T05:40:08.1651732Z ##[endgroup]
+2026-07-18T05:40:08.1669347Z Temporarily overriding HOME='/home/runner/work/_temp/4161d12d-5f09-4dee-8e08-07882bc95da4' before making global git config changes
+2026-07-18T05:40:08.1670944Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-18T05:40:08.1676770Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/blprodtycoon/blprodtycoon
+2026-07-18T05:40:08.1934774Z Deleting the contents of '/home/runner/work/blprodtycoon/blprodtycoon'
+2026-07-18T05:40:08.1939603Z ##[group]Initializing the repository
+2026-07-18T05:40:08.1945544Z [command]/usr/bin/git init /home/runner/work/blprodtycoon/blprodtycoon
+2026-07-18T05:40:08.2572738Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-07-18T05:40:08.2574109Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-07-18T05:40:08.2574851Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-07-18T05:40:08.2575434Z hint: call:
+2026-07-18T05:40:08.2575726Z hint:
+2026-07-18T05:40:08.2576234Z hint: 	git config --global init.defaultBranch <name>
+2026-07-18T05:40:08.2576954Z hint:
+2026-07-18T05:40:08.2654591Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-07-18T05:40:08.2655918Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-07-18T05:40:08.2656900Z hint:
+2026-07-18T05:40:08.2657480Z hint: 	git branch -m <name>
+2026-07-18T05:40:08.2657971Z hint:
+2026-07-18T05:40:08.2658595Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-07-18T05:40:08.2659675Z Initialized empty Git repository in /home/runner/work/blprodtycoon/blprodtycoon/.git/
+2026-07-18T05:40:08.2660985Z [command]/usr/bin/git remote add origin https://github.com/howyoulikethatbitch/blprodtycoon
+2026-07-18T05:40:08.2865357Z ##[endgroup]
+2026-07-18T05:40:08.2866060Z ##[group]Disabling automatic garbage collection
+2026-07-18T05:40:08.2870622Z [command]/usr/bin/git config --local gc.auto 0
+2026-07-18T05:40:08.2907156Z ##[endgroup]
+2026-07-18T05:40:08.2907662Z ##[group]Setting up auth
+2026-07-18T05:40:08.2915190Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-18T05:40:08.2952648Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-18T05:40:08.5507898Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-18T05:40:08.5557091Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-18T05:40:08.5846743Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-18T05:40:08.5881314Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-18T05:40:08.6125752Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-07-18T05:40:08.6167387Z ##[endgroup]
+2026-07-18T05:40:08.6168024Z ##[group]Fetching the repository
+2026-07-18T05:40:08.6177860Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +fdb09f4fea9d02e475dc152f6c7a5baa1d535b7d:refs/remotes/origin/main
+2026-07-18T05:40:09.5762571Z From https://github.com/howyoulikethatbitch/blprodtycoon
+2026-07-18T05:40:09.5767349Z  * [new ref]         fdb09f4fea9d02e475dc152f6c7a5baa1d535b7d -> origin/main
+2026-07-18T05:40:09.5973060Z ##[endgroup]
+2026-07-18T05:40:09.5974133Z ##[group]Determining the checkout info
+2026-07-18T05:40:09.5983791Z ##[endgroup]
+2026-07-18T05:40:09.5992742Z [command]/usr/bin/git sparse-checkout disable
+2026-07-18T05:40:09.6096462Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-07-18T05:40:09.6132702Z ##[group]Checking out the ref
+2026-07-18T05:40:09.6139040Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-07-18T05:40:09.6878286Z Switched to a new branch 'main'
+2026-07-18T05:40:09.6883874Z branch 'main' set up to track 'origin/main'.
+2026-07-18T05:40:09.6891674Z ##[endgroup]
+2026-07-18T05:40:09.6945849Z [command]/usr/bin/git log -1 --format=%H
+2026-07-18T05:40:09.6972473Z fdb09f4fea9d02e475dc152f6c7a5baa1d535b7d
