@@ -1,0 +1,8 @@
+﻿2026-07-18T05:18:10.6504672Z ##[group]Run npm install
+2026-07-18T05:18:10.6505007Z [36;1mnpm install[0m
+2026-07-18T05:18:10.6589799Z shell: /usr/bin/bash -e {0}
+2026-07-18T05:18:10.6590101Z ##[endgroup]
+2026-07-18T05:19:21.3417487Z npm error Exit handler never called!
+2026-07-18T05:19:21.3418699Z npm error This is an error with npm itself. Please report this error at:
+2026-07-18T05:19:21.3419611Z npm error   <https://github.com/npm/cli/issues>
+2026-07-18T05:19:21.3420801Z npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-07-18T05_18_10_728Z-debug-0.log
