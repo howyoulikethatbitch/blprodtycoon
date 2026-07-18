@@ -34,8 +34,8 @@ const COMPANY_EVENTS = [
     id: 'comp_sponsorship',
     weight: 4,
     label: '💼 BRAND SPONSORSHIP',
-    // Prompt 6.4: only fires if studio money ≤ 50,000
-    condition: s => s.money <= 50000,
+    // Prompt 6.4: only fires when studio is actually struggling for cash
+    condition: s => s.money < 15000,
     makeData: () => ({
       message:
         'A lifestyle brand wants to sponsor your studio. Easy money — no strings attached.',
@@ -175,7 +175,9 @@ const COMPANY_EVENTS = [
   },
 ]
 
-// ─── Tricky Events (Prompt 6.5 — 30% of all events, ⚠️ badge, mixed outcomes) ──
+// ─── Tricky Events (Prompt 6.5 — 30% of all events, ⚠️ badge, both choices cost something) ──
+// Pop rewards capped at 10–25K so no single event can skip tier thresholds.
+// Every choice has a real downside — no free win on either option.
 const TRICKY_COMPANY_EVENTS = [
   {
     id: 'tricky_viral_stunt',
@@ -184,15 +186,20 @@ const TRICKY_COMPANY_EVENTS = [
     makeData: () => ({
       badge: '⚠️ RISKY CHOICE',
       message:
-        'A media agency offers a viral marketing stunt. It\'ll spike fan attention but the content is edgy and divisive.',
+        'A media agency offers a viral marketing stunt. '
+        + 'It\'ll spike fan attention but the content is edgy and divisive. '
+        + 'Turning it down means sitting out the trend — fans notice.',
       choices: [
-        { label: '✅ Accept (+500K pop, −8 rep)',
+        { label: '✅ Accept (+12,000 pop, −8 rep)',
           effect: (s, d) => {
-            d({ type: A.SET_POPULARITY, value: s.popularity + 500000 })
+            d({ type: A.SET_POPULARITY, value: s.popularity + 12000 })
             d({ type: A.ADD_REPUTATION, amount: -8 })
           } },
-        { label: '❌ Decline (+3 rep, no pop)',
-          effect: (s, d) => d({ type: A.ADD_REPUTATION, amount: 3 }) },
+        { label: '❌ Decline (−5,000 pop, +4 rep)',
+          effect: (s, d) => {
+            d({ type: A.SET_POPULARITY, value: Math.max(0, s.popularity - 5000) })
+            d({ type: A.ADD_REPUTATION, amount: 4 })
+          } },
       ],
     }),
   },
@@ -204,16 +211,17 @@ const TRICKY_COMPANY_EVENTS = [
       badge: '⚠️ RISKY CHOICE',
       message:
         'Finance suggests raiding the equipment reserve for quick cash. '
-        + 'Good for funds but industry insiders will notice.',
+        + 'Good for funds but industry insiders will notice. '
+        + 'A proper audit keeps your standing but costs time and money.',
       choices: [
-        { label: '✅ Accept (+₩5,000, −6 rep)',
+        { label: '✅ Raid reserve (+₩8,000, −6 rep)',
           effect: (s, d) => {
-            d({ type: A.ADD_MONEY,      amount: 5000 })
+            d({ type: A.ADD_MONEY,      amount: 8000 })
             d({ type: A.ADD_REPUTATION, amount: -6 })
           } },
-        { label: '❌ Decline — pay for proper audit (−₩1,500, +4 rep)',
+        { label: '❌ Proper audit (−₩2,000, +4 rep)',
           effect: (s, d) => {
-            d({ type: A.ADD_MONEY,      amount: -1500 })
+            d({ type: A.ADD_MONEY,      amount: -2000 })
             d({ type: A.ADD_REPUTATION, amount: 4 })
           } },
       ],
@@ -228,15 +236,18 @@ const TRICKY_COMPANY_EVENTS = [
       badge: '⚠️ RISKY CHOICE',
       message:
         'A rival studio proposes a co-branding deal. '
-        + 'It boosts your reputation but also elevates the competition.',
+        + 'Accepting builds your credibility — but sharing the spotlight costs fans. '
+        + 'Declining runs counter-marketing, boosting your pop but burning a bridge.',
       choices: [
-        { label: '✅ Accept (+6 rep, rival also gains +10 score)',
+        { label: '✅ Accept (+7 rep, −8,000 pop — sharing spotlight)',
           effect: (s, d) => {
-            d({ type: A.ADD_REPUTATION, amount: 6 })
+            d({ type: A.ADD_REPUTATION, amount: 7 })
+            d({ type: A.SET_POPULARITY, value: Math.max(0, s.popularity - 8000) })
           } },
-        { label: '❌ Decline (+10K pop from counter-marketing)',
+        { label: '❌ Decline (+8,000 pop, −3 rep — seen as territorial)',
           effect: (s, d) => {
-            d({ type: A.SET_POPULARITY, value: s.popularity + 10000 })
+            d({ type: A.SET_POPULARITY, value: s.popularity + 8000 })
+            d({ type: A.ADD_REPUTATION, amount: -3 })
           } },
       ],
     }),
@@ -252,19 +263,23 @@ const TRICKY_COMPANY_EVENTS = [
       return {
         badge: '⚠️ RISKY CHOICE',
         message:
-          `Fans are demanding ${actor.name} do a solo event ASAP. `
-          + `Accepting pushes them hard — great for pop but rough on happiness.`,
+          `Fans are demanding ${actor.name} do a solo fan meet ASAP. `
+          + `Pushing them delivers pop but hammers their happiness. `
+          + `Protecting them keeps morale up but disappoints the fanbase.`,
         choices: [
-          { label: `✅ Push ${actor.name} (+30K pop, −12 happiness)`,
+          { label: `✅ Push ${actor.name} (+18,000 pop, −12 happiness)`,
             effect: (s2, d) => {
-              d({ type: A.SET_POPULARITY, value: s2.popularity + 30000 })
+              d({ type: A.SET_POPULARITY, value: s2.popularity + 18000 })
+              const cur = s2.actors.find(x => x.id === actor.id)
               d({ type: A.UPDATE_ACTOR, id: actor.id,
-                  patch: { happiness: clamp((actor.happiness ?? 70) - 12, 0, 100) } })
+                  patch: { happiness: clamp(((cur ?? actor).happiness ?? 70) - 12, 0, 100) } })
             } },
-          { label: `❌ Protect ${actor.name} (+8 happiness, no pop)`,
+          { label: `❌ Protect ${actor.name} (+10 happiness, −6,000 pop)`,
             effect: (s2, d) => {
+              d({ type: A.SET_POPULARITY, value: Math.max(0, s2.popularity - 6000) })
+              const cur = s2.actors.find(x => x.id === actor.id)
               d({ type: A.UPDATE_ACTOR, id: actor.id,
-                  patch: { happiness: clamp((actor.happiness ?? 70) + 8, 0, 100) } })
+                  patch: { happiness: clamp(((cur ?? actor).happiness ?? 70) + 10, 0, 100) } })
             } },
         ],
       }
@@ -278,16 +293,20 @@ const TRICKY_COMPANY_EVENTS = [
       badge: '⚠️ RISKY CHOICE',
       message:
         'A top magazine offers a provocative cover shoot. '
-        + 'Great money but the community is divided on the concept.',
+        + 'Good money and a pop spike, but the community is divided. '
+        + 'Declining protects your rep — but the planning fee is already spent.',
       choices: [
-        { label: '✅ Accept (+₩4,000, +200K pop, −5 rep)',
+        { label: '✅ Accept (+₩4,000, +15,000 pop, −5 rep)',
           effect: (s, d) => {
             d({ type: A.ADD_MONEY,      amount: 4000 })
-            d({ type: A.SET_POPULARITY, value: s.popularity + 200000 })
+            d({ type: A.SET_POPULARITY, value: s.popularity + 15000 })
             d({ type: A.ADD_REPUTATION, amount: -5 })
           } },
-        { label: '❌ Decline (+4 rep from principled refusal)',
-          effect: (s, d) => d({ type: A.ADD_REPUTATION, amount: 4 }) },
+        { label: '❌ Decline (−₩1,000 sunk cost, +4 rep)',
+          effect: (s, d) => {
+            d({ type: A.ADD_MONEY,      amount: -1000 })
+            d({ type: A.ADD_REPUTATION, amount: 4 })
+          } },
       ],
     }),
   },
@@ -295,10 +314,7 @@ const TRICKY_COMPANY_EVENTS = [
     id: 'tricky_hidden_romance',
     weight: 2,
     label: '⚠️ HIDDEN RELATIONSHIP RUMOUR',
-    condition: s => {
-      const signed = s.actors.filter(a => a.signed)
-      return signed.length >= 2
-    },
+    condition: s => s.actors.filter(a => a.signed).length >= 2,
     makeData: (s) => {
       const signed = s.actors.filter(a => a.signed)
       if (signed.length < 2) return null
@@ -307,25 +323,26 @@ const TRICKY_COMPANY_EVENTS = [
         badge: '⚠️ RISKY CHOICE',
         message:
           `Tabloids claim ${a.name} and ${b.name} are secretly dating. `
-          + `Confirming thrills fans but strains their professional loyalty.`,
+          + `Confirming thrills fans and builds chemistry — but the spotlight strains their loyalty. `
+          + `Denying protects them professionally but fans lose interest.`,
         choices: [
-          { label: `✅ Confirm (+chem, +100K pop, −10 loyalty each)`,
+          { label: `✅ Confirm (+20,000 pop, +15 chem, −10 loyalty each)`,
             effect: (s2, d) => {
-              d({ type: A.SET_POPULARITY, value: s2.popularity + 100000 })
+              d({ type: A.SET_POPULARITY, value: s2.popularity + 20000 })
               const curA = s2.actors.find(x => x.id === a.id)
               const curB = s2.actors.find(x => x.id === b.id)
               if (curA) d({ type: A.UPDATE_ACTOR, id: a.id, patch: {
-                loyalty: clamp((curA.loyalty ?? 60) - 10, 0, 100),
+                loyalty:       clamp((curA.loyalty ?? 60) - 10, 0, 100),
                 chemistry_map: { ...(curA.chemistry_map ?? {}), [b.id]: clamp((curA.chemistry_map?.[b.id] ?? 0) + 15, 0, 100) },
               } })
               if (curB) d({ type: A.UPDATE_ACTOR, id: b.id, patch: {
-                loyalty: clamp((curB.loyalty ?? 60) - 10, 0, 100),
+                loyalty:       clamp((curB.loyalty ?? 60) - 10, 0, 100),
                 chemistry_map: { ...(curB.chemistry_map ?? {}), [a.id]: clamp((curB.chemistry_map?.[a.id] ?? 0) + 15, 0, 100) },
               } })
             } },
-          { label: `❌ Deny (+loyalty each, −50K pop)`,
+          { label: `❌ Deny (−8,000 pop, +10 loyalty each)`,
             effect: (s2, d) => {
-              d({ type: A.SET_POPULARITY, value: Math.max(0, s2.popularity - 50000) })
+              d({ type: A.SET_POPULARITY, value: Math.max(0, s2.popularity - 8000) })
               const curA = s2.actors.find(x => x.id === a.id)
               const curB = s2.actors.find(x => x.id === b.id)
               if (curA) d({ type: A.UPDATE_ACTOR, id: a.id, patch: { loyalty: clamp((curA.loyalty ?? 60) + 10, 0, 100) } })
@@ -343,17 +360,20 @@ const TRICKY_COMPANY_EVENTS = [
     makeData: () => ({
       badge: '⚠️ RISKY CHOICE',
       message:
-        'An awards strategist offers a guaranteed nomination campaign — costly but high impact. '
-        + 'Decline and use that money internally instead.',
+        'An awards strategist offers a guaranteed nomination campaign — costly but high rep impact. '
+        + 'Declining saves the budget but the missed PR causes your fanbase to stagnate.',
       choices: [
-        { label: '✅ Launch campaign (−₩5,000, +10 rep, +1 award nomination)',
+        { label: '✅ Launch campaign (−₩5,000, +10 rep, +1 award)',
           effect: (s, d) => {
             d({ type: A.ADD_MONEY,      amount: -5000 })
             d({ type: A.ADD_REPUTATION, amount: 10 })
-            d({ type: A.ADD_AWARD,      amount: 1 })
+            d({ type: A.ADD_AWARD })
           } },
-        { label: '❌ Save the money (+₩5,000 stays, +2 rep from studio discipline)',
-          effect: (s, d) => d({ type: A.ADD_REPUTATION, amount: 2 }) },
+        { label: '❌ Save the money (−8,000 pop, +2 rep)',
+          effect: (s, d) => {
+            d({ type: A.SET_POPULARITY, value: Math.max(0, s.popularity - 8000) })
+            d({ type: A.ADD_REPUTATION, amount: 2 })
+          } },
       ],
     }),
   },
