@@ -35,6 +35,13 @@ function GameApp() {
     setSfxEnabled(state.settings?.sfxOn !== false)
   }, [state.settings?.scanlines, state.settings?.animSpeed, state.settings?.sfxOn])
 
+  // ── Lock body scroll when a modal is open ─────────────────────────────────
+  // Must be declared BEFORE the early return so hook count is stable across renders
+  useEffect(() => {
+    document.body.classList.toggle('modal-open', (state.modalQueue?.length ?? 0) > 0)
+    return () => document.body.classList.remove('modal-open')
+  }, [state.modalQueue?.length])
+
   if (!state.started) return <TitleScreen />
 
   const openProfile = (actorId) => {
@@ -57,12 +64,6 @@ function GameApp() {
       default:          return <Dashboard setScreen={setScreen} />
     }
   }
-
-  // Lock body scroll when a modal is open
-  useEffect(() => {
-    document.body.classList.toggle('modal-open', state.modalQueue.length > 0)
-    return () => document.body.classList.remove('modal-open')
-  }, [state.modalQueue.length])
 
   return (
     <div className="app-layout">
