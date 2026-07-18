@@ -1,8 +1,8 @@
 /**
  * App.jsx — Root game app, screen routing
- * Prompt 3: added 'company' screen
+ * Prompt 8: Confetti mounted, settings → body class wiring
  */
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { GameProvider, useGame } from './game/state.jsx'
 import TitleScreen from './components/TitleScreen.jsx'
 import TopBar from './components/TopBar.jsx'
@@ -14,11 +14,26 @@ import ActorProfile from './components/ActorProfile.jsx'
 import Settings from './components/Settings.jsx'
 import CompanyStatus from './components/CompanyStatus.jsx'
 import ModalSystem from './components/ModalSystem.jsx'
+import Confetti from './components/Confetti.jsx'
+import { setSfxEnabled } from './game/audio.js'
 
 function GameApp() {
   const { state } = useGame()
-  const [screen, setScreen]           = useState('dashboard')
+  const [screen, setScreen]             = useState('dashboard')
   const [profileActor, setProfileActor] = useState(null)
+
+  // ── Wire settings → body classes + audio ─────────────────────────────────
+  useEffect(() => {
+    const b = document.body
+    // Scanlines
+    b.classList.toggle('no-scanlines', !state.settings?.scanlines)
+    // Animation speed
+    b.classList.remove('anim-slow', 'anim-fast')
+    if (state.settings?.animSpeed === 'slow') b.classList.add('anim-slow')
+    if (state.settings?.animSpeed === 'fast') b.classList.add('anim-fast')
+    // SFX
+    setSfxEnabled(state.settings?.sfxOn !== false)
+  }, [state.settings?.scanlines, state.settings?.animSpeed, state.settings?.sfxOn])
 
   if (!state.started) return <TitleScreen />
 
@@ -43,6 +58,12 @@ function GameApp() {
     }
   }
 
+  // Lock body scroll when a modal is open
+  useEffect(() => {
+    document.body.classList.toggle('modal-open', state.modalQueue.length > 0)
+    return () => document.body.classList.remove('modal-open')
+  }, [state.modalQueue.length])
+
   return (
     <div className="app-layout">
       <TopBar />
@@ -53,6 +74,7 @@ function GameApp() {
         </main>
       </div>
       <ModalSystem />
+      <Confetti />
     </div>
   )
 }

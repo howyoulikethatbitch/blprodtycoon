@@ -1,16 +1,46 @@
 /**
  * ModalSystem.jsx — Global modal queue renderer
- * Prompt 5: productionResult now shows four critics, fan reviews, social posts, awards.
+ * Prompt 8: slide-up animation, queue badge, confetti on awards/rankUp
  */
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useGame, A } from '../game/state.jsx'
 import { fmtMoney } from '../game/ranking.js'
 import { SFX } from '../game/audio.js'
 import { TIER_COLOR } from '../game/actors.js'
+import { triggerConfetti } from './Confetti.jsx'
 
 export default function ModalSystem() {
   const { state, dispatch } = useGame()
   const [modal] = state.modalQueue
+  const queueLen  = state.modalQueue.length
+  const prevModal = useRef(null)
+
+  // Play SFX and fire confetti on every new modal
+  useEffect(() => {
+    if (!modal) return
+    // Only react when the modal id/type actually changes
+    const key = modal.type + JSON.stringify(modal.data?.label ?? modal.data?.title ?? '')
+    if (prevModal.current === key) return
+    prevModal.current = key
+
+    // Choose sound based on type
+    if (modal.type === 'rankUp') {
+      SFX.levelUp()
+      triggerConfetti(1.2)
+    } else if (modal.type === 'productionResult' && modal.data?.eval?.awarded) {
+      SFX.award()
+      triggerConfetti(1.5)
+    } else if (
+      modal.type === 'event' &&
+      typeof modal.data?.label === 'string' &&
+      modal.data.label.includes('VICTORY')
+    ) {
+      SFX.success()
+      triggerConfetti(0.8)
+    } else {
+      SFX.modal()
+    }
+  }, [modal])
 
   if (!modal) return null
 
@@ -21,6 +51,26 @@ export default function ModalSystem() {
 
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && dismiss()}>
+
+      {/* Queue counter badge */}
+      {queueLen > 1 && (
+        <div style={{
+          position:    'fixed',
+          top:         12,
+          right:       12,
+          background:  'var(--pink)',
+          color:       'var(--bg-deep)',
+          fontSize:    7,
+          padding:     '4px 8px',
+          zIndex:      100001,
+          border:      '2px solid #8A2B52',
+          boxShadow:   '2px 2px 0 var(--shadow)',
+          pointerEvents: 'none',
+        }}>
+          {queueLen - 1} MORE ▼
+        </div>
+      )}
+
       {modal.type === 'productionResult' && (
         <ProductionResultModal data={modal.data} onClose={dismiss} />
       )}

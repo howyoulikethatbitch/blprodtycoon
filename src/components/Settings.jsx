@@ -75,14 +75,30 @@ export default function Settings() {
     pushToast(dispatch, 'Game reset.', '')
   }
 
-  // ─── Rename ──────────────────────────────────────────────────────────────────
-  function handleRename() {
+  // ─── Rename (in-panel text input, no window.prompt) ──────────────────────────
+  const [renaming, setRenaming]   = useState(false)
+  const [renameVal, setRenameVal] = useState('')
+  const renameRef                 = useRef(null)
+
+  function openRename() {
     SFX.click()
-    const name = window.prompt('Enter new studio name:', state.companyName)
-    if (name && name.trim()) {
-      dispatch({ type: A.SET_COMPANY_NAME, name: name.trim() })
-      pushToast(dispatch, `Studio renamed to "${name.trim()}"`)
+    setRenameVal(state.companyName)
+    setRenaming(true)
+    setTimeout(() => renameRef.current?.select(), 30)
+  }
+
+  function commitRename() {
+    const trimmed = renameVal.trim()
+    if (trimmed && trimmed !== state.companyName) {
+      dispatch({ type: A.SET_COMPANY_NAME, name: trimmed })
+      pushToast(dispatch, `Studio renamed to "${trimmed}"`)
     }
+    setRenaming(false)
+  }
+
+  function handleRenameKey(e) {
+    if (e.key === 'Enter')  commitRename()
+    if (e.key === 'Escape') setRenaming(false)
   }
 
   return (
@@ -158,15 +174,46 @@ export default function Settings() {
       {/* ── Studio ── */}
       <div className="panel">
         <div className="panel-title">🏢 STUDIO</div>
-        <div style={{ fontSize: 8, color: 'var(--lav)', marginBottom: 10 }}>
-          Current name: <span style={{ color: 'var(--pink)' }}>{state.companyName}</span>
-        </div>
-        <button
-          onClick={handleRename}
-          style={{ fontSize: 8, padding: '10px 14px', width: '100%', textAlign: 'center' }}
-        >
-          ✏️ RENAME STUDIO
-        </button>
+        {renaming ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input
+              ref={renameRef}
+              value={renameVal}
+              maxLength={28}
+              onChange={e => setRenameVal(e.target.value)}
+              onKeyDown={handleRenameKey}
+              placeholder="Studio name…"
+              style={{ width: '100%', fontSize: 9 }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="btn-gold"
+                onClick={commitRename}
+                style={{ flex: 1, fontSize: 8, padding: '10px', textAlign: 'center' }}
+              >
+                ✓ SAVE
+              </button>
+              <button
+                onClick={() => { SFX.click(); setRenaming(false) }}
+                style={{ flex: 1, fontSize: 8, padding: '10px', textAlign: 'center' }}
+              >
+                ✕ CANCEL
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div style={{ fontSize: 8, color: 'var(--lav)', marginBottom: 10 }}>
+              Current: <span style={{ color: 'var(--pink)' }}>{state.companyName}</span>
+            </div>
+            <button
+              onClick={openRename}
+              style={{ fontSize: 8, padding: '10px 14px', width: '100%', textAlign: 'center' }}
+            >
+              ✏️ RENAME STUDIO
+            </button>
+          </>
+        )}
       </div>
 
       {/* ── Save data ── */}
