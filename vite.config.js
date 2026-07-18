@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 // Update this if deploying to a custom domain (use '/')
 export default defineConfig({
   plugins: [react()],
-  base: '/bl-production-tycoon/',
+  base: '/blprodtycoon/',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
