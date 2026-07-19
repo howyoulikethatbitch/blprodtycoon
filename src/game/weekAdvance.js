@@ -14,7 +14,7 @@ import { rollWeeklyEvents, rollActorEvent, runChemPulse, rollCpEvents } from './
 import { calcRank, computeNumericRank, playerScore } from './ranking.js'
 import { SFX, resumeAudio } from './audio.js'
 import { getGameTierByRank } from './tiers.js'
-import { GENRE_UNLOCK_BY_GRADE } from './productions.js'
+import { GENRE_UNLOCK_BY_GRADE, GENRE_UNLOCK_COUNTS, GENRES } from './productions.js'
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 
@@ -31,6 +31,15 @@ export function useWeekAdvance() {
     const week = state.week
     // Prompt 1: tier now derived from numeric rank, not week
     const tier = getGameTierByRank(state.numericRank ?? 101)
+
+    // ── Genre trends: regenerate at start of each year (or first week ever) ──
+    const weekInYear = ((week - 1) % 52) + 1
+    if (weekInYear === 1 || !(state.genreTrends?.length)) {
+      const trendCounts = { rookie: 3, rising: 4, popular: 5, worldwide: 6 }
+      const trendCount  = trendCounts[tier.id] ?? 3
+      const shuffled    = [...GENRES].sort(() => Math.random() - 0.5)
+      dispatch({ type: A.SET_GENRE_TRENDS, trends: shuffled.slice(0, trendCount) })
+    }
 
     // ── 1. Tick productions ───────────────────────────────────────────────────
     const completedThisWeek = []
@@ -133,10 +142,16 @@ export function useWeekAdvance() {
 
       const finalScore = evalResult.score
 
-      // Apply stat deltas
+      // Apply stat deltas — genre trend gives +20% pop bonus
+      const isTrending = (state.genreTrends ?? []).includes(prod.genre)
+      const trendedPop = isTrending ? Math.round(evalResult.popDelta * 1.20) : evalResult.popDelta
       dispatch({ type: A.ADD_MONEY,      amount: revenue })
       dispatch({ type: A.ADD_REPUTATION, amount: evalResult.repDelta })
-      dispatch({ type: A.SET_POPULARITY, value: state.popularity + evalResult.popDelta })
+      dispatch({ type: A.SET_POPULARITY, value: state.popularity + trendedPop })
+      if (isTrending) {
+        pushEventLog(dispatch,
+          `📈 "${prod.genre}" is trending! +20% pop bonus for "${prod.title}"`, 'gold', week)
+      }
 
       // Chemistry + XP for cast
       const chemDeltas = calcBondGrowth(castActors, finalScore)
@@ -182,8 +197,8 @@ export function useWeekAdvance() {
         )
       }
 
-      // ── Prompt 3: Happiness bonus/penalty on cast actors based on grade ─────
-      const happinessByGrade = { S: 15, A: 10, B: 6, C: 0, D: -6, F: -12 }
+      // ── Happiness bonus/penalty on cast actors based on grade ─────────────
+      const happinessByGrade = { 'S+': 20, S: 15, A: 10, B: 6, C: 0, D: -6, F: -12 }
       const happinessDelta   = happinessByGrade[evalResult.grade] ?? 0
       if (happinessDelta !== 0) {
         for (const cActor of castActors) {
@@ -192,16 +207,21 @@ export function useWeekAdvance() {
         }
       }
 
-      // ── Prompt 4: Unlock genres based on production grade ─────────────────
-      const newGenres = GENRE_UNLOCK_BY_GRADE[evalResult.grade] ?? []
-      if (newGenres.length > 0) {
-        dispatch({ type: A.UNLOCK_GENRES, genres: newGenres })
-        const current = state.unlockedGenres ?? ['Romance', 'School', 'Office']
-        const fresh   = newGenres.filter(g => !current.includes(g))
-        if (fresh.length > 0) {
-          pushEventLog(dispatch,
-            `🎭 New genres unlocked: ${fresh.join(', ')}! (${evalResult.grade} grade)`,
-            'gold', week)
+      // ── Grade count increment → count-based genre unlocks ─────────────────
+      const newGradeCount   = ((state.gradeCounts ?? {})[evalResult.grade] ?? 0) + 1
+      dispatch({ type: A.INCREMENT_GRADE_COUNT, grade: evalResult.grade })
+      const gradeThreshold  = GENRE_UNLOCK_COUNTS[evalResult.grade]
+      if (gradeThreshold && newGradeCount >= gradeThreshold) {
+        const genresToUnlock = GENRE_UNLOCK_BY_GRADE[evalResult.grade] ?? []
+        if (genresToUnlock.length > 0) {
+          dispatch({ type: A.UNLOCK_GENRES, genres: genresToUnlock })
+          const current = state.unlockedGenres ?? ['Romance', 'School', 'Office']
+          const fresh   = genresToUnlock.filter(g => !current.includes(g))
+          if (fresh.length > 0) {
+            pushEventLog(dispatch,
+              `🎭 Genres unlocked: ${fresh.join(', ')}! (${evalResult.grade}×${newGradeCount})`,
+              'gold', week)
+          }
         }
       }
 

@@ -28,7 +28,10 @@ export const INITIAL_STATE = {
   modalQueue:    [],
   toasts:        [],
   fixedCPs:      [],   // array of [actorIdA, actorIdB] pairs
+  fixedCPNames:  {},   // bondKey → saved CP name (locked after first lineup submission)
   freeAgentsPool: [], // 3.4: ex-actors + new talent pool entries
+  gradeCounts:   {},   // { grade → total productions ever at that grade }
+  genreTrends:   [],   // genre names trending this year (refreshes each 52-week year)
   rivals:        [],   // 99 rival studios {id, name, score} — generated at START_GAME
   productionsCompleted: 0,  // total productions ever finished — drives studio quality multiplier
   settings: {
@@ -82,7 +85,10 @@ export const A = {
   UPDATE_FREE_AGENT:  'UPDATE_FREE_AGENT',
   INIT_FREE_AGENTS:   'INIT_FREE_AGENTS',
   // Prompt 4: genre unlock system
-  UNLOCK_GENRES:      'UNLOCK_GENRES',
+  UNLOCK_GENRES:          'UNLOCK_GENRES',
+  INCREMENT_GRADE_COUNT:  'INCREMENT_GRADE_COUNT',
+  SET_FIXED_CP_NAME:      'SET_FIXED_CP_NAME',
+  SET_GENRE_TRENDS:       'SET_GENRE_TRENDS',
 }
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -308,10 +314,31 @@ function gameReducer(state, action) {
           ? action.saveData.rivals
           : generateRivals(),
         productionsCompleted: action.saveData.productionsCompleted ?? 0,
+        gradeCounts:          action.saveData.gradeCounts          ?? {},
+        fixedCPNames:         action.saveData.fixedCPNames         ?? {},
+        genreTrends:          action.saveData.genreTrends          ?? [],
       }
 
     case A.MARK_SAVED:
       return { ...state, lastSaved: action.ts }
+
+    case A.INCREMENT_GRADE_COUNT:
+      return {
+        ...state,
+        gradeCounts: {
+          ...(state.gradeCounts ?? {}),
+          [action.grade]: ((state.gradeCounts ?? {})[action.grade] ?? 0) + 1,
+        },
+      }
+
+    case A.SET_FIXED_CP_NAME:
+      return {
+        ...state,
+        fixedCPNames: { ...(state.fixedCPNames ?? {}), [action.key]: action.name },
+      }
+
+    case A.SET_GENRE_TRENDS:
+      return { ...state, genreTrends: action.trends }
 
     default:
       return state

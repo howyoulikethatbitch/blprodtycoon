@@ -30,22 +30,31 @@ export const RATINGS = [
   { id: 'r',    label: 'R',     popMult: 0.8 },   // TV blocks R
 ]
 
-// ─── Genres ───────────────────────────────────────────────────────────────────
+// ─── Genres (22 total) ────────────────────────────────────────────────────────
 export const GENRES = [
   'Romance', 'Comedy', 'Slice of Life', 'School', 'Office',
   'Action', 'Drama', 'Fantasy', 'Horror', 'Mystery',
   'Thriller', 'Historical', 'Sci-Fi', 'Sports', 'Crime',
   'Music', 'Idol', 'Psychological', 'Omegaverse', 'Supernatural',
+  'Post-Apocalyptic', 'Coming-of-Age',
 ]
 
-// Prompt 4: default genres + what each grade unlocks (cumulative)
+// Default genres + what each grade unlocks (count-based — see GENRE_UNLOCK_COUNTS)
 export const DEFAULT_GENRES   = ['Romance', 'School', 'Office']
 export const GENRE_UNLOCK_BY_GRADE = {
-  D: ['Comedy', 'Slice of Life'],
-  C: ['Action', 'Drama'],
-  B: ['Music', 'Mystery', 'Sports', 'Supernatural'],
-  A: ['Horror', 'Thriller', 'Crime', 'Fantasy'],
-  S: ['Historical', 'Sci-Fi', 'Idol', 'Psychological', 'Omegaverse'],
+  C:    ['Music', 'Sports'],
+  B:    ['Slice of Life', 'Comedy'],
+  A:    ['Supernatural', 'Historical', 'Horror', 'Mystery', 'Idol'],
+  S:    ['Fantasy', 'Crime', 'Action', 'Omegaverse', 'Post-Apocalyptic'],
+  'S+': ['Sci-Fi', 'Thriller', 'Drama', 'Psychological', 'Coming-of-Age'],
+}
+// Productions-at-grade required to unlock that grade's genre group
+export const GENRE_UNLOCK_COUNTS = {
+  C:    2,
+  B:    2,
+  A:    3,
+  S:    2,
+  'S+': 1,
 }
 
 export const GENRE_EMOJI = {
@@ -67,8 +76,10 @@ export const GENRE_EMOJI = {
   Music:          '🎵',
   Idol:           '🌟',
   Psychological:  '🧠',
-  Omegaverse:     '🐺',
-  Supernatural:   '🌙',
+  Omegaverse:         '🐺',
+  Supernatural:       '🌙',
+  'Post-Apocalyptic': '☢️',
+  'Coming-of-Age':    '🌱',
 }
 
 // ─── Story origin ─────────────────────────────────────────────────────────────
@@ -119,7 +130,9 @@ const COMBO_TABLE = {
     Music:         1.5,  // music biopics & idol arcs suit mini
     Idol:          1.5,  // idol stories shine in compact format
     Psychological: 1.5,  // slow-burn tension perfect for mini
-    Omegaverse:    1.5,  // fan-favorite; best in tight format
+    Omegaverse:          1.5,  // fan-favorite; best in tight format
+    'Post-Apocalyptic':  1.0,  // intense but world-building needs space
+    'Coming-of-Age':     1.5,  // personal growth arcs suit compact format
   },
   series: {
     // ── Original 5 (unchanged) ──
@@ -138,7 +151,9 @@ const COMBO_TABLE = {
     Music:         1.0,
     Idol:          1.5,  // idol journey suits a full season
     Psychological: 1.5,
-    Omegaverse:    1.0,
+    Omegaverse:          1.0,
+    'Post-Apocalyptic':  1.5,  // epic world-building thrives in long series
+    'Coming-of-Age':     1.5,  // full coming-of-age journey needs a season
   },
   movie: {
     // ── Original 5 (unchanged) ──
@@ -157,7 +172,9 @@ const COMBO_TABLE = {
     Music:         1.0,
     Idol:          0.6,  // idol story too short for full arc in film
     Psychological: 1.0,
-    Omegaverse:    0.6,  // too niche & complex for film format
+    Omegaverse:          0.6,  // too niche & complex for film format
+    'Post-Apocalyptic':  1.5,  // cinematic spectacle suits the big screen
+    'Coming-of-Age':     1.0,  // works in film, but series format is richer
   },
 }
 

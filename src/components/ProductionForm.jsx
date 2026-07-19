@@ -11,7 +11,7 @@ import {
   genCpName, getComboResult, DEFAULT_GENRES,
 } from '../game/productions.js'
 import { getGameTierByRank } from '../game/tiers.js'
-import { calcChemistryBonus, chemTier, getChem } from '../game/chemistry.js'
+import { calcChemistryBonus, chemTier, getChem, bondKey } from '../game/chemistry.js'
 import { canAssign, moodEmoji } from '../game/actors.js'
 import { fmtMoney } from '../game/ranking.js'
 import { SFX } from '../game/audio.js'
@@ -81,10 +81,13 @@ export default function ProductionForm({ setScreen }) {
   const lead2 = state.actors.find(a => a.id === Number(lead2Id))
 
   useEffect(() => {
-    if (!cpEdited) {
+    if (cpNameLocked && storedCPName) {
+      setCpName(storedCPName)
+      setCpEdited(false)
+    } else if (!cpEdited) {
       setCpName(genCpName(lead1?.name ?? '', lead2?.name ?? ''))
     }
-  }, [lead1Id, lead2Id, cpEdited])
+  }, [lead1Id, lead2Id, cpEdited, cpNameLocked, storedCPName])
 
   // Prompt 5: CP auto-fill — when a lead with a fixed CP is selected,
   // automatically fill the partner slot.
@@ -210,7 +213,11 @@ export default function ProductionForm({ setScreen }) {
   const alreadyFixedCP = lead1 && lead2 && (state.fixedCPs ?? []).some(
     ([x, y]) => (x === lead1.id && y === lead2.id) || (x === lead2.id && y === lead1.id)
   )
-  const totalCost      = cost + (cpFixed && fixedCpAllowed && !alreadyFixedCP ? fixedCpPrice : 0)
+  const isEffectivelyFixed = alreadyFixedCP || (cpFixed && fixedCpAllowed)
+  const fixedCPKey    = lead1 && lead2 ? bondKey(lead1.id, lead2.id) : null
+  const storedCPName  = isEffectivelyFixed && fixedCPKey ? ((state.fixedCPNames ?? {})[fixedCPKey] ?? null) : null
+  const cpNameLocked  = !!storedCPName
+  const totalCost     = cost + (cpFixed && fixedCpAllowed && !alreadyFixedCP ? fixedCpPrice : 0)
   const canAffordTotal = state.money >= totalCost
 
   function handleSubmit(e) {
@@ -261,6 +268,11 @@ export default function ProductionForm({ setScreen }) {
     // kept as-is — no need to re-register them.
     if (!alreadyFixedCP && cpFixed && fixedCpAllowed && lead1 && lead2) {
       dispatch({ type: A.ADD_FIXED_CP, pair: [lead1.id, lead2.id] })
+    }
+
+    // Save Fixed CP name (locks it for this pair going forward)
+    if (isEffectivelyFixed && fixedCPKey) {
+      dispatch({ type: A.SET_FIXED_CP_NAME, key: fixedCPKey, name: cpName })
     }
 
     for (const id of castIds) {
@@ -362,6 +374,33 @@ export default function ProductionForm({ setScreen }) {
         {/* Genre */}
         <div className="field">
           <label>GENRE</label>
+
+          {/* Genre Trends */}
+          {(state.genreTrends ?? []).length > 0 && (() => {
+            const trendColors = ['#FF6B9D','#6BC5FF','#FFD700','#5CE1A0','#DA70D6','#FF8C42']
+            return (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 6, color: 'var(--lav)', letterSpacing: 1 }}>TRENDS:</span>
+                {(state.genreTrends).map((g, i) => (
+                  <div key={g} style={{
+                    background:   genre === g ? trendColors[i % trendColors.length] : 'var(--bg-inset)',
+                    border:       `2px solid ${trendColors[i % trendColors.length]}`,
+                    color:        genre === g ? 'var(--bg-deep)' : 'var(--white)',
+                    fontSize:     6,
+                    padding:      '2px 5px',
+                    display:      'inline-flex',
+                    alignItems:   'center',
+                    gap:          3,
+                    letterSpacing: 0.5,
+                  }}>
+                    <span style={{ fontSize: 9 }}>{GENRE_EMOJI[g] ?? '🎬'}</span>
+                    <span>{g}</span>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
           {/* Selected genre display */}
           <div style={styles.genreDisplay}>
             <span style={{ fontSize: 16 }}>{GENRE_EMOJI[genre] ?? '🎬'}</span>
@@ -381,7 +420,7 @@ export default function ProductionForm({ setScreen }) {
             </button>
           </div>
 
-          {/* Prompt 3: Genre reuse warning */}
+          {/* Genre reuse warning */}
           {isGenreReused && (
             <div style={styles.genreWarn}>
               ⚠️ Reusing this genre may result in lower ratings and reputation.
@@ -400,13 +439,19 @@ export default function ProductionForm({ setScreen }) {
         )}
 
         {/* Slot machine modal */}
-        {showSlotMachine && (
-          <SlotMachineModal
-            onSelect={g => { setGenre(g); setShowSlotMachine(false); SFX.confirm() }}
-            onClose={() => setShowSlotMachine(false)}
-            unlockedGenres={state.unlockedGenres ?? DEFAULT_GENRES}
-          />
-        )}
+        {showSlotMachine && (() => {
+          const spinLimitByTier = { rookie: 2, rising: 3, popular: 5, worldwide: Infinity }
+          const spinLimit = spinLimitByTier[gameTier.id] ?? 2
+          return (
+            <SlotMachineModal
+              onSelect={g => { setGenre(g); setShowSlotMachine(false); SFX.confirm() }}
+              onClose={() => setShowSlotMachine(false)}
+              unlockedGenres={state.unlockedGenres ?? DEFAULT_GENRES}
+              spinLimit={spinLimit}
+              currentGenre={genre}
+            />
+          )
+        })()}
 
       </div>
 
@@ -492,13 +537,25 @@ export default function ProductionForm({ setScreen }) {
         {/* CP name */}
         <div className="field" style={{ marginTop: 10 }}>
           <label>CP NAME (couple pairing)</label>
+          {isEffectivelyFixed && !cpNameLocked && cpName && (
+            <div style={{ fontSize: 6, color: 'var(--gold)', marginBottom: 4, lineHeight: 1.8 }}>
+              ⚠️ Are you sure &quot;{cpName}&quot; is the CP Name? Changes will be locked in after submission.
+            </div>
+          )}
           <input
             type="text"
             value={cpName}
             maxLength={20}
-            onChange={e => { setCpName(e.target.value); setCpEdited(true) }}
+            onChange={e => { if (!cpNameLocked) { setCpName(e.target.value); setCpEdited(true) } }}
             placeholder="Auto-generated from lead names"
+            readOnly={cpNameLocked}
+            style={{ opacity: cpNameLocked ? 0.7 : 1, cursor: cpNameLocked ? 'not-allowed' : 'text' }}
           />
+          {cpNameLocked && (
+            <div style={{ fontSize: 6, color: 'var(--pink)', marginTop: 3 }}>
+              🔒 CP name locked for this Fixed CP pair
+            </div>
+          )}
         </div>
 
         {/* 3.2: Fixed vs Unfixed CP toggle */}
@@ -968,35 +1025,50 @@ function GenrePickModal({ current, onSelect, onClose, unlockedGenres }) {
 }
 
 // ─── Slot Machine Modal ───────────────────────────────────────────────────────
-// Prompt 4: only cycles through unlocked genres
-function SlotMachineModal({ onSelect, onClose, unlockedGenres }) {
+// Spins through unlocked genres. Tier-based spin limits; 70/30 fair-roll logic.
+function SlotMachineModal({ onSelect, onClose, unlockedGenres, spinLimit, currentGenre }) {
   const pool = (unlockedGenres ?? DEFAULT_GENRES).filter(g => GENRES.includes(g))
   const [spinning,    setSpinning]    = React.useState(false)
   const [landed,      setLanded]      = React.useState(null)
   const [displayIdx,  setDisplayIdx]  = React.useState(0)
+  const [spinCount,   setSpinCount]   = React.useState(0)
   const intervalRef = React.useRef(null)
 
+  const limit     = spinLimit ?? Infinity
+  const spinsLeft = limit === Infinity ? Infinity : limit - spinCount
+  const canSpin   = !spinning && spinsLeft > 0
+
   function spin() {
-    if (spinning) return
+    if (!canSpin) return
     setLanded(null)
     setSpinning(true)
+    setSpinCount(c => c + 1)
 
     let tick = 0
-    const totalTicks = 28 + Math.floor(Math.random() * 10)  // 28–37 ticks
+    const totalTicks = 28 + Math.floor(Math.random() * 10)
     let delay = 60
 
     function nextTick() {
       setDisplayIdx(i => (i + 1) % pool.length)
       tick++
       if (tick >= totalTicks) {
-        // Land on a random unlocked genre
-        const winner = pool[Math.floor(Math.random() * pool.length)]
-        setDisplayIdx(pool.indexOf(winner))
+        // Fair roll: 70% different genre, 30% same (if in pool)
+        const samePool = pool.filter(g => g === currentGenre)
+        const diffPool = pool.filter(g => g !== currentGenre)
+        let winner
+        if (samePool.length > 0 && diffPool.length > 0 && Math.random() < 0.30) {
+          winner = samePool[0]
+        } else if (diffPool.length > 0) {
+          winner = diffPool[Math.floor(Math.random() * diffPool.length)]
+        } else {
+          winner = pool[Math.floor(Math.random() * pool.length)]
+        }
+        const idx = pool.indexOf(winner)
+        setDisplayIdx(idx >= 0 ? idx : 0)
         setLanded(winner)
         setSpinning(false)
         return
       }
-      // Slow down near the end
       if (tick > totalTicks - 8) delay = 80 + (tick - (totalTicks - 8)) * 40
       intervalRef.current = setTimeout(nextTick, delay)
     }
@@ -1009,6 +1081,13 @@ function SlotMachineModal({ onSelect, onClose, unlockedGenres }) {
   }, [])
 
   const displayGenre = pool[displayIdx] ?? pool[0] ?? 'Romance'
+  const spinLabel = spinning
+    ? '⏳ SPINNING…'
+    : spinsLeft <= 0
+      ? '🚫 NO SPINS LEFT'
+      : limit === Infinity
+        ? '🎰 SPIN AGAIN'
+        : `🎰 SPIN AGAIN (${spinsLeft} left)`
 
   return (
     <div style={modalStyles.overlay} onClick={!spinning ? onClose : undefined}>
@@ -1042,7 +1121,7 @@ function SlotMachineModal({ onSelect, onClose, unlockedGenres }) {
           )}
         </div>
 
-        {/* Spinning strip preview — only unlocked genres */}
+        {/* Spinning strip preview */}
         <div style={modalStyles.slotStrip}>
           {pool.slice(displayIdx, displayIdx + 5).concat(pool.slice(0, Math.max(0, 5 - (pool.length - displayIdx)))).map((g, i) => (
             <span key={i} style={{
@@ -1055,11 +1134,15 @@ function SlotMachineModal({ onSelect, onClose, unlockedGenres }) {
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-          <button type="button" style={modalStyles.spinBtn}
-            onClick={spin} disabled={spinning}
+        <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button type="button" style={{
+            ...modalStyles.spinBtn,
+            opacity: canSpin ? 1 : 0.45,
+            cursor: canSpin ? 'pointer' : 'not-allowed',
+          }}
+            onClick={spin} disabled={!canSpin}
           >
-            {spinning ? '⏳ SPINNING…' : '🎰 SPIN AGAIN'}
+            {spinLabel}
           </button>
           {landed && (
             <button type="button" style={modalStyles.acceptBtn}

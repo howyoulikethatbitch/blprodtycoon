@@ -4,14 +4,15 @@
  */
 import { runAllCritics } from './critics.js'
 
-// ─── Score → grade (Prompt 3: F/D/C/B/A/S with updated labels) ───────────────
+// ─── Score → grade (F/D/C/B/A/S/S+ scale) ────────────────────────────────────
 export function scoreGrade(score) {
-  if (score >= 90) return { grade: 'S', label: 'PERFECT',  color: '#FFD700' }
-  if (score >= 72) return { grade: 'A', label: 'GREAT',    color: '#5CE1A0' }
-  if (score >= 55) return { grade: 'B', label: 'GOOD',     color: '#6BC5FF' }
-  if (score >= 40) return { grade: 'C', label: 'NEUTRAL',  color: '#9B86C4' }
-  if (score >= 25) return { grade: 'D', label: 'BAD',      color: '#FF8C42' }
-  return                  { grade: 'F', label: 'TERRIBLE', color: '#FF5470' }
+  if (score >= 96) return { grade: 'S+', label: 'LEGENDARY', color: '#FF85E1' }
+  if (score >= 88) return { grade: 'S',  label: 'PERFECT',   color: '#FFD700' }
+  if (score >= 72) return { grade: 'A',  label: 'GREAT',     color: '#5CE1A0' }
+  if (score >= 55) return { grade: 'B',  label: 'GOOD',      color: '#6BC5FF' }
+  if (score >= 40) return { grade: 'C',  label: 'NEUTRAL',   color: '#9B86C4' }
+  if (score >= 25) return { grade: 'D',  label: 'BAD',       color: '#FF8C42' }
+  return                  { grade: 'F',  label: 'TERRIBLE',  color: '#FF5470' }
 }
 
 // ─── Popularity impact ────────────────────────────────────────────────────────
