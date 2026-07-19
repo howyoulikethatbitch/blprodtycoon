@@ -200,8 +200,19 @@ export function calcRevenue(score, budgetMult, type, reputation, platform, combo
   return Math.round(baseRevenue * scoreMult * repBonus * platMult * comboMult * revenueMod)
 }
 
+// ─── Studio quality multiplier (production experience curve) ─────────────────
+// Represents the studio learning its workflow: first few productions execute
+// at reduced quality regardless of actor skill, improving with experience.
+function studioQualityMult(productionsCompleted) {
+  if (productionsCompleted <  3) return 0.65   // greenhorn — still figuring it out
+  if (productionsCompleted <  6) return 0.78   // finding the rhythm
+  if (productionsCompleted < 10) return 0.88   // getting confident
+  if (productionsCompleted < 15) return 0.95   // near-professional
+  return 1.0                                   // fully experienced
+}
+
 // ─── Score formula ────────────────────────────────────────────────────────────
-export function calcScore(production, castActors, chemistryBonus = 0) {
+export function calcScore(production, castActors, chemistryBonus = 0, productionsCompleted = 0) {
   if (!castActors.length) return 0
 
   const { type, budget, schedule, story } = production
@@ -221,8 +232,9 @@ export function calcScore(production, castActors, chemistryBonus = 0) {
   }
   statScore = statScore / castActors.length
 
-  const budgetMod = 0.5 + budgetMult * 0.2
-  const raw = statScore * budgetMod * qMult + chemistryBonus * 5 + storyMod
+  const budgetMod  = 0.5 + budgetMult * 0.2
+  const sqMult     = studioQualityMult(productionsCompleted)
+  const raw = (statScore * budgetMod * qMult + chemistryBonus * 5 + storyMod) * sqMult
   return Math.round(Math.max(0, Math.min(100, raw)))
 }
 

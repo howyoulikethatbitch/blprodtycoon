@@ -29,7 +29,8 @@ export const INITIAL_STATE = {
   toasts:        [],
   fixedCPs:      [],   // array of [actorIdA, actorIdB] pairs
   freeAgentsPool: [], // 3.4: ex-actors + new talent pool entries
-  rivals:        [],   // 49 rival studios {id, name, score} — generated at START_GAME
+  rivals:        [],   // 99 rival studios {id, name, score} — generated at START_GAME
+  productionsCompleted: 0,  // total productions ever finished — drives studio quality multiplier
   settings: {
     sfxOn:      true,
     scanlines:  true,
@@ -50,7 +51,8 @@ export const A = {
   SET_POPULARITY:     'SET_POPULARITY',
   SET_RANK:           'SET_RANK',
   SET_NUMERIC_RANK:   'SET_NUMERIC_RANK',
-  ADD_AWARD:          'ADD_AWARD',
+  ADD_AWARD:               'ADD_AWARD',
+  INCREMENT_PRODS_COMPLETED: 'INCREMENT_PRODS_COMPLETED',
   UNLOCK_TIER:        'UNLOCK_TIER',
   UPDATE_ACTOR:       'UPDATE_ACTOR',
   SET_ACTORS:         'SET_ACTORS',
@@ -123,6 +125,9 @@ function gameReducer(state, action) {
 
     case A.ADD_AWARD:
       return { ...state, awards: state.awards + (action.amount ?? 1) }
+
+    case A.INCREMENT_PRODS_COMPLETED:
+      return { ...state, productionsCompleted: (state.productionsCompleted ?? 0) + (action.count ?? 1) }
 
     case A.UNLOCK_TIER:
       if (state.unlockedTiers.includes(action.tier)) return state
@@ -298,6 +303,7 @@ function gameReducer(state, action) {
         rivals:         action.saveData.rivals?.length
           ? action.saveData.rivals
           : generateRivals(),
+        productionsCompleted: action.saveData.productionsCompleted ?? 0,
       }
 
     case A.MARK_SAVED:

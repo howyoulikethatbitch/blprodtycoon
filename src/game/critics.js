@@ -204,8 +204,11 @@ function scoreIndustry(prod, castActors, chemValue, baseScore) {
   const cbBonus = combo >= 1.5 ? 0.8 : combo <= 0.6 ? -0.6 : 0.2
   const adapt   = prod.story === 'adaptation' ? 0.4 : 0
   const sched   = prod.schedule === '12m' ? 0.5 : prod.schedule === '6m' ? 0.2 : 0
+  // Cap the stacked positive bonuses so that menu choices alone can't inflate
+  // an inexperienced studio to a high grade — skill must do the heavy lifting.
+  const bonus   = Math.min(0.8, cbBonus + adapt + sched)
   const base    = baseScore / 100
-  const stars   = roundStars(1.5 + base * 1.8 + cbBonus + adapt + sched)
+  const stars   = roundStars(1.5 + base * 1.8 + bonus)
   const quoteRaw = pick(stars >= 4 ? QUOTES.industry.high : stars >= 3 ? QUOTES.industry.mid : QUOTES.industry.low)
   return {
     id: 'industry', name: 'Industry Critic', icon: '🏭',
@@ -237,7 +240,8 @@ function scoreSocial(prod, castActors, chemValue, baseScore) {
   const rMod      = prod.rating === 'pg' ? 0.8 : prod.rating === 'r' ? -0.5 : 0
   const srPenalty = (prod.genre === 'School' && prod.rating === 'r') ? -1.5 : 0
   const base      = baseScore / 100
-  const stars     = roundStars(2.5 + base * 1.0 + rMod + srPenalty)
+  // Floor lowered 2.5 → 1.8: weak productions no longer get a free near-3 from Social.
+  const stars     = roundStars(1.8 + base * 1.2 + rMod + srPenalty)
   const quoteRaw  = pick(stars >= 4 ? QUOTES.social.high : stars >= 3 ? QUOTES.social.mid : QUOTES.social.low)
   return {
     id: 'social', name: 'Social Critic', icon: '🌈',

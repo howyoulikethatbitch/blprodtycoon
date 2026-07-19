@@ -99,7 +99,7 @@ export function useWeekAdvance() {
           : 0
 
       const chemBonus  = calcChemistryBonus(castActors)
-      const baseScore  = calcScore(prod, castActors, chemBonus)
+      const baseScore  = calcScore(prod, castActors, chemBonus, state.productionsCompleted ?? 0)
       const comboMult  = prod.comboResult?.mult ?? 1.0
       let adjBase      = Math.round(Math.min(100, baseScore * comboMult))
 
@@ -277,6 +277,11 @@ export function useWeekAdvance() {
           data: { prod, eval: evalResult, score: finalScore, revenue },
         },
       })
+    }
+
+    // Increment studio experience counter once per completed production
+    if (completedThisWeek.length > 0) {
+      dispatch({ type: A.INCREMENT_PRODS_COMPLETED, count: completedThisWeek.length })
     }
 
     // ── 5. Weekly actor tick ──────────────────────────────────────────────────

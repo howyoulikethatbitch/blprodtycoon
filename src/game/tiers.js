@@ -25,7 +25,7 @@ export const GAME_TIERS = [
     negotiateMod: 0.50,       // −50% cost
     // Reviews
     repLossCap: -5,           // max rep loss per review
-    reviewStarBonus: 0.6,     // additive bonus to avgStars for better distribution
+    reviewStarBonus: 0,       // no artificial bonus — let weak actors show natural results
     // CP breakup
     cpBreakupThreshold: 5,
     // Free agents
@@ -47,7 +47,7 @@ export const GAME_TIERS = [
     revenueMod: 1.10,
     negotiateMod: 0.75,
     repLossCap: -10,
-    reviewStarBonus: 0.3,
+    reviewStarBonus: 0.1,
     cpBreakupThreshold: 10,
     resignCostMult: 1.25,
   },
