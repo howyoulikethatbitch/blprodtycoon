@@ -177,7 +177,10 @@ function ActorCard({ actor, allActors, onClick }) {
 export function ActorPortrait({ actor, size = 64, isLocked = false, style: extraStyle }) {
   const [imgFailed, setImgFailed] = useState(false)
   const padded    = String(actor.id).padStart(2, '0')
-  const src       = `${BASE}images/actor_${padded}.jpg`
+  // Pool talent actors carry a portraitFile field; use pool portrait dir
+  const src = actor.portraitFile
+    ? `${BASE}images/pool/${actor.portraitFile}`
+    : `${BASE}images/actor_${padded}.jpg`
   const fallback  = PORTRAIT_COLORS[(actor.id - 1) % PORTRAIT_COLORS.length]
   const initials  = (actor.name ?? '?')[0]
 

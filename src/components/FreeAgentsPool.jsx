@@ -3,7 +3,7 @@
  * Type A: Ex-actors from original 20 who left (2× stats, re-sign cost)
  * Type B: New talent (5 per tier, normal stats, standard sign cost)
  */
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useGame, A, pushToast, pushEventLog } from '../game/state.jsx'
 import { TIER_COLOR, moodEmoji, NEW_TALENT_POOL, TIER_ORDER } from '../game/actors.js'
 import { SFX } from '../game/audio.js'
@@ -14,6 +14,7 @@ const BASE = import.meta.env.BASE_URL
 
 export default function FreeAgentsPool() {
   const { state, dispatch } = useGame()
+  const [pendingSign, setPendingSign] = useState(null)  // { kind, data }
 
   const week = state.week
 
@@ -57,18 +58,17 @@ export default function FreeAgentsPool() {
       .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
   }, [state.freeAgentsPool])
 
-  function handleSignExActor(entry) {
+  function doSignExActor(entry) {
     if (state.money < entry.signCost) {
       SFX.fail()
       pushToast(dispatch, `Need ${fmtMoney(entry.signCost)} to re-sign ${entry.name}.`, 'red')
       return
     }
     SFX.confirm()
-    // Restore the actor: set their signed status back (unfreeze stats)
     dispatch({ type: A.UPDATE_ACTOR, id: entry.originalActorId, patch: {
       signed:     true,
       status:     'available',
-      happiness:  80,  // start fresh happy (3.5)
+      happiness:  80,
       loyalty:    50,
       idleWeeks:  0,
     } })
@@ -81,7 +81,7 @@ export default function FreeAgentsPool() {
     pushToast(dispatch, `Welcome back, ${entry.name}!`, 'green')
   }
 
-  function handleSignNewTalent(nt) {
+  function doSignNewTalent(nt) {
     if (state.money < nt.signCost) {
       SFX.fail()
       pushToast(dispatch, `Need ${fmtMoney(nt.signCost)} to sign ${nt.name}.`, 'red')
@@ -98,7 +98,7 @@ export default function FreeAgentsPool() {
       characteristics: [...(nt.characteristics ?? [])],
       signed:         true,
       status:         'available',
-      happiness:      80,  // 3.5: start happy
+      happiness:      80,
       loyalty:        65,
       idleWeeks:      0,
       injuredWeeks:   0,
@@ -112,6 +112,7 @@ export default function FreeAgentsPool() {
       exp:            0,
       isNewTalent:    true,
       poolId:         nt.poolId,
+      portraitFile:   nt.portraitFile ?? null,
       idleReturnCount: 0,
     }
     dispatch({ type: A.SET_ACTORS, actors: [...state.actors, newActor] })
@@ -123,7 +124,7 @@ export default function FreeAgentsPool() {
     pushToast(dispatch, `${nt.name} signed! New talent joins the roster.`, 'green')
   }
 
-  function handleSignReturnedTalent(entry) {
+  function doSignReturnedTalent(entry) {
     if (state.money < entry.signCost) {
       SFX.fail()
       pushToast(dispatch, `Need ${fmtMoney(entry.signCost)} to re-sign ${entry.name}.`, 'red')
@@ -154,6 +155,7 @@ export default function FreeAgentsPool() {
       exp:            0,
       isNewTalent:    true,
       poolId:         entry.poolId,
+      portraitFile:   entry.portraitFile ?? null,
       idleReturnCount: entry.idleReturnCount + 1,
     }
     dispatch({ type: A.SET_ACTORS, actors: [...state.actors, newActor] })
@@ -163,6 +165,18 @@ export default function FreeAgentsPool() {
       `🔄 Re-signed ${entry.name} from Free Agents Pool!`, 'pink', week,
     )
     pushToast(dispatch, `${entry.name} re-signed!`, 'green')
+  }
+
+  function handleSignExActor(entry)       { setPendingSign({ kind: 'ex',       data: entry }) }
+  function handleSignNewTalent(nt)        { setPendingSign({ kind: 'new',      data: nt    }) }
+  function handleSignReturnedTalent(entry){ setPendingSign({ kind: 'returned', data: entry }) }
+
+  function confirmSign() {
+    if (!pendingSign) return
+    if (pendingSign.kind === 'ex')       doSignExActor(pendingSign.data)
+    if (pendingSign.kind === 'new')      doSignNewTalent(pendingSign.data)
+    if (pendingSign.kind === 'returned') doSignReturnedTalent(pendingSign.data)
+    setPendingSign(null)
   }
 
   const hasAnything = exActors.length + newTalent.length + returnedTalent.length + exActorsCooling.length > 0
@@ -248,6 +262,51 @@ export default function FreeAgentsPool() {
           </div>
         </div>
       )}
+
+      {/* ── Sign Confirmation Modal ────────────────────────────────────────── */}
+      {pendingSign && (
+        <div style={styles.modalOverlay} onClick={() => setPendingSign(null)}>
+          <div style={styles.modalBox} onClick={e => e.stopPropagation()}>
+            <div style={styles.modalTitle}>✍️ CONFIRM SIGNING</div>
+            <div style={styles.modalBody}>
+              <div style={{ fontSize: 9, color: 'var(--white)', marginBottom: 8 }}>
+                Are you sure you want to sign
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--pink)', marginBottom: 4 }}>
+                {pendingSign.data.name}
+              </div>
+              <div style={{ fontSize: 8, color: 'var(--lav)', marginBottom: 12 }}>
+                {pendingSign.data.tier}
+              </div>
+              <div style={{ fontSize: 8, color: 'var(--gold)', marginBottom: 16 }}>
+                This will cost{' '}
+                <span style={{ fontSize: 10, color: 'var(--gold)' }}>
+                  {fmtMoney(pendingSign.data.signCost)}
+                </span>
+              </div>
+              <div style={{ fontSize: 7, color: state.money >= pendingSign.data.signCost ? 'var(--green)' : 'var(--red)', marginBottom: 16 }}>
+                Your balance: {fmtMoney(state.money)}
+                {state.money < pendingSign.data.signCost && ' — Insufficient funds'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                style={{ ...styles.signBtn, flex: 1, opacity: state.money >= pendingSign.data.signCost ? 1 : 0.5 }}
+                onClick={confirmSign}
+                disabled={state.money < pendingSign.data.signCost}
+              >
+                ✅ CONFIRM
+              </button>
+              <button
+                style={{ ...styles.cancelBtn, flex: 1 }}
+                onClick={() => setPendingSign(null)}
+              >
+                ✖ CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -298,16 +357,20 @@ function NewTalentCard({ nt, onSign, canAfford, isReturned }) {
   const tierColor = TIER_COLOR[nt.tier] ?? 'var(--lav)'
   return (
     <div style={styles.card}>
-      {/* Silhouette portrait */}
+      {/* Portrait — use pool portrait if available, fallback to star icon */}
       <div style={styles.portrait}>
-        <div style={{
-          width: 60, height: 60,
-          background: 'var(--bg-inset)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 24, border: '2px solid var(--shadow)',
-        }}>
-          🌟
-        </div>
+        {nt.portraitFile ? (
+          <ActorPortrait actor={{ id: 0, name: nt.name ?? '?', portraitFile: nt.portraitFile }} size={60} />
+        ) : (
+          <div style={{
+            width: 60, height: 60,
+            background: 'var(--bg-inset)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 24, border: '2px solid var(--shadow)',
+          }}>
+            🌟
+          </div>
+        )}
         <div style={{ ...styles.typeBadge, background: 'rgba(107,197,255,0.15)', color: 'var(--blue)', border: '1px solid var(--blue)' }}>
           {isReturned ? 'RETURNED' : 'NEW'}
         </div>
@@ -394,5 +457,45 @@ const styles = {
     boxShadow:  '2px 2px 0 #8A2B52',
     cursor:     'pointer',
     whiteSpace: 'nowrap',
+  },
+  cancelBtn: {
+    fontSize:   7,
+    padding:    '6px 10px',
+    minHeight:  'auto',
+    background: 'var(--bg-inset)',
+    color:      'var(--lav)',
+    border:     '1px solid var(--shadow)',
+    cursor:     'pointer',
+    whiteSpace: 'nowrap',
+  },
+  modalOverlay: {
+    position:       'fixed',
+    inset:          0,
+    background:     'rgba(0,0,0,0.75)',
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'center',
+    zIndex:         999,
+    padding:        16,
+  },
+  modalBox: {
+    background:   'var(--bg-deep, #120A24)',
+    border:       '2px solid var(--pink)',
+    padding:      24,
+    maxWidth:     320,
+    width:        '100%',
+    boxShadow:    '0 0 40px rgba(255,107,157,0.4)',
+    textAlign:    'center',
+  },
+  modalTitle: {
+    fontSize:     10,
+    color:        'var(--pink)',
+    letterSpacing: 2,
+    marginBottom: 16,
+  },
+  modalBody: {
+    borderBottom: '1px solid var(--shadow)',
+    marginBottom: 16,
+    paddingBottom: 4,
   },
 }

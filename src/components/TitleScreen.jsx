@@ -11,7 +11,8 @@ export default function TitleScreen() {
   const { dispatch } = useGame()
   const [phase, setPhase]             = useState('title')   // 'title' | 'newgame' | 'settings'
   const [companyName, setCompanyName] = useState('GMMTV')
-  const [startYear, setStartYear]     = useState(2024)
+  const [startYear, setStartYear]     = useState(2026)
+  const [yearMinMsg, setYearMinMsg]   = useState(false)
   const [blink, setBlink]             = useState(true)
   const [hasSave, setHasSave]         = useState(false)
   const [fading, setFading]           = useState(false)
@@ -52,7 +53,7 @@ export default function TitleScreen() {
       dispatch({
         type: A.START_GAME,
         companyName: companyName.trim() || 'GMMTV',
-        startYear:   Math.max(2020, startYear || 2024),
+        startYear:   Math.max(2020, startYear || 2026),
         actors,
       })
     }, 400)
@@ -102,14 +103,37 @@ export default function TitleScreen() {
             </div>
             <div className="field">
               <label>START YEAR</label>
-              <input
-                type="number"
-                value={startYear}
-                min={2020}
-                step={1}
-                onChange={e => setStartYear(Math.max(2020, Number(e.target.value) || 2020))}
-                style={{ fontSize: 10 }}
-              />
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0,
+                width: '100%',
+              }}>
+                <button
+                  type="button"
+                  style={styles.yearStepBtn}
+                  onClick={() => {
+                    if (startYear <= 2020) {
+                      setYearMinMsg(true)
+                      setTimeout(() => setYearMinMsg(false), 2000)
+                    } else {
+                      setStartYear(y => y - 1)
+                      setYearMinMsg(false)
+                    }
+                  }}
+                >{'<'}</button>
+                <div style={styles.yearDisplay}>{startYear}</div>
+                <button
+                  type="button"
+                  style={styles.yearStepBtn}
+                  onClick={() => { setStartYear(y => y + 1); setYearMinMsg(false) }}
+                >{'>'}</button>
+              </div>
+              {yearMinMsg && (
+                <div style={{ fontSize: 7, color: 'var(--red)', marginTop: 4, letterSpacing: 1 }}>
+                  Minimum year: 2020
+                </div>
+              )}
               <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 4 }}>
                 Changes cannot be undone..
               </div>
@@ -279,6 +303,28 @@ const styles = {
     color:    '#6E6390',
     marginTop: 4,
     lineHeight: 2,
+  },
+  yearStepBtn: {
+    background:    'var(--bg-inset, #1F1338)',
+    border:        '2px solid #9B86C4',
+    color:         '#FFD700',
+    fontSize:      11,
+    padding:       '10px 16px',
+    cursor:        'pointer',
+    lineHeight:    1,
+    flexShrink:    0,
+  },
+  yearDisplay: {
+    flex:          1,
+    textAlign:     'center',
+    fontSize:      11,
+    color:         '#FFFFFF',
+    background:    'var(--bg-inset, #1F1338)',
+    border:        '2px solid #9B86C4',
+    borderLeft:    'none',
+    borderRight:   'none',
+    padding:       '10px 8px',
+    letterSpacing: 2,
   },
 }
 

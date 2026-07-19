@@ -804,6 +804,44 @@ function LineupTimeline({ weekInYear, productions, yearStartGlobal, previewStart
         <span>▪ Colored = scheduled production</span>
         <span>▪ White border = current week</span>
       </div>
+
+      {/* Production title list — shows all productions scheduled in this year */}
+      {(() => {
+        const yearProds = productions
+          .map((p, idx) => ({ p, idx }))
+          .filter(({ p }) => {
+            if (!p.weekScheduled) return false
+            const s = p.weekScheduled - yearStartGlobal + 1
+            return s >= 1 && s <= 52
+          })
+        if (!yearProds.length) return null
+        return (
+          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ fontSize: 6, color: 'var(--lav)', letterSpacing: 1, marginBottom: 2 }}>
+              SCHEDULED THIS YEAR
+            </div>
+            {yearProds.map(({ p, idx }) => {
+              const color = PROD_COLORS[idx % PROD_COLORS.length]
+              const startInYear = p.weekScheduled - yearStartGlobal + 1
+              const endInYear   = Math.min(52, startInYear + (SCHEDULES.find(s => s.id === p.schedule)?.weeks ?? 0) - 1)
+              return (
+                <div key={p.id ?? idx} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 10, height: 10, background: color, flexShrink: 0, borderRadius: 2 }} />
+                  <div style={{ fontSize: 7, color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                    {p.title}
+                  </div>
+                  <div style={{ fontSize: 6, color: 'var(--lav)', flexShrink: 0 }}>
+                    Wk {startInYear}–{endInYear}
+                  </div>
+                  <div style={{ fontSize: 6, color: 'var(--pink)', flexShrink: 0, textTransform: 'uppercase' }}>
+                    {p.phase ?? 'scheduled'}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })()}
     </div>
   )
 }
