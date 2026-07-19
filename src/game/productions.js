@@ -292,7 +292,7 @@ export function scoreToStars(score) {
 export function createProduction({
   type, title, genre, budget, schedule,
   platform, rating, story, castIds, leadIds,
-  cpName, weekStarted, weekScheduled,
+  cpName, weekStarted, weekScheduled, genreMultiplier,
 }) {
   const s = SCHEDULES.find(sc => sc.id === schedule) ?? SCHEDULES[1]
   const t = PROD_TYPES[type]
@@ -321,8 +321,9 @@ export function createProduction({
     viewerCount:      0,
     comboResult:      null,       // computed at wrap
     scandal:          false,
-    weekStarted:      weekStarted   ?? null,
-    weekScheduled:    weekScheduled ?? null,  // global week when filming actually begins
+    weekStarted:      weekStarted    ?? null,
+    weekScheduled:    weekScheduled  ?? null,  // global week when filming actually begins
+    genreMultiplier:  genreMultiplier ?? 1,    // 2 if 2× slot bonus was applied
   }
 }
 
@@ -336,8 +337,12 @@ export function tickProduction(production) {
       ((production.weeksTotal - weeksLeft) / production.weeksTotal) * 100
     )
     if (weeksLeft === 0) {
-      // Move to wrap phase
-      const comboResult = getComboResult(production.type, production.genre)
+      // Move to wrap phase — apply genreMultiplier (2× slot bonus) to combo mult
+      const baseCombo = getComboResult(production.type, production.genre)
+      const gMult     = production.genreMultiplier ?? 1
+      const comboResult = gMult > 1
+        ? { ...baseCombo, mult: Math.round(baseCombo.mult * gMult * 100) / 100 }
+        : baseCombo
       return { weeksLeft: 0, progressPct: 100, phase: 'wrap', comboResult, status: 'active' }
     }
     return { weeksLeft, progressPct, phase: 'filming', status: 'active' }

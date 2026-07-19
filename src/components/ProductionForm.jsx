@@ -62,6 +62,12 @@ export default function ProductionForm({ setScreen }) {
   const [showGenrePick, setShowGenrePick] = useState(false)  // genre select modal
   const [showSlotMachine, setShowSlotMachine] = useState(false)  // random genre modal
 
+  // Slot machine spin tracking — persists across cancel/reopen to prevent spin cheat
+  const [slotSpinsUsed, setSlotSpinsUsed] = useState(0)
+  const [bonusSpins,    setBonusSpins]    = useState(0)
+  // 2× genre multiplier from slot — applied at production wrap
+  const [genreMultiplier, setGenreMultiplier] = useState(1)
+
   // Prompt 2 — Year Lineup: start week within the current year (1–52)
   const [startWeekInYear, setStartWeekInYear] = useState(weekInYear)
 
@@ -257,8 +263,9 @@ export default function ProductionForm({ setScreen }) {
       castIds,
       leadIds:   castIds.slice(0, 2),
       cpName,
-      weekStarted:   state.week,
-      weekScheduled: weekScheduled,
+      weekStarted:     state.week,
+      weekScheduled:   weekScheduled,
+      genreMultiplier: genreMultiplier,
       // Already-fixed pairs get fixedCP:true automatically (no extra fee charged).
       // New fixed CP contracts require the toggle + chemistry ≥ 20.
       fixedCP:   alreadyFixedCP || (cpFixed && fixedCpAllowed),
@@ -410,18 +417,39 @@ export default function ProductionForm({ setScreen }) {
             <span style={{ fontSize: 10, color: 'var(--white)', fontWeight: 'bold' }}>{genre}</span>
           </div>
           {/* Two action buttons */}
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <button type="button" style={styles.genreBtn}
               onClick={() => { SFX.click(); setShowGenrePick(true) }}
             >
               🎭 Select Genre
             </button>
-            <button type="button" style={{ ...styles.genreBtn, background: 'var(--lav)', color: 'var(--bg-deep)' }}
-              onClick={() => { SFX.click(); setShowSlotMachine(true) }}
-            >
-              🎰 Random Genre
-            </button>
+            {(() => {
+              const baseLimitByTier = { rookie: 2, rising: 3, popular: 5, worldwide: Infinity }
+              const baseLimit = baseLimitByTier[gameTier.id] ?? 2
+              const spinsLeft = baseLimit === Infinity
+                ? Infinity
+                : Math.max(0, baseLimit + bonusSpins - slotSpinsUsed)
+              const spinLabel = baseLimit === Infinity
+                ? '🎰 Random Genre'
+                : `🎰 Random Genre (${spinsLeft} left)`
+              return (
+                <button type="button"
+                  style={{ ...styles.genreBtn, background: spinsLeft <= 0 ? 'var(--gray)' : 'var(--lav)', color: 'var(--bg-deep)' }}
+                  onClick={() => { SFX.click(); setShowSlotMachine(true) }}
+                  disabled={spinsLeft <= 0}
+                  title={spinsLeft <= 0 ? 'No spins remaining this production' : ''}
+                >
+                  {spinLabel}
+                </button>
+              )
+            })()}
           </div>
+          {/* 2× multiplier active badge */}
+          {genreMultiplier === 2 && (
+            <div style={{ fontSize: 8, color: 'var(--gold)', letterSpacing: 1, fontWeight: 'bold', marginTop: 4 }}>
+              ✨ 2× GENRE MULTIPLIER ACTIVE — combo bonus doubled!
+            </div>
+          )}
 
           {/* Genre reuse warning */}
           {isGenreReused && (
@@ -443,15 +471,23 @@ export default function ProductionForm({ setScreen }) {
 
         {/* Slot machine modal */}
         {showSlotMachine && (() => {
-          const spinLimitByTier = { rookie: 2, rising: 3, popular: 5, worldwide: Infinity }
-          const spinLimit = spinLimitByTier[gameTier.id] ?? 2
+          const baseLimitByTier = { rookie: 2, rising: 3, popular: 5, worldwide: Infinity }
+          const baseLimit = baseLimitByTier[gameTier.id] ?? 2
+          const effectiveSpinsLeft = baseLimit === Infinity
+            ? Infinity
+            : Math.max(0, baseLimit + bonusSpins - slotSpinsUsed)
           return (
             <SlotMachineModal
               onSelect={g => { setGenre(g); setShowSlotMachine(false); SFX.confirm() }}
               onClose={() => setShowSlotMachine(false)}
               unlockedGenres={state.unlockedGenres ?? DEFAULT_GENRES}
-              spinLimit={spinLimit}
+              spinsLeft={effectiveSpinsLeft}
+              onSpinUsed={() => setSlotSpinsUsed(c => c + 1)}
+              onSpinAgain={() => setBonusSpins(c => c + 1)}
+              onMultiplierAccepted={() => { setGenreMultiplier(2); SFX.confirm() }}
               currentGenre={genre}
+              gameTierId={gameTier.id}
+              genreTrends={state.genreTrends ?? []}
             />
           )
         })()}
@@ -1028,48 +1064,99 @@ function GenrePickModal({ current, onSelect, onClose, unlockedGenres }) {
 }
 
 // ─── Slot Machine Modal ───────────────────────────────────────────────────────
-// Spins through unlocked genres. Tier-based spin limits; 70/30 fair-roll logic.
-function SlotMachineModal({ onSelect, onClose, unlockedGenres, spinLimit, currentGenre }) {
-  const pool = (unlockedGenres ?? DEFAULT_GENRES).filter(g => GENRES.includes(g))
-  const [spinning,    setSpinning]    = React.useState(false)
-  const [landed,      setLanded]      = React.useState(null)
-  const [displayIdx,  setDisplayIdx]  = React.useState(0)
-  const [spinCount,   setSpinCount]   = React.useState(0)
+// Outcome-based spin: 5 result types (Genre Trend / Other Trend / Available /
+// Spin Again / 2× Multiplier) with tier-based probability weights.
+// spinsLeft is managed by parent so the count persists across cancel/reopen.
+function SlotMachineModal({
+  onSelect, onClose, unlockedGenres, spinsLeft, onSpinUsed, onSpinAgain,
+  onMultiplierAccepted, currentGenre, gameTierId, genreTrends,
+}) {
+  const unlocked   = (unlockedGenres ?? DEFAULT_GENRES).filter(g => GENRES.includes(g))
+  const locked     = GENRES.filter(g => !unlocked.includes(g))
+  const trendPool  = (genreTrends ?? []).filter(g => GENRES.includes(g))        // all trending genres
+  const otherPool  = locked.filter(g => !trendPool.includes(g))                  // locked non-trending
+  const availPool  = unlocked.length > 0 ? unlocked : DEFAULT_GENRES             // unlocked genres
+
+  // Tier-based outcome weights (must sum to 100 per tier)
+  // Worldwide has no Spin Again — already unlimited; its weights sum without it.
+  const WEIGHTS = {
+    rookie:    { genreTrend: 8,  otherTrend: 20, available: 35, spinAgain: 25, multiplier: 12 },
+    rising:    { genreTrend: 10, otherTrend: 16, available: 38, spinAgain: 22, multiplier: 14 },
+    popular:   { genreTrend: 14, otherTrend: 12, available: 40, spinAgain: 18, multiplier: 16 },
+    worldwide: { genreTrend: 20, otherTrend: 18, available: 45, spinAgain: 0,  multiplier: 17 },
+  }
+  const w = WEIGHTS[gameTierId] ?? WEIGHTS.rookie
+
+  function rollOutcome() {
+    // If a sub-pool is empty, redistribute its weight to available
+    const effectiveTrend  = trendPool.length > 0 ? w.genreTrend : 0
+    const effectiveOther  = otherPool.length > 0 ? w.otherTrend : 0
+    const effectiveAvail  = w.available
+      + (trendPool.length === 0 ? w.genreTrend : 0)
+      + (otherPool.length  === 0 ? w.otherTrend  : 0)
+
+    // Build weighted bucket
+    const bucket = []
+    for (let i = 0; i < effectiveTrend;       i++) bucket.push('genreTrend')
+    for (let i = 0; i < effectiveOther;        i++) bucket.push('otherTrend')
+    for (let i = 0; i < effectiveAvail;        i++) bucket.push('available')
+    for (let i = 0; i < w.spinAgain;           i++) bucket.push('spinAgain')
+    for (let i = 0; i < w.multiplier;          i++) bucket.push('multiplier')
+    if (bucket.length === 0) { for (let i = 0; i < 100; i++) bucket.push('available') }
+
+    const type = bucket[Math.floor(Math.random() * bucket.length)]
+
+    if (type === 'genreTrend') {
+      return { type, genre: trendPool[Math.floor(Math.random() * trendPool.length)] }
+    }
+    if (type === 'otherTrend') {
+      return { type, genre: otherPool[Math.floor(Math.random() * otherPool.length)] }
+    }
+    if (type === 'spinAgain')  return { type }
+    if (type === 'multiplier') return { type }
+
+    // available — 70% different genre, 30% same
+    const same = availPool.filter(g => g === currentGenre)
+    const diff = availPool.filter(g => g !== currentGenre)
+    let genre
+    if (same.length > 0 && diff.length > 0 && Math.random() < 0.30) genre = same[0]
+    else if (diff.length > 0) genre = diff[Math.floor(Math.random() * diff.length)]
+    else genre = availPool[Math.floor(Math.random() * availPool.length)]
+    return { type: 'available', genre }
+  }
+
+  const [spinning,   setSpinning]  = React.useState(false)
+  const [outcome,    setOutcome]   = React.useState(null)   // { type, genre? }
+  const [displayIdx, setDisplayIdx]= React.useState(0)
   const intervalRef = React.useRef(null)
 
-  const limit     = spinLimit ?? Infinity
-  const spinsLeft = limit === Infinity ? Infinity : limit - spinCount
-  const canSpin   = !spinning && spinsLeft > 0
+  const isInfinite = spinsLeft === Infinity
+  const canSpin    = !spinning && (isInfinite || spinsLeft > 0)
+  const displayPool = availPool
 
   function spin() {
     if (!canSpin) return
-    setLanded(null)
+    setOutcome(null)
     setSpinning(true)
-    setSpinCount(c => c + 1)
+    onSpinUsed()   // decrement count immediately in parent (persists on cancel)
 
     let tick = 0
     const totalTicks = 28 + Math.floor(Math.random() * 10)
     let delay = 60
 
     function nextTick() {
-      setDisplayIdx(i => (i + 1) % pool.length)
+      setDisplayIdx(i => (i + 1) % displayPool.length)
       tick++
       if (tick >= totalTicks) {
-        // Fair roll: 70% different genre, 30% same (if in pool)
-        const samePool = pool.filter(g => g === currentGenre)
-        const diffPool = pool.filter(g => g !== currentGenre)
-        let winner
-        if (samePool.length > 0 && diffPool.length > 0 && Math.random() < 0.30) {
-          winner = samePool[0]
-        } else if (diffPool.length > 0) {
-          winner = diffPool[Math.floor(Math.random() * diffPool.length)]
-        } else {
-          winner = pool[Math.floor(Math.random() * pool.length)]
+        const result = rollOutcome()
+        if (result.genre) {
+          const idx = displayPool.indexOf(result.genre)
+          setDisplayIdx(idx >= 0 ? idx : 0)
         }
-        const idx = pool.indexOf(winner)
-        setDisplayIdx(idx >= 0 ? idx : 0)
-        setLanded(winner)
+        setOutcome(result)
         setSpinning(false)
+        // Spin Again: grant +1 bonus spin in parent automatically
+        if (result.type === 'spinAgain') onSpinAgain()
         return
       }
       if (tick > totalTicks - 8) delay = 80 + (tick - (totalTicks - 8)) * 40
@@ -1083,14 +1170,100 @@ function SlotMachineModal({ onSelect, onClose, unlockedGenres, spinLimit, curren
     return () => clearTimeout(intervalRef.current)
   }, [])
 
-  const displayGenre = pool[displayIdx] ?? pool[0] ?? 'Romance'
+  const displayGenre = displayPool[displayIdx] ?? displayPool[0] ?? 'Romance'
+
+  // Spin button label — spinsLeft already decremented, so show post-spin count
   const spinLabel = spinning
     ? '⏳ SPINNING…'
-    : spinsLeft <= 0
+    : (!isInfinite && spinsLeft <= 0)
       ? '🚫 NO SPINS LEFT'
-      : limit === Infinity
+      : isInfinite
         ? '🎰 SPIN AGAIN'
         : `🎰 SPIN AGAIN (${spinsLeft} left)`
+
+  // Center emoji/name in slot window
+  const slotEmoji = outcome?.type === 'spinAgain'  ? '🎰'
+                  : outcome?.type === 'multiplier' ? '✨'
+                  : (GENRE_EMOJI[displayGenre] ?? '🎬')
+  const slotLabel = spinning          ? displayGenre
+                  : outcome?.type === 'spinAgain'  ? 'SPIN AGAIN!'
+                  : outcome?.type === 'multiplier' ? '2× MULTIPLIER!'
+                  : (outcome?.genre ?? displayGenre)
+
+  // Sub-label shown after landing
+  function OutcomeTag() {
+    if (!outcome || spinning) return null
+    const tagStyles = {
+      fontSize: 8, letterSpacing: 1.5, fontWeight: 'bold', marginTop: 6,
+    }
+    switch (outcome.type) {
+      case 'genreTrend': return (
+        <div>
+          <div style={{ ...tagStyles, color: 'var(--gold)' }}>📈 GENRE TREND!</div>
+          <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 2 }}>
+            {outcome.genre} is trending this year!
+          </div>
+        </div>
+      )
+      case 'otherTrend': return (
+        <div>
+          <div style={{ ...tagStyles, color: 'var(--pink)' }}>🔓 LOCKED GENRE (TREND)</div>
+          <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 2 }}>
+            {outcome.genre} — normally locked, unlocked via spin!
+          </div>
+        </div>
+      )
+      case 'spinAgain': return (
+        <div>
+          <div style={{ ...tagStyles, color: 'var(--green)' }}>🎰 +1 SPIN GRANTED!</div>
+          <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 2 }}>
+            Spin again to pick your genre.
+          </div>
+        </div>
+      )
+      case 'multiplier': return (
+        <div>
+          <div style={{ ...tagStyles, color: 'var(--gold)' }}>✨ 2× COMBO MULTIPLIER!</div>
+          <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 2 }}>
+            Accept to double your genre×type combo bonus.
+          </div>
+        </div>
+      )
+      default: return (
+        <div style={{ ...tagStyles, color: 'var(--green)' }}>✨ LANDED!</div>
+      )
+    }
+  }
+
+  // Action buttons below spin button
+  function ActionButtons() {
+    if (!outcome || spinning) return null
+    switch (outcome.type) {
+      case 'spinAgain':
+        // Bonus spin already granted — user just spins again; no extra button needed
+        return null
+      case 'multiplier':
+        return (
+          <button type="button" style={modalStyles.acceptBtn}
+            onClick={() => { onMultiplierAccepted(); onClose() }}
+          >
+            ✅ ACCEPT 2× BONUS
+          </button>
+        )
+      case 'genreTrend':
+      case 'otherTrend':
+      case 'available':
+        return (
+          <button type="button" style={modalStyles.acceptBtn}
+            onClick={() => onSelect(outcome.genre)}
+          >
+            ✅ USE {(outcome.genre ?? '').toUpperCase()}
+          </button>
+        )
+      default:
+        return null
+    }
+  }
 
   return (
     <div style={modalStyles.overlay} onClick={!spinning ? onClose : undefined}>
@@ -1104,37 +1277,36 @@ function SlotMachineModal({ onSelect, onClose, unlockedGenres, spinLimit, curren
             transition: spinning ? 'none' : 'transform 0.3s',
             filter: spinning ? 'blur(1px)' : 'none',
           }}>
-            {GENRE_EMOJI[displayGenre] ?? '🎬'}
+            {slotEmoji}
           </div>
           <div style={{
             fontSize: 12,
-            color: landed ? 'var(--gold)' : 'var(--lav)',
+            color: outcome ? 'var(--gold)' : 'var(--lav)',
             marginTop: 8,
             letterSpacing: 2,
             fontWeight: 'bold',
             minHeight: 20,
             transition: 'color 0.2s',
           }}>
-            {spinning ? displayGenre : (landed ?? displayGenre)}
+            {slotLabel}
           </div>
-          {landed && (
-            <div style={{ fontSize: 7, color: 'var(--green)', marginTop: 6, letterSpacing: 1 }}>
-              ✨ LANDED!
-            </div>
-          )}
+          <OutcomeTag />
         </div>
 
-        {/* Spinning strip preview */}
+        {/* Spinning strip preview (genre emojis) */}
         <div style={modalStyles.slotStrip}>
-          {pool.slice(displayIdx, displayIdx + 5).concat(pool.slice(0, Math.max(0, 5 - (pool.length - displayIdx)))).map((g, i) => (
-            <span key={i} style={{
-              fontSize: 16,
-              opacity: i === 0 ? 1 : 0.3 - i * 0.04,
-              transition: 'opacity 0.1s',
-            }}>
-              {GENRE_EMOJI[g] ?? '🎬'}
-            </span>
-          ))}
+          {displayPool
+            .slice(displayIdx, displayIdx + 5)
+            .concat(displayPool.slice(0, Math.max(0, 5 - (displayPool.length - displayIdx))))
+            .map((g, i) => (
+              <span key={i} style={{
+                fontSize: 16,
+                opacity: i === 0 ? 1 : Math.max(0, 0.3 - i * 0.04),
+                transition: 'opacity 0.1s',
+              }}>
+                {GENRE_EMOJI[g] ?? '🎬'}
+              </span>
+            ))}
         </div>
 
         <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -1147,14 +1319,9 @@ function SlotMachineModal({ onSelect, onClose, unlockedGenres, spinLimit, curren
           >
             {spinLabel}
           </button>
-          {landed && (
-            <button type="button" style={modalStyles.acceptBtn}
-              onClick={() => onSelect(landed)}
-            >
-              ✅ USE {landed.toUpperCase()}
-            </button>
-          )}
+          <ActionButtons />
         </div>
+
         {!spinning && (
           <button type="button" style={modalStyles.closeBtn} onClick={onClose}>✕ CANCEL</button>
         )}
