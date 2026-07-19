@@ -15,7 +15,7 @@ export const INITIAL_STATE = {
   reputation:    10,
   popularity:    0,
   rank:          'INDIE',
-  numericRank:   50,
+  numericRank:   101,
   awards:        0,
   unlockedTiers: ['Rookie'],
   // Prompt 4: genre unlock system — default unlocked, expand by production grade

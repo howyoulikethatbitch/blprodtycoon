@@ -105,18 +105,18 @@ export function getNextGameTier(week) {
 }
 
 /**
- * Prompt 1: Rank-based tier lookup.
- * Tier progression difficulty now mirrors industry ranking milestones:
- *   Rookie     → rank 40–50  (rank > 39)
- *   Rising Star→ rank 25–39  (rank ≤ 39)
- *   Popular    → rank 10–24  (rank ≤ 24)
- *   Worldwide  → rank 1–9    (rank ≤  9)
+ * Rank-based tier lookup — expanded to 101-slot leaderboard.
+ * Tier progression gates (out of 100 rivals + player = 101 total):
+ *   Rookie      → rank 76–101  (rank > 75)
+ *   Rising Star → rank 46–75   (rank ≤ 75)
+ *   Popular     → rank 16–45   (rank ≤ 45)
+ *   Worldwide   → rank 1–15    (rank ≤ 15)
  * Matches TIER_UNLOCK_RANK in actors.js exactly.
  */
 export function getGameTierByRank(numericRank) {
-  if (numericRank <= 9)  return GAME_TIERS[3]  // Worldwide
-  if (numericRank <= 24) return GAME_TIERS[2]  // Popular
-  if (numericRank <= 39) return GAME_TIERS[1]  // Rising Star
+  if (numericRank <= 15) return GAME_TIERS[3]  // Worldwide
+  if (numericRank <= 45) return GAME_TIERS[2]  // Popular
+  if (numericRank <= 75) return GAME_TIERS[1]  // Rising Star
   return GAME_TIERS[0]                          // Rookie
 }
 
@@ -129,9 +129,8 @@ export function getNextGameTierByRank(numericRank) {
 
 /** Numeric rank threshold at which the next tier unlocks (for TopBar display). */
 export function getNextTierRankThreshold(numericRank) {
-  const thresholds = [39, 24, 9]  // Rookie→Rising, Rising→Popular, Popular→Worldwide
-  if (numericRank <= 9)  return null  // already at max
-  if (numericRank <= 24) return 9
-  if (numericRank <= 39) return 24
-  return 39
+  if (numericRank <= 15) return null  // already at max (Worldwide)
+  if (numericRank <= 45) return 15    // Popular → Worldwide
+  if (numericRank <= 75) return 45    // Rising Star → Popular
+  return 75                           // Rookie → Rising Star
 }

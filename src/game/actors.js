@@ -32,14 +32,14 @@ export const ALL_CHARACTERISTICS = [
 
 // ─── Tier configuration ───────────────────────────────────────────────────────
 export const TIER_STATS = {
-  'Rookie':      { skillMin: 10, skillMax: 30, signMin: 100,  signMax: 300,  trainGain: 10, unlockRank: 50 },
-  'Rising Star': { skillMin: 30, skillMax: 55, signMin: 400,  signMax: 800,  trainGain: 7,  unlockRank: 39 },
-  'Popular':     { skillMin: 55, skillMax: 80, signMin: 1000, signMax: 2000, trainGain: 5,  unlockRank: 24 },
-  'Worldwide':   { skillMin: 80, skillMax: 95, signMin: 3000, signMax: 5000, trainGain: 3,  unlockRank: 9  },
+  'Rookie':      { skillMin: 10, skillMax: 30, signMin: 100,  signMax: 300,  trainGain: 10, unlockRank: 101 },
+  'Rising Star': { skillMin: 30, skillMax: 55, signMin: 400,  signMax: 800,  trainGain: 7,  unlockRank: 75  },
+  'Popular':     { skillMin: 55, skillMax: 80, signMin: 1000, signMax: 2000, trainGain: 5,  unlockRank: 45  },
+  'Worldwide':   { skillMin: 80, skillMax: 95, signMin: 3000, signMax: 5000, trainGain: 3,  unlockRank: 15  },
 }
 
 export const TIER_UNLOCK_RANK = {
-  'Rookie': 50, 'Rising Star': 39, 'Popular': 24, 'Worldwide': 9,
+  'Rookie': 101, 'Rising Star': 75, 'Popular': 45, 'Worldwide': 15,
 }
 
 export const TIER_ORDER = ['Rookie', 'Rising Star', 'Popular', 'Worldwide']

@@ -30,7 +30,7 @@ export function useWeekAdvance() {
 
     const week = state.week
     // Prompt 1: tier now derived from numeric rank, not week
-    const tier = getGameTierByRank(state.numericRank ?? 50)
+    const tier = getGameTierByRank(state.numericRank ?? 101)
 
     // ── 1. Tick productions ───────────────────────────────────────────────────
     const completedThisWeek = []
@@ -169,15 +169,15 @@ export function useWeekAdvance() {
 
       // ── Awards (avgStars ≥ 4.5) ───────────────────────────────────────────
       if (evalResult.awarded) {
-        dispatch({ type: A.ADD_REPUTATION, amount: 10 })
-        dispatch({ type: A.SET_POPULARITY, value: state.popularity + evalResult.popDelta + 25000 })
-        dispatch({ type: A.ADD_MONEY, amount: 3000 })
+        dispatch({ type: A.ADD_REPUTATION, amount: 6 })
+        dispatch({ type: A.SET_POPULARITY, value: state.popularity + evalResult.popDelta + 12000 })
+        dispatch({ type: A.ADD_MONEY, amount: 2000 })
         dispatch({ type: A.ADD_AWARD })
         for (const actor of castActors) {
           dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch: { awards: (actor.awards ?? 0) + 1 } })
         }
         pushEventLog(dispatch,
-          `🏆 "${prod.title}" wins an industry award! +10 rep · +₩3,000`,
+          `🏆 "${prod.title}" wins an industry award! +6 rep · +₩2,000`,
           'gold', week,
         )
       }
@@ -442,9 +442,9 @@ export function useWeekAdvance() {
       }
     }
 
-    if (numRank <= 39) autoSignTier('Rising Star', '🌟', numRank)
-    if (numRank <= 24) autoSignTier('Popular',     '💕', numRank)
-    if (numRank <= 9)  autoSignTier('Worldwide',   '🌍', numRank)
+    if (numRank <= 75) autoSignTier('Rising Star', '🌟', numRank)
+    if (numRank <= 45) autoSignTier('Popular',     '💕', numRank)
+    if (numRank <= 15) autoSignTier('Worldwide',   '🌍', numRank)
 
     // ── 5.6 Rivalry showdown (every 10 weeks) ────────────────────────────────
     if (week > 0 && week % 10 === 0 && (state.rivals ?? []).length > 0) {
@@ -457,17 +457,17 @@ export function useWeekAdvance() {
         const winChance  = Math.min(0.88, (ps / (ps + rival.score)) * 1.6 + 0.05)
         const playerWins = Math.random() < winChance
         if (playerWins) {
-          dispatch({ type: A.ADD_REPUTATION,  amount: 8 })
-          dispatch({ type: A.SET_POPULARITY,  value: state.popularity + 15000 })
+          dispatch({ type: A.ADD_REPUTATION,  amount: 5 })
+          dispatch({ type: A.SET_POPULARITY,  value: state.popularity + 8000 })
           dispatch({ type: A.UPDATE_RIVALS,   id: rival.id, scoreDelta: -25 })
           pushEventLog(dispatch,
-            `⚔️ Showdown vs ${rival.name}: WON! +8 rep +15K pop`, 'gold', week)
+            `⚔️ Showdown vs ${rival.name}: WON! +5 rep +8K pop`, 'gold', week)
           dispatch({ type: A.PUSH_MODAL, modal: { type: 'event', data: {
             label: '⚔️ RIVALRY SHOWDOWN — VICTORY!',
             message:
               `Your studio faced off against ${rival.name} in the weekly rankings!\n\n` +
               `Your score: ${ps.toLocaleString()}\nRival score: ${rival.score.toLocaleString()}\n\n` +
-              `VICTORY! +8 rep · +15,000 pop · rival weakened.`,
+              `VICTORY! +5 rep · +8,000 pop · rival weakened.`,
             choices: [{ label: '🏆 CELEBRATE!', effect: () => {} }],
           } } })
         } else {
