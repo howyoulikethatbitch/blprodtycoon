@@ -80,6 +80,12 @@ export default function ProductionForm({ setScreen }) {
   const lead1 = state.actors.find(a => a.id === Number(lead1Id))
   const lead2 = state.actors.find(a => a.id === Number(lead2Id))
 
+  // CP name lock — computed early (before useEffect) so the hook can reference them
+  // storedCPName is only non-null when a name was previously submitted for a Fixed CP pair
+  const fixedCPKey   = lead1 && lead2 ? bondKey(lead1.id, lead2.id) : null
+  const storedCPName = fixedCPKey ? ((state.fixedCPNames ?? {})[fixedCPKey] ?? null) : null
+  const cpNameLocked = !!storedCPName
+
   useEffect(() => {
     if (cpNameLocked && storedCPName) {
       setCpName(storedCPName)
@@ -214,9 +220,6 @@ export default function ProductionForm({ setScreen }) {
     ([x, y]) => (x === lead1.id && y === lead2.id) || (x === lead2.id && y === lead1.id)
   )
   const isEffectivelyFixed = alreadyFixedCP || (cpFixed && fixedCpAllowed)
-  const fixedCPKey    = lead1 && lead2 ? bondKey(lead1.id, lead2.id) : null
-  const storedCPName  = isEffectivelyFixed && fixedCPKey ? ((state.fixedCPNames ?? {})[fixedCPKey] ?? null) : null
-  const cpNameLocked  = !!storedCPName
   const totalCost     = cost + (cpFixed && fixedCpAllowed && !alreadyFixedCP ? fixedCpPrice : 0)
   const canAffordTotal = state.money >= totalCost
 
