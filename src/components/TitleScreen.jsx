@@ -10,7 +10,7 @@ import { initAudio, SFX } from '../game/audio.js'
 export default function TitleScreen() {
   const { dispatch } = useGame()
   const [phase, setPhase]             = useState('title')   // 'title' | 'newgame' | 'settings'
-  const [companyName, setCompanyName] = useState('Studio Sakura')
+  const [companyName, setCompanyName] = useState('GMMTV')
   const [startYear, setStartYear]     = useState(2024)
   const [blink, setBlink]             = useState(true)
   const [hasSave, setHasSave]         = useState(false)
@@ -51,7 +51,7 @@ export default function TitleScreen() {
     setTimeout(() => {
       dispatch({
         type: A.START_GAME,
-        companyName: companyName.trim() || 'Studio Sakura',
+        companyName: companyName.trim() || 'GMMTV',
         startYear:   Math.max(2020, startYear || 2024),
         actors,
       })
@@ -96,7 +96,7 @@ export default function TitleScreen() {
                 value={companyName}
                 maxLength={28}
                 onChange={e => setCompanyName(e.target.value)}
-                placeholder="Studio Sakura"
+                placeholder="GMMTV"
                 style={{ fontSize: 10 }}
               />
             </div>
@@ -111,7 +111,7 @@ export default function TitleScreen() {
                 style={{ fontSize: 10 }}
               />
               <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 4 }}>
-                Minimum year: 2020 · 1 year = 52 weeks · Cannot be changed after starting.
+                Changes cannot be undone..
               </div>
             </div>
             <div style={styles.startRow}>
