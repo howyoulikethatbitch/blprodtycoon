@@ -538,25 +538,66 @@ function makeActorEvent(type, actor, state) {
         const c = getChem(actor, o.id)
         if (c > bestChem) { bestChem = c; partner = o }
       }
-      const alreadyFixed = (state.fixedCPs ?? []).some(
-        ([x, y]) => bondKey(x, y) === bondKey(actor.id, partner.id)
-      )
+
+      // Find who each viral actor is currently bonded with (current production co-lead or
+      // fixed CP partner), excluding the viral partner themselves.
+      function getPenaltyTargetId(actorId, excludeId) {
+        const prod = state.productions.find(p =>
+          (p.leadIds ?? []).includes(actorId) || (p.castIds ?? []).includes(actorId)
+        )
+        if (prod) {
+          const coStar = (prod.leadIds ?? []).find(id => id !== actorId && id !== excludeId)
+            ?? (prod.castIds ?? []).find(id => id !== actorId && id !== excludeId)
+          if (coStar) return coStar
+        }
+        for (const [x, y] of (state.fixedCPs ?? [])) {
+          if (x === actorId && y !== excludeId) return y
+          if (y === actorId && x !== excludeId) return x
+        }
+        return null
+      }
+
+      const actorTargetId   = getPenaltyTargetId(actor.id, partner.id)
+      const partnerTargetId = getPenaltyTargetId(partner.id, actor.id)
+
+      function applyPenalty(s, d, amount) {
+        function deductChem(fromId, toId) {
+          const from = s.actors.find(x => x.id === fromId)
+          const to   = s.actors.find(x => x.id === toId)
+          if (!from || !to) return
+          d({ type: A.UPDATE_ACTOR, id: fromId, patch: {
+            chemistry_map: { ...(from.chemistry_map ?? {}), [toId]: clamp((from.chemistry_map?.[toId] ?? 0) - amount, 0, 100) },
+          } })
+          d({ type: A.UPDATE_ACTOR, id: toId, patch: {
+            chemistry_map: { ...(to.chemistry_map ?? {}), [fromId]: clamp((to.chemistry_map?.[fromId] ?? 0) - amount, 0, 100) },
+          } })
+        }
+        if (actorTargetId) deductChem(actor.id, actorTargetId)
+        if (partnerTargetId && partnerTargetId !== actorTargetId) deductChem(partner.id, partnerTargetId)
+      }
+
       return {
         label: '🔥 VIRAL CHEMISTRY MOMENT',
         message:
           `A candid video of ${actor.name} and ${partner.name} went viral! `
-          + `Fans are obsessed with their chemistry (${bestChem}).`,
+          + `Fans are obsessed with their chemistry (${bestChem}). `
+          + `Management wants to capitalize — but this could shake up existing bonds.`,
         choices: [
-          alreadyFixed
-            ? { label: `💕 Already a Fixed CP! (+pop)`,
-                effect: (s, d) => d({ type: A.SET_POPULARITY, value: s.popularity + 10000 }) }
-            : { label: `💕 Form Fixed CP: ${actor.name} × ${partner.name}`,
-                effect: (s, d) => {
-                  d({ type: A.ADD_FIXED_CP, pair: [actor.id, partner.id] })
-                  d({ type: A.SET_POPULARITY, value: s.popularity + 12000 })
-                } },
-          { label: '🤷 Ride the moment (+pop)',
-            effect: (s, d) => d({ type: A.SET_POPULARITY, value: s.popularity + 5000 }) },
+          {
+            label: `💕 Form Fixed CP: ${actor.name} × ${partner.name} (++ pop, −− chem with current partners)`,
+            effect: (s, d) => {
+              d({ type: A.ADD_FIXED_CP, pair: [actor.id, partner.id] })
+              d({ type: A.SET_POPULARITY, value: s.popularity + 20000 })
+              applyPenalty(s, d, 25)
+            },
+          },
+          {
+            label: `🤷 Ride the moment (+ pop, − chem with current partners)`,
+            effect: (s, d) => {
+              d({ type: A.SET_POPULARITY, value: s.popularity + 10000 })
+              applyPenalty(s, d, 12)
+            },
+          },
         ],
       }
     }

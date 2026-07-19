@@ -215,11 +215,15 @@ function gameReducer(state, action) {
 
     case A.ADD_FIXED_CP: {
       const [x, y] = action.pair
-      const already = (state.fixedCPs ?? []).some(([a, b]) => (
-        (a === x && b === y) || (a === y && b === x)
-      ))
+      // Remove any existing Fixed CP pairs involving either actor (an actor can only
+      // be in one Fixed CP at a time — forming a new one dissolves the old one).
+      const without = (state.fixedCPs ?? []).filter(
+        ([a, b]) => a !== x && b !== x && a !== y && b !== y
+      )
+      // Guard: exact same pair already exists after stripping (shouldn't happen, but safe)
+      const already = without.some(([a, b]) => (a === x && b === y) || (a === y && b === x))
       if (already) return state
-      return { ...state, fixedCPs: [...(state.fixedCPs ?? []), [x, y]] }
+      return { ...state, fixedCPs: [...without, [x, y]] }
     }
 
     case A.REMOVE_FIXED_CP: {

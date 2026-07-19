@@ -206,7 +206,11 @@ export default function ProductionForm({ setScreen }) {
   const avgChem = lead1 && lead2 ? Math.round((chemValue) ) : 0
   const fixedCpAllowed = lead1 && lead2 && avgChem >= 20
   const fixedCpPrice   = fixedCpCost(lead1, lead2)
-  const totalCost      = cost + (cpFixed && fixedCpAllowed ? fixedCpPrice : 0)
+  // Disable Fixed CP option if this pair is already a Fixed CP
+  const alreadyFixedCP = lead1 && lead2 && (state.fixedCPs ?? []).some(
+    ([x, y]) => (x === lead1.id && y === lead2.id) || (x === lead2.id && y === lead1.id)
+  )
+  const totalCost      = cost + (cpFixed && fixedCpAllowed && !alreadyFixedCP ? fixedCpPrice : 0)
   const canAffordTotal = state.money >= totalCost
 
   function handleSubmit(e) {
@@ -245,14 +249,17 @@ export default function ProductionForm({ setScreen }) {
       cpName,
       weekStarted:   state.week,
       weekScheduled: weekScheduled,
-      fixedCP:   cpFixed && fixedCpAllowed,
+      // Already-fixed pairs get fixedCP:true automatically (no extra fee charged).
+      // New fixed CP contracts require the toggle + chemistry ≥ 20.
+      fixedCP:   alreadyFixedCP || (cpFixed && fixedCpAllowed),
     })
 
     dispatch({ type: A.ADD_PRODUCTION, production: prod })
     dispatch({ type: A.ADD_MONEY, amount: -totalCost })
 
-    // Register Fixed CP pair if selected (3.2)
-    if (cpFixed && fixedCpAllowed && lead1 && lead2) {
+    // Register new Fixed CP pair if user opted in (3.2). Already-fixed pairs are
+    // kept as-is — no need to re-register them.
+    if (!alreadyFixedCP && cpFixed && fixedCpAllowed && lead1 && lead2) {
       dispatch({ type: A.ADD_FIXED_CP, pair: [lead1.id, lead2.id] })
     }
 
@@ -260,7 +267,10 @@ export default function ProductionForm({ setScreen }) {
       dispatch({ type: A.UPDATE_ACTOR, id, patch: { assignedTo: prod.id, status: 'filming' } })
     }
 
-    pushToast(dispatch, `"${prod.title}" production started!${cpFixed && fixedCpAllowed ? ' 💕 Fixed CP registered!' : ''}`, 'green')
+    const fixedMsg = alreadyFixedCP
+      ? ' 💕 Fixed CP production!'
+      : (cpFixed && fixedCpAllowed ? ' 💕 Fixed CP registered!' : '')
+    pushToast(dispatch, `"${prod.title}" production started!${fixedMsg}`, 'green')
     setScreen('dashboard')
   }
 
@@ -506,20 +516,34 @@ export default function ProductionForm({ setScreen }) {
               </button>
               <button type="button"
                 className={cpFixed ? 'sel' : ''}
-                onClick={() => { SFX.click(); if (fixedCpAllowed) setCpFixed(true) }}
-                disabled={!fixedCpAllowed}
-                title={!fixedCpAllowed ? `Chemistry must be ≥20 to lock a Fixed CP (current: ${avgChem})` : ''}
+                onClick={() => { SFX.click(); if (fixedCpAllowed && !alreadyFixedCP) setCpFixed(true) }}
+                disabled={!fixedCpAllowed || alreadyFixedCP}
+                title={
+                  alreadyFixedCP
+                    ? 'These actors are already a Fixed CP pair'
+                    : !fixedCpAllowed
+                      ? `Chemistry must be ≥20 to lock a Fixed CP (current: ${avgChem})`
+                      : ''
+                }
               >
-                💕 Fixed CP {fixedCpAllowed ? `(−₩${fixedCpPrice.toLocaleString()})` : `(need chem ≥20)`}
+                {alreadyFixedCP
+                  ? '💕 Fixed CP (already paired!)'
+                  : `💕 Fixed CP ${fixedCpAllowed ? `(−₩${fixedCpPrice.toLocaleString()})` : `(need chem ≥20)`}`
+                }
               </button>
             </div>
-            {cpFixed && fixedCpAllowed && (
+            {alreadyFixedCP && (
+              <div style={{ fontSize: 7, color: 'var(--pink)', marginTop: 6 }}>
+                💕 These actors are already a Fixed CP — no new contract needed.
+              </div>
+            )}
+            {!alreadyFixedCP && cpFixed && fixedCpAllowed && (
               <div style={{ fontSize: 7, color: 'var(--pink)', marginTop: 6 }}>
                 💕 Fixed CPs are locked together for all future productions.
                 Chemistry must stay ≥20 or the contract breaks.
               </div>
             )}
-            {!fixedCpAllowed && (
+            {!alreadyFixedCP && !fixedCpAllowed && (
               <div style={{ fontSize: 7, color: 'var(--gray)', marginTop: 4 }}>
                 Chemistry {avgChem}/100 — need ≥20 to offer a Fixed CP contract.
               </div>
