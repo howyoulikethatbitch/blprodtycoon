@@ -1,0 +1,130 @@
+EVENTS:
+
+## Suggestions for Better Balance & Challenge
+
+### **1. Company Events — Too Safe**
+
+**Problem:** 
+- Bad Press, Script Leak: Both options lose reputation anyway—feels like punishment with no real choice
+- Sponsorship, International Offer: Free money with almost no downside
+- Fixed CP Offer: No risk—just say yes for guaranteed high chemistry pair
+
+**Suggestions:**
+- **Bad Press & Script Leak:** Add a *reputation floor* — if you've done well, maybe "Ignore" only costs -1 rep instead of -3. Rewards good standing.
+- **Sponsorship/International:** Add a hidden *brand fatigue* penalty — too many sponsorships tank your "artistic credibility" (small rep loss over time)
+- **Fixed CP Offer:** Lock them into 3+ productions together — they can't be cast separately for a while. This creates real strategic depth (good chemistry vs. creative freedom)
+
+---
+
+### **2. Tricky Events — Missing Teeth**
+
+**Problem:**
+- Players can just reload/reset if they pick wrong, undermining the "both choices suck" design
+- Rewards/penalties cap too low (±8,000 pop, ±5 rep max) — high-tier players barely feel them
+
+**Suggestions:**
+- **Scale rewards/penalties by game tier & progression** — A Worldwide-tier studio should feel different consequences than Rookie
+- **Hidden reputation decay** — Hidden damage (reputation dents that show later) makes players *unsure* if they made the right call
+- **Make one choice asymmetrically better** — "Viral Stunt" could give you +12k pop but build a -2 rep *debt* you pay off slowly over 4 weeks. Rival Alliance could lock you out of collab opportunities for 2 weeks if you decline
+
+---
+
+### **3. Actor Events — Too Predictable**
+
+**Problem:**
+- Poaching/Raise/Solo Ambitions: All follow the same formula — "pay money or lose actor"
+- Scandal: Three options but only one is really "good" (PR cleanup)
+- Injury: Healing is always safe, pushing through is always bad
+
+**Suggestions:**
+- **Poaching Attempt:** Add a **third choice** — "Counter-offer from rival studio" (accept and actor gets *temporarily buffed* (+10 acting) for 2 productions, but loyalty drops by 20 after). Creates real tension.
+- **Scandal:** 
+  - If actor is *high-tier*, PR cleanup might fail (25% chance). 
+  - If you fire them, add a -10 rep hit (industry backlash for firing a star).
+  - Ignoring could eventually escalate to production shutdowns if it's your lead actor.
+- **Injury:**
+  - Rest always works, but "Push Through" should be a *gamble* — 60% chance they re-injure (forced 3-week rest instead), 40% they recover early (only 1 week)
+  - High-tier actors should have better odds (70% success)
+
+---
+
+### **4. CP Events — Too Passive**
+
+**Problem:**
+- They **always succeed** — removes all tension
+- Accept is always mathematically superior (free happiness boost + chemistry)
+- Decline penalties only hurt at higher tiers (Rookie has none)
+
+**Suggestions:**
+- **Make some CP events have a *risk* element** — "Live Stream Session" could succeed 85% of the time; if it fails (15% chance), both actors lose -10 chemistry from awkward content + -2 rep
+- **Add a *chemistry requirement*** — If actors have chem < 40, they might refuse to do risky content like "Controversial Photoshoot" together
+- **Tier-based decline penalties at Rookie too** — Even Rookie should feel *some* consequence, like -5 chemistry on decline (not -20, but noticeable)
+- **Add a cooldown penalty** — If you decline too many CP events with a pair (3+ declines in a row), they get -10 loyalty each time, questioning why the studio won't capitalize on them
+
+---
+
+### **5. Chemistry Pulse — Needs More Dynamism**
+
+**Problem:**
+- CP Endorsement Deal: Free ₩1,200 with no downside—feels like guaranteed income
+- Quit Threats: Only triggers if happiness < 20 + idle ≥ 4 weeks (too specific)
+- Breakup Crisis: Threshold is tier-based, but doesn't account for *how long* they've been a Fixed CP
+
+**Suggestions:**
+- **CP Endorsement Deal:**
+  - Make it a *choice* instead of automatic income — "A brand wants to feature them. Accept (+₩1,200) or decline (+5 pop instead)"
+  - Or add a *brand reputation cost* — Accepting too many endorsements (4+ per season) makes the actors feel "sellout," tanking their individual reputation slightly
+- **Quit Threats:**
+  - Expand trigger to include low *loyalty* too (loyalty < 30 + idle ≥ 2 weeks)
+  - Or trigger if an actor has been in *too many consecutive productions* without rest (burnout)
+  - Add severity tiers: at 25% threat they complain, at 50% they threaten, at 75%+ they actually leave
+- **Breakup Crisis:**
+  - Add a *public breakup* variant — If Fixed CP breaks after 5+ productions together, it's a -10 rep hit (industry scandal)
+  - Or let players *negotiate* to keep the contract but downgrade it to "Temporary Pair" (less locked-in, more flexible)
+- **Add Positive Bonuses:**
+  - Chemistry ≥ 90 → "Legendary Pair Status" (±5% production score boost for all future productions together)
+  - Or "Icon Couple" milestone (after 10+ productions together) → small weekly passive income
+
+---
+
+### **6. Missing Challenge Events**
+
+**Problem:** No events punish poor planning or bad decisions over time.
+
+**Suggestions:**
+- **Burnt-Out Studio Event** (triggers if 3+ productions failed in last 8 weeks):
+  - Actor morale crisis
+  - Options: Mandatory break week (−production) OR push hard (risk more failures)
+
+- **Rival Studio Talent Raid** (triggers if you've rejected 5+ CP event offers):
+  - Rival tries to poach multiple actors at once
+  - Forces you to either spend big on retention or lose key talent
+
+- **Fan Backlash Event** (triggers if you've used 3+ scandal outcomes):
+  - Cumulative reputation hit
+  - Players realize short-term fixes create long-term problems
+
+- **Financial Audit Event** (if reputation < 10):
+  - Forced to pay ₩2,000 for compliance
+  - Adds consequence to reputation mismanagement
+
+---
+
+## Summary: Fairness & Challenge Balance
+
+| Area | Issue | Fix |
+|---|---|---|
+| **Company Events** | Too free/safe | Add brand fatigue, lock Fixed CPs, reputation floors |
+| **Tricky Events** | Consequences too weak | Scale by tier, add hidden debt mechanics |
+| **Actor Events** | Predictable patterns | Add gambles, tier-based outcomes, career consequences |
+| **CP Events** | Always succeed | Add risk %, chem requirements, decline penalties for all |
+| **Chemistry Pulse** | Auto-income & passive | Make endorsements a choice, expand triggers, reward legendary pairs |
+| **Meta** | No long-term consequences | Add burnout, talent raids, cumulative failure events |
+
+---
+
+**Keep as-is (already fair & challenging):**
+- ✅ Extreme Fan Demand — Real tradeoff (pop vs. actor morale)
+- ✅ Awards Campaign Gamble — Costs money but rewards reputation (clear choice)
+- ✅ Injury mechanics — Risk-reward is clear and tier-aware
+- ✅ Bankruptcy Warning — Consequences are real and immediate

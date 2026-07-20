@@ -1,0 +1,68 @@
+Draft Fixes for Viral Chemistry Moment Event
+
+Fix 1: Correct Penalty Application with Fresh State
+
+Problem: Penalties calculated from stale state before dispatch.
+
+Solution: Recalculate penalty targets after each dispatch, or pass fresh actor data.
+
+Fix 2: Add Downside if No Penalty Targets
+
+Problem: If actor has no current partner, event has pure upside.
+
+Solution: Add a reputation or money cost as fallback penalty.
+
+Fix 3: Show Warning if Existing Fixed CP Will Be Hurt
+
+Problem: Hidden consequence if actor already has a Fixed CP.
+
+Solution: Detect and warn player explicitly.
+
+# Draft Fixes for Viral Chemistry Moment Event
+
+----
+
+## Fix 4: Scale Penalty Based on Previous Chemistry
+
+**Problem:** Chemistry penalty is flat (−25 or −12) regardless of prior relationship strength.
+
+**Solution:** Calculate penalty proportional to the betrayal.
+
+---
+
+## Fix 5: Add Cooldown for Viral Chemistry Events
+
+**Problem:** Multiple viral chemistry events can fire in one week, cascading damage.
+
+**Solution:** Add per-actor cooldown.
+
+---
+
+## Summary of Fixes
+
+| # | Fix | Impact | Effort |
+|---|---|---|---|
+| 1 | Recalculate penalty targets from fresh state | 🟢 Correctness | Medium |
+| 2 | Add fallback cost if no conflicts | 🟡 Balance | Small |
+| 3 | Show Fixed CP warnings explicitly | 🟢 UX | Small |
+| 4 | Scale penalties by relationship strength | 🟢 Fairness | Medium |
+| 5 | Add per-actor cooldown | 🟢 Prevents spam | Small |
+
+---
+
+## Implementation Priority
+
+**High (Do first):**
+- Fix 1: Correct penalty logic
+- Fix 3: Show warnings
+
+**Medium (Do next):**
+- Fix 4: Scale penalties
+- Fix 5: Add cooldown
+
+**Low (Polish):**
+- Fix 2: Add fallback cost
+
+---
+
+Ready to create prompts for Replit? Or want me to adjust any of these fixes? 🚀
