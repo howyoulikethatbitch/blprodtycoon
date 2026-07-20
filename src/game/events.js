@@ -504,25 +504,90 @@ function makeActorEvent(type, actor, state) {
     }
 
     case 'romance': {
-      const others = state.actors.filter(a => a.signed && a.id !== actor.id)
-      if (!others.length) return null
-      const other = others[Math.floor(Math.random() * others.length)]
+      // Problem 7: 6-week per-actor cooldown
+      const romanceCoolKey = `offScriptRomance_${actor.id}`
+      const lastRomanceWk  = state.flags?.[romanceCoolKey] ?? -999
+      if ((state.week - lastRomanceWk) < 6) return null
+
+      // Problems 1 & 8: exclude existing Fixed CP partner and current production co-leads
+      const actorCpPartnerIds = new Set(
+        (state.fixedCPs ?? []).flatMap(([x, y]) =>
+          x === actor.id ? [y] : y === actor.id ? [x] : []
+        )
+      )
+      const actorActiveProd = state.productions.find(p =>
+        (p.leadIds ?? []).includes(actor.id)
+      )
+      const actorCoLeadIds = new Set(
+        actorActiveProd ? (actorActiveProd.leadIds ?? []).filter(id => id !== actor.id) : []
+      )
+      const eligible = state.actors.filter(a =>
+        a.signed &&
+        a.id !== actor.id &&
+        !actorCpPartnerIds.has(a.id) &&
+        !actorCoLeadIds.has(a.id)
+      )
+      // Problem 4 (null case): actor is too committed — no eligible partner
+      if (!eligible.length) return null
+
+      // Problem 1: pick highest-chemistry eligible partner
+      let other = eligible[0], bestChem = getChem(actor, eligible[0].id)
+      for (const o of eligible) {
+        const c = getChem(actor, o.id)
+        if (c > bestChem) { bestChem = c; other = o }
+      }
+
+      // Problem 2: warn if trigger actor is in a Fixed CP (with someone else, since partner is excluded)
+      const cpConflictId = [...actorCpPartnerIds][0]
+      const cpConflictActor = cpConflictId ? state.actors.find(a => a.id === cpConflictId) : null
+      const cpWarning = cpConflictActor
+        ? `\n\n⚠️ ${actor.name} is currently in a Fixed CP with ${cpConflictActor.name}. Confirming this romance will damage that relationship!`
+        : ''
+
       return {
         label: '💘 OFF-SCRIPT ROMANCE',
+        flagKey: romanceCoolKey,
         message:
-          `${actor.name} and ${other.name} have been spotted together off-set. `
-          + `Fans are shipping them hard. What's your official stance?`,
+          `${actor.name} and ${other.name} (chemistry: ${bestChem}) have been spotted together off-set. `
+          + `Fans are shipping them hard. What's your official stance?`
+          + cpWarning,
         choices: [
-          { label: '✅ Confirm relationship (+chemistry)',
+          // Problem 3: symmetric chemistry update on both actors
+          { label: '✅ Confirm relationship (+20 chemistry, +happiness to both)',
             effect: (s, d) => {
-              const cur    = getChem(actor, other.id)
-              const newMap = { ...(actor.chemistry_map ?? {}), [other.id]: clamp(cur + 20, 0, 100) }
-              d({ type: A.UPDATE_ACTOR, id: actor.id, patch: { chemistry_map: newMap } })
+              const curA = s.actors.find(x => x.id === actor.id)
+              const curB = s.actors.find(x => x.id === other.id)
+              if (curA) d({ type: A.UPDATE_ACTOR, id: actor.id, patch: {
+                chemistry_map: { ...(curA.chemistry_map ?? {}), [other.id]: clamp((curA.chemistry_map?.[other.id] ?? 0) + 20, 0, 100) },
+                happiness: clamp((curA.happiness ?? 70) + 10, 0, 100),
+              } })
+              if (curB) d({ type: A.UPDATE_ACTOR, id: other.id, patch: {
+                chemistry_map: { ...(curB.chemistry_map ?? {}), [actor.id]: clamp((curB.chemistry_map?.[actor.id] ?? 0) + 20, 0, 100) },
+                happiness: clamp((curB.happiness ?? 70) + 10, 0, 100),
+              } })
             } },
-          { label: '❌ Deny publicly (−happiness)',
-            effect: (s, d) => d({ type: A.UPDATE_ACTOR, id: actor.id,
-              patch: { happiness: clamp(h - 15, 0, 100) } }) },
-          { label: '🤷 No comment', effect: () => {} },
+          // Problem 5: denial costs both actors
+          { label: '❌ Deny publicly (−15 happiness trigger, −10 partner, −8k pop)',
+            effect: (s, d) => {
+              const curA = s.actors.find(x => x.id === actor.id)
+              const curB = s.actors.find(x => x.id === other.id)
+              if (curA) d({ type: A.UPDATE_ACTOR, id: actor.id,
+                patch: { happiness: clamp((curA.happiness ?? 70) - 15, 0, 100) } })
+              if (curB) d({ type: A.UPDATE_ACTOR, id: other.id,
+                patch: { happiness: clamp((curB.happiness ?? 70) - 10, 0, 100) } })
+              d({ type: A.SET_POPULARITY, value: Math.max(0, s.popularity - 8000) })
+            } },
+          // Problem 6: no comment has real cost
+          { label: '🤷 No comment (−2k pop, −5 loyalty to both — confusion)',
+            effect: (s, d) => {
+              d({ type: A.SET_POPULARITY, value: Math.max(0, s.popularity - 2000) })
+              const curA = s.actors.find(x => x.id === actor.id)
+              const curB = s.actors.find(x => x.id === other.id)
+              if (curA) d({ type: A.UPDATE_ACTOR, id: actor.id,
+                patch: { loyalty: clamp((curA.loyalty ?? 60) - 5, 0, 100) } })
+              if (curB) d({ type: A.UPDATE_ACTOR, id: other.id,
+                patch: { loyalty: clamp((curB.loyalty ?? 60) - 5, 0, 100) } })
+            } },
         ],
       }
     }
