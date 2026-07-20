@@ -627,6 +627,12 @@ export function useWeekAdvance() {
       const awardsYear   = getYearFromWeek(week)
       const awardsResult = computeAllAwards(state, week, extraHistoryRecords)
       dispatch({ type: A.SET_AWARDS_DATA, data: awardsResult })
+      // Track AotY winner for consecutive-win penalty next year
+      const aotYResult = awardsResult.results.find(r => r.awardId === 'actor_of_year')
+      dispatch({
+        type: A.SET_FLAG, key: 'lastAotYWinner',
+        value: aotYResult?.winner?.isPlayer ? (aotYResult.winner.actorName ?? null) : null,
+      })
       dispatch({ type: A.PUSH_MODAL, modal: {
         type: 'event',
         data: {

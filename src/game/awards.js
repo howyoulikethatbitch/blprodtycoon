@@ -63,9 +63,17 @@ function bestGrade(records) {
 }
 
 // ─── Performance multiplier for actor awards ──────────────────────────────────
-// Ties an actor's award score to their best production grade this year.
 const PERF_MULTIPLIERS = { 'S+': 1.6, 'S': 1.3, 'A': 1.0, 'B': 0.75, 'C': 0.55, 'D': 0.35, 'F': 0.35 }
-const NO_PROD_MULT = 0.2   // actor had zero productions this year
+const NO_PROD_MULT = 0.2   // actor had zero qualifying productions this year
+
+// Per-tier fame ceilings — reaching ceiling = 100% fame contribution.
+// Actors below ceiling can still win but have to compensate with higher grade multiplier.
+const FAME_CEILING = {
+  'Rookie':      3_000,
+  'Rising Star': 10_000,
+  'Popular':     40_000,
+  'Worldwide':   100_000,
+}
 
 // Minimum grade an actor must have achieved to be eligible for each tier award
 const TIER_MIN_GRADE = {
@@ -82,11 +90,32 @@ function getBestActorGrade(actorId, yearHistory) {
   return bestGrade(prods)
 }
 
-/** Award score = fame × performanceMultiplier + 5 home bonus */
-function actorAwardScore(actor, yearHistory, homeBonus = 5) {
-  const grade = getBestActorGrade(actor.id, yearHistory)
-  const mult  = grade ? (PERF_MULTIPLIERS[grade] ?? 0.35) : NO_PROD_MULT
-  return (actor.fame ?? 0) * mult + homeBonus
+/**
+ * Normalized actor score (0–160 range, same scale as bumped rival ranges).
+ * fame is normalized against a per-tier ceiling so raw fame numbers cannot
+ * auto-win — an actor needs both sufficient fame AND a strong grade to compete.
+ * Grade multiplier (0.2–1.6) pushes the effective ceiling for elite performers.
+ */
+function actorNormalizedScore(actor, yearHistory, homeBonus = 5) {
+  const grade    = getBestActorGrade(actor.id, yearHistory)
+  const mult     = grade ? (PERF_MULTIPLIERS[grade] ?? 0.35) : NO_PROD_MULT
+  const ceil     = FAME_CEILING[actor.tier] ?? FAME_CEILING['Popular']
+  const normFame = Math.min(1, (actor.fame ?? 0) / ceil)
+  return normFame * mult * 100 + homeBonus
+}
+
+/** Count lead-role productions (in leadIds) for actorId meeting minGrade this year */
+function countLeadProductions(actorId, yearHistory, minGrade) {
+  return yearHistory.filter(h =>
+    (h.leadIds ?? []).includes(actorId) && isGradeAtLeast(h.grade, minGrade)
+  ).length
+}
+
+/** Count all productions (lead or cast) for actorId meeting minGrade this year */
+function countActorProductions(actorId, yearHistory, minGrade) {
+  return yearHistory.filter(h =>
+    (h.castIds ?? []).includes(actorId) && isGradeAtLeast(h.grade, minGrade)
+  ).length
 }
 
 // ─── Year helpers ─────────────────────────────────────────────────────────────
@@ -149,20 +178,31 @@ function pickRivalTitle(usedTitles) {
 
 /**
  * Rival actor "fame score" for a tier, scaled by rival company's leaderboard score.
- * User actors receive a +5 home-company boost on top of their real fame.
+ * Ranges are calibrated to match the normalized 0–160 player score scale.
  * Competition grows harder each year (+4 per year, capped at +40).
+ *
+ * Tier award ranges (bumped up from previous [10-35]…[70-100]):
+ *   Rookie      → [25,  55]
+ *   Rising Star → [45,  80]
+ *   Popular     → [65,  95]
+ *   Worldwide   → [80, 110]
+ * Major award ranges (higher ceiling, tougher competition):
+ *   BestLead    → [65,  95]
+ *   AotY        → [85, 120]
  */
 function rivalActorScore(tier, rivalScore, year = 1) {
   const ranges = {
-    'Rookie':      [10, 35],
-    'Rising Star': [30, 60],
-    'Popular':     [50, 80],
-    'Worldwide':   [70, 100],
+    'Rookie':      [25,  55],
+    'Rising Star': [45,  80],
+    'Popular':     [65,  95],
+    'Worldwide':   [80, 110],
+    'BestLead':    [65,  95],
+    'AotY':        [85, 120],
   }
-  const [lo, hi] = ranges[tier] ?? [20, 55]
-  const norm     = Math.min(1, (rivalScore ?? 100) / 1000)
-  const base     = lo + (hi - lo) * norm
-  const yearBoost = Math.min((year - 1) * 4, 40)   // competition escalates yearly
+  const [lo, hi] = ranges[tier] ?? [45, 75]
+  const norm      = Math.min(1, (rivalScore ?? 100) / 1000)
+  const base      = lo + (hi - lo) * norm
+  const yearBoost = Math.min((year - 1) * 4, 40)
   return base + yearBoost + (Math.random() * 10 - 5)
 }
 
@@ -217,14 +257,15 @@ export function computeAllAwards(state, week, extraHistory = []) {
     const minGrade = TIER_MIN_GRADE[tier]
     const eligible = (state.actors ?? []).filter(a => a.tier === tier && isActorEligible(a))
 
-    // Pick player's best candidate only if they meet the minimum grade threshold
+    // Best candidate only if they meet the minimum grade threshold for this tier
     const bestUser = eligible.length > 0
       ? eligible.reduce((best, a) => (a.fame ?? 0) > (best.fame ?? 0) ? a : best, eligible[0])
       : null
-    const userActorGrade  = bestUser ? getBestActorGrade(bestUser.id, yearHistory) : null
-    const meetsThreshold  = userActorGrade && isGradeAtLeast(userActorGrade, minGrade)
-    const userScore       = bestUser && meetsThreshold
-      ? actorAwardScore(bestUser, yearHistory, 5)   // +5 home boost
+    const userActorGrade = bestUser ? getBestActorGrade(bestUser.id, yearHistory) : null
+    const meetsThreshold = userActorGrade && isGradeAtLeast(userActorGrade, minGrade)
+    // Normalized score — same scale as bumped rival ranges (0–160)
+    const userScore = bestUser && meetsThreshold
+      ? actorNormalizedScore(bestUser, yearHistory, 5)
       : -1
 
     const topRivals = rivals.slice(0, 10)
@@ -290,17 +331,27 @@ export function computeAllAwards(state, week, extraHistory = []) {
     } else rivalWin('best_storyline', false)
   } else rivalWin('best_storyline', false)
 
-  // ── Best Lead Actor (highest scoring actor who appeared this year) ──────────
-  const yearActors = (state.actors ?? []).filter(a => isActorEligible(a) && yearCastIds.has(a.id))
-  const bestLead   = yearActors.length > 0
-    ? yearActors.reduce((best, a) => actorAwardScore(a, yearHistory, 0) > actorAwardScore(best, yearHistory, 0) ? a : best, yearActors[0])
+  // ── Best Lead Actor ────────────────────────────────────────────────────────
+  // Requires: tier ≥ Rising Star AND ≥2 lead-role (leadIds) productions with grade ≥ A this year.
+  // Score: normalized (0–160 scale). Rivals use BestLead range [65, 95].
+  const LEAD_ELIGIBLE_TIERS = new Set(['Rising Star', 'Popular', 'Worldwide'])
+  const yearLeadActors = (state.actors ?? []).filter(a =>
+    isActorEligible(a) &&
+    LEAD_ELIGIBLE_TIERS.has(a.tier) &&
+    yearCastIds.has(a.id) &&
+    countLeadProductions(a.id, yearHistory, 'A') >= 2
+  )
+  const bestLead = yearLeadActors.length > 0
+    ? yearLeadActors.reduce((best, a) =>
+        actorNormalizedScore(a, yearHistory, 0) > actorNormalizedScore(best, yearHistory, 0) ? a : best,
+        yearLeadActors[0])
     : null
-  const userLeadScore = bestLead ? actorAwardScore(bestLead, yearHistory, 5) : -1
+  const userLeadScore = bestLead ? actorNormalizedScore(bestLead, yearHistory, 5) : -1
 
   const top5Rivals = rivals.slice(0, 5)
   let bestRivalLeadScore = -1, bestRivalLeadIdx = 0
   top5Rivals.forEach((r, idx) => {
-    const s = rivalActorScore('Popular', r.score, year)
+    const s = rivalActorScore('BestLead', r.score, year)
     if (s > bestRivalLeadScore) { bestRivalLeadScore = s; bestRivalLeadIdx = idx }
   })
 
@@ -341,16 +392,34 @@ export function computeAllAwards(state, week, extraHistory = []) {
     } else rivalWin('movie_of_year', true)
   } else rivalWin('movie_of_year', true)
 
-  // ── Actor Of The Year (best performance-weighted actor this year) ──────────
-  const bestAoY      = yearActors.length > 0
-    ? yearActors.reduce((best, a) => actorAwardScore(a, yearHistory, 0) > actorAwardScore(best, yearHistory, 0) ? a : best, yearActors[0])
+  // ── Actor Of The Year ─────────────────────────────────────────────────────
+  // Requires: tier ≥ Popular AND ≥2 productions (any role) with grade ≥ S this year.
+  // Score: normalized (0–160 scale). Rivals use AotY range [85, 120] — the toughest in the game.
+  // Consecutive-win penalty: −20% if the same actor won last year (academy wants fresh talent).
+  const AOT_ELIGIBLE_TIERS = new Set(['Popular', 'Worldwide'])
+  const lastAotYWinner     = state.flags?.lastAotYWinner ?? null
+
+  const yearAotYActors = (state.actors ?? []).filter(a =>
+    isActorEligible(a) &&
+    AOT_ELIGIBLE_TIERS.has(a.tier) &&
+    yearCastIds.has(a.id) &&
+    countActorProductions(a.id, yearHistory, 'S') >= 2
+  )
+
+  function aotYScore(actor) {
+    const base = actorNormalizedScore(actor, yearHistory, 5)
+    return lastAotYWinner && actor.name === lastAotYWinner ? base * 0.8 : base
+  }
+
+  const bestAoY      = yearAotYActors.length > 0
+    ? yearAotYActors.reduce((best, a) => aotYScore(a) > aotYScore(best) ? a : best, yearAotYActors[0])
     : null
-  const userAoYScore = bestAoY ? actorAwardScore(bestAoY, yearHistory, 5) : -1
+  const userAoYScore = bestAoY ? aotYScore(bestAoY) : -1
 
   const top3Rivals = rivals.slice(0, 3)
   let bestRivalAoY = -1, bestRivalAoYIdx = 0
   top3Rivals.forEach((r, idx) => {
-    const s = rivalActorScore('Worldwide', r.score, year)
+    const s = rivalActorScore('AotY', r.score, year)
     if (s > bestRivalAoY) { bestRivalAoY = s; bestRivalAoYIdx = idx }
   })
 
