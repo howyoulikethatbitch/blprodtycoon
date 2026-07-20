@@ -35,6 +35,9 @@ export const INITIAL_STATE = {
   gradeCounts:   {},   // { grade → total productions ever at that grade }
   genreTrends:   [],   // genre names trending this year (refreshes each 52-week year)
   rivals:        [],   // 99 rival studios {id, name, score} — generated at START_GAME
+  // BL Awards
+  awardsPhase:   null, // null | 'ceremony' | 'summary'
+  awardsData:    null, // { results, userWins, year, attended }
   productionsCompleted: 0,  // total productions ever finished — drives studio quality multiplier
   settings: {
     sfxOn:      true,
@@ -93,6 +96,10 @@ export const A = {
   SET_GENRE_TRENDS:       'SET_GENRE_TRENDS',
   // Theme unlock system
   UNLOCK_THEMES:          'UNLOCK_THEMES',
+  // BL Awards
+  SET_AWARDS_DATA:        'SET_AWARDS_DATA',
+  SET_AWARDS_PHASE:       'SET_AWARDS_PHASE',
+  CLEAR_AWARDS:           'CLEAR_AWARDS',
 }
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -156,9 +163,19 @@ function gameReducer(state, action) {
     case A.UPDATE_ACTOR:
       return {
         ...state,
-        actors: state.actors.map(a =>
-          a.id === action.id ? { ...a, ...action.patch } : a
-        ),
+        actors: state.actors.map(a => {
+          if (a.id !== action.id) return a
+          const updated = { ...a, ...action.patch }
+          // Track injuries this year: increment when newly becoming injured
+          if (action.patch.status === 'injured' && a.status !== 'injured') {
+            updated.injuredThisYear = (a.injuredThisYear ?? 0) + 1
+          }
+          // Track permanent leave: set hasLeft when a signed actor unsigns
+          if (action.patch.signed === false && a.signed === true) {
+            updated.hasLeft = true
+          }
+          return updated
+        }),
       }
 
     case A.SIGN_ACTOR:
@@ -322,6 +339,8 @@ function gameReducer(state, action) {
         fixedCPNames:         action.saveData.fixedCPNames         ?? {},
         genreTrends:          action.saveData.genreTrends          ?? [],
         unlockedThemes:       action.saveData.unlockedThemes       ?? ['Slow Burn', 'Friends-to-Lovers', 'Enemies-to-Lovers', 'Soulmates', 'Forbidden Love'],
+        awardsPhase:          null,   // never restore mid-ceremony
+        awardsData:           null,
       }
 
     case A.MARK_SAVED:
@@ -351,6 +370,21 @@ function gameReducer(state, action) {
       if (!incoming.length) return state
       return { ...state, unlockedThemes: [...current, ...incoming] }
     }
+
+    case A.SET_AWARDS_DATA:
+      return { ...state, awardsData: action.data }
+
+    case A.SET_AWARDS_PHASE:
+      return {
+        ...state,
+        awardsPhase: action.phase,
+        awardsData:  state.awardsData
+          ? { ...state.awardsData, attended: action.attended ?? false }
+          : state.awardsData,
+      }
+
+    case A.CLEAR_AWARDS:
+      return { ...state, awardsPhase: null, awardsData: null }
 
     default:
       return state

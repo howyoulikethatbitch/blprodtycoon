@@ -27,13 +27,32 @@ const LOG_COLOR = {
 
 export default function Dashboard({ setScreen }) {
   const { state } = useGame()
-  const rank     = calcRank(state.reputation, state.popularity)
-  const progress = rankProgress(state.reputation, state.popularity)
-  const active   = state.productions.filter(p => p.status === 'active')
-  const recent   = [...state.history].reverse().slice(0, 6)
+  const rank        = calcRank(state.reputation, state.popularity)
+  const progress    = rankProgress(state.reputation, state.popularity)
+  const active      = state.productions.filter(p => p.status === 'active')
+  const recent      = [...state.history].reverse().slice(0, 6)
+  const weekInYear  = ((state.week - 1) % 52) + 1
+  const currentYear = Math.ceil(state.week / 52)
+  const showAwardsBanner = weekInYear >= 49 && weekInYear <= 51
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* ── BL Awards countdown banner (weeks 49–51) ── */}
+      {showAwardsBanner && (
+        <div style={styles.awardsBanner}>
+          <span style={{ fontSize: 18 }}>✨</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 9, color: 'var(--gold)', letterSpacing: 1 }}>
+              BL AWARDS NIGHT — YEAR {currentYear}
+            </div>
+            <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 2 }}>
+              {52 - weekInYear} week{52 - weekInYear === 1 ? '' : 's'} until the ceremony. Prepare your studio!
+            </div>
+          </div>
+          <span style={{ fontSize: 18 }}>🏆</span>
+        </div>
+      )}
 
       {/* ── Studio snapshot ── */}
       <div className="panel">
@@ -279,6 +298,15 @@ function BigStat({ label, value, color }) {
 }
 
 const styles = {
+  awardsBanner: {
+    display:        'flex',
+    alignItems:     'center',
+    gap:            12,
+    padding:        '12px 14px',
+    border:         '2px solid var(--gold)',
+    background:     'linear-gradient(90deg,rgba(255,215,0,0.10) 0%,rgba(255,215,0,0.04) 100%)',
+    animation:      'pulse 2.5s ease-in-out infinite',
+  },
   statsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, 1fr)',

@@ -16,6 +16,7 @@ import CompanyStatus from './components/CompanyStatus.jsx'
 import FreeAgentsPool from './components/FreeAgentsPool.jsx'
 import ModalSystem from './components/ModalSystem.jsx'
 import Confetti from './components/Confetti.jsx'
+import AwardsCeremony from './components/AwardsCeremony.jsx'
 import { setSfxEnabled } from './game/audio.js'
 
 function GameApp() {
@@ -44,6 +45,9 @@ function GameApp() {
   }, [state.modalQueue?.length])
 
   if (!state.started) return <TitleScreen />
+
+  // BL Awards ceremony takes over the full screen when active
+  if (state.awardsPhase) return <AwardsCeremony />
 
   const openProfile = (actorId) => {
     setProfileActor(actorId)

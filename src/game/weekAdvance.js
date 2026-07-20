@@ -16,6 +16,7 @@ import { SFX, resumeAudio } from './audio.js'
 import { getGameTierByRank } from './tiers.js'
 import { GENRE_UNLOCK_BY_GRADE, GENRE_UNLOCK_COUNTS, GENRES } from './productions.js'
 import { THEME_UNLOCK_BY_GRADE, THEME_UNLOCK_COUNTS, DEFAULT_THEMES } from './themes.js'
+import { computeAllAwards, calcAttendanceEffects, getLackingArea, getYearFromWeek, AWARD_DEFS } from './awards.js'
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 
@@ -35,6 +36,14 @@ export function useWeekAdvance() {
 
     // ── Genre trends: regenerate at start of each year (or first week ever) ──
     const weekInYear = ((week - 1) % 52) + 1
+    // Reset per-year actor tracking at new year start
+    if (weekInYear === 1) {
+      for (const actor of state.actors) {
+        if ((actor.injuredThisYear ?? 0) > 0) {
+          dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch: { injuredThisYear: 0 } })
+        }
+      }
+    }
     if (weekInYear === 1 || !(state.genreTrends?.length)) {
       const trendCounts = { rookie: 3, rising: 4, popular: 5, worldwide: 6 }
       const trendCount  = trendCounts[tier.id] ?? 3
@@ -43,9 +52,10 @@ export function useWeekAdvance() {
     }
 
     // ── 1. Tick productions ───────────────────────────────────────────────────
-    const completedThisWeek = []
-    const wrappedThisWeek   = []
-    const releasingThisWeek = []
+    const completedThisWeek    = []
+    const wrappedThisWeek      = []
+    const releasingThisWeek    = []
+    const extraHistoryRecords  = []   // for awards: productions completing this week
 
     for (const prod of state.productions) {
       if (prod.status !== 'active') continue
@@ -171,17 +181,17 @@ export function useWeekAdvance() {
         })
       }
 
-      // Record completion
-      dispatch({
-        type: A.COMPLETE_PRODUCTION, id: prod.id,
-        record: {
-          ...prod,
-          score:         finalScore,
-          revenue,
-          grade:         evalResult.grade,
-          weekCompleted: week,
-        },
-      })
+      // Record completion (chemScore stored for BL Awards chemistry check)
+      const historyRecord = {
+        ...prod,
+        score:         finalScore,
+        revenue,
+        grade:         evalResult.grade,
+        weekCompleted: week,
+        chemScore:     chemValue,
+      }
+      dispatch({ type: A.COMPLETE_PRODUCTION, id: prod.id, record: historyRecord })
+      extraHistoryRecords.push(historyRecord)
 
       // ── Awards (avgStars ≥ 4.5) ───────────────────────────────────────────
       if (evalResult.awarded) {
@@ -589,6 +599,51 @@ export function useWeekAdvance() {
       const lbl = actorEvent.data?.label ?? 'Actor Event'
       pushEventLog(dispatch, `[ACTOR] ${lbl}`, 'pink', week)
       dispatch({ type: A.PUSH_MODAL, modal: actorEvent })
+    }
+
+    // ── 7d. BL Awards reminder — week 48 of each year ────────────────────────
+    if (weekInYear === 48) {
+      const awardsYear = getYearFromWeek(week)
+      const flagKey    = `awardsReminder_${awardsYear}`
+      if (!state.flags?.[flagKey]) {
+        dispatch({ type: A.SET_FLAG, key: flagKey, value: week })
+        dispatch({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
+          title: '✨ BL AWARDS COMING SOON',
+          message:
+            `The Year ${awardsYear} BL Awards Night is in 4 weeks!\n\n`
+            + `Prepare your productions — the industry is watching.\n`
+            + `Make sure your actors are in top form and your recent work shines.`,
+        } } })
+        pushEventLog(dispatch, `🏆 BL Awards: ceremony in 4 weeks! (Year ${awardsYear})`, 'gold', week)
+      }
+    }
+
+    // ── 7e. BL Awards ceremony — week 52 of each year ────────────────────────
+    if (weekInYear === 52) {
+      const awardsYear   = getYearFromWeek(week)
+      const awardsResult = computeAllAwards(state, week, extraHistoryRecords)
+      dispatch({ type: A.SET_AWARDS_DATA, data: awardsResult })
+      dispatch({ type: A.PUSH_MODAL, modal: {
+        type: 'event',
+        data: {
+          label: `✨ BL AWARDS NIGHT — YEAR ${awardsYear} ✨`,
+          message:
+            `The Year ${awardsYear} BL Awards Night has arrived!\n\n`
+            + `Your productions, actors, and studio are all under the spotlight.\n\n`
+            + `Will you attend the ceremony? Attending boosts visibility but comes with risk.`,
+          choices: [
+            {
+              label: '✨ ATTEND THE CEREMONY',
+              effect: (s, d) => d({ type: A.SET_AWARDS_PHASE, phase: 'ceremony', attended: true }),
+            },
+            {
+              label: '📺 SKIP — WATCH FROM HOME',
+              effect: (s, d) => d({ type: A.SET_AWARDS_PHASE, phase: 'summary', attended: false }),
+            },
+          ],
+        },
+      } })
+      pushEventLog(dispatch, `✨ BL Awards Night Year ${awardsYear} — the ceremony begins!`, 'gold', week)
     }
 
     // ── 8. Advance week ───────────────────────────────────────────────────────
