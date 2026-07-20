@@ -201,6 +201,10 @@ export default function ProductionForm({ setScreen }) {
   // Prompt 1: tier now rank-based
   const gameTier = getGameTierByRank(state.numericRank ?? 50)
 
+  // Genre trends: cap to current tier's count so display & slot machine stay in sync
+  const TREND_COUNTS_BY_TIER = { rookie: 3, rising: 4, popular: 5, worldwide: 6 }
+  const displayedGenreTrends = (state.genreTrends ?? []).slice(0, TREND_COUNTS_BY_TIER[gameTier.id] ?? 3)
+
   // Cost & affordability
   const cost     = calcCost(prodType, budgetMult, schedule, castIds.length, gameTier.productionCostMod)
   const schedInfo  = SCHEDULES.find(s => s.id === schedule)
@@ -417,12 +421,12 @@ export default function ProductionForm({ setScreen }) {
           <label>GENRE</label>
 
           {/* Genre Trends */}
-          {(state.genreTrends ?? []).length > 0 && (() => {
+          {displayedGenreTrends.length > 0 && (() => {
             const trendColors = ['#FF6B9D','#6BC5FF','#FFD700','#5CE1A0','#DA70D6','#FF8C42']
             return (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8, alignItems: 'center' }}>
                 <span style={{ fontSize: 6, color: 'var(--lav)', letterSpacing: 1 }}>TRENDS:</span>
-                {(state.genreTrends).map((g, i) => (
+                {displayedGenreTrends.map((g, i) => (
                   <div key={g} style={{
                     background:   genre === g ? trendColors[i % trendColors.length] : 'var(--bg-inset)',
                     border:       `2px solid ${trendColors[i % trendColors.length]}`,
@@ -542,7 +546,7 @@ export default function ProductionForm({ setScreen }) {
               onMultiplierAccepted={() => { setGenreMultiplier(2); SFX.confirm() }}
               currentGenre={genre}
               gameTierId={gameTier.id}
-              genreTrends={state.genreTrends ?? []}
+              genreTrends={displayedGenreTrends}
             />
           )
         })()}
