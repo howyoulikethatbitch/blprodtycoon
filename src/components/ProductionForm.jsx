@@ -300,6 +300,30 @@ export default function ProductionForm({ setScreen }) {
       ? ' 💕 Fixed CP production!'
       : (cpFixed && fixedCpAllowed ? ' 💕 Fixed CP registered!' : '')
     pushToast(dispatch, `"${prod.title}" production started!${fixedMsg}`, 'green')
+
+    // Reset form — only here, after a confirmed submission (not on tab switch)
+    setProdType('series')
+    setTitle('')
+    setGenre('Romance')
+    setStory('original')
+    setSchedule('6m')
+    setPlatform('tv')
+    setRating('pg13')
+    setBudgetMult(DEFAULT_BUDGET)
+    setLead1Id('')
+    setLead2Id('')
+    setCpName('')
+    setCpEdited(false)
+    setShowChem(true)
+    setCpFixed(false)
+    setTheme('Slow Burn')
+    setLead1FixedLocked(false)
+    setLead2FixedLocked(false)
+    setSlotSpinsUsed(0)
+    setBonusSpins(0)
+    setGenreMultiplier(1)
+    setStartWeekInYear(((state.week - 1) % 52) + 1)
+
     setScreen('dashboard')
   }
 

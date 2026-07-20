@@ -57,7 +57,6 @@ function GameApp() {
   const renderScreen = () => {
     switch (screen) {
       case 'dashboard':    return <Dashboard setScreen={setScreen} />
-      case 'produce':      return <ProductionForm setScreen={setScreen} />
       case 'actors':       return <ActorRoster openProfile={openProfile} />
       case 'profile':      return <ActorProfile actorId={profileActor} onBack={closeProfile} />
       case 'company':      return <CompanyStatus setScreen={setScreen} />
@@ -73,7 +72,12 @@ function GameApp() {
       <div className="app-body">
         <Sidebar currentScreen={screen} setScreen={setScreen} />
         <main className="app-main">
-          {renderScreen()}
+          {/* Always mounted — preserves all form state across tab switches.
+              Only resets after a successful "Add to Line-up" submission. */}
+          <div style={{ display: screen === 'produce' ? 'contents' : 'none' }}>
+            <ProductionForm setScreen={setScreen} />
+          </div>
+          {screen !== 'produce' && renderScreen()}
         </main>
       </div>
       <ModalSystem />
