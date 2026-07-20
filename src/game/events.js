@@ -1009,12 +1009,84 @@ function rollCpEventData(ev, a, b, isDuring, tier) {
   }
 }
 
+// ─── Creative Differences event ───────────────────────────────────────────────
+// Fires during filming on the highest-chemistry pair (chem ≥ 60).
+// Sacrificing −15 chemistry yields a +8 quality boost on their production.
+function rollCreativeDifferencesEvent(state, week) {
+  if (Math.random() > 0.18) return null
+
+  const filmingProds = state.productions.filter(p => p.status === 'active' && p.phase === 'filming')
+  let bestPair = null, bestChem = 59   // minimum threshold to trigger
+
+  for (const prod of filmingProds) {
+    const leads = (prod.leadIds ?? [])
+      .map(id => state.actors.find(a => a.id === id))
+      .filter(Boolean)
+    if (leads.length >= 2) {
+      const chem = getChem(leads[0], leads[1].id)
+      if (chem > bestChem) { bestChem = chem; bestPair = { a: leads[0], b: leads[1], prod } }
+    }
+  }
+  if (!bestPair) return null
+
+  const { a, b, prod } = bestPair
+  const coolKey = `creativeDiff_${bondKey(a.id, b.id)}`
+  // Cooldown: one event per 10 weeks per pair
+  const lastFired = state.flags?.[coolKey] ?? 0
+  if (week - lastFired < 10) return null
+
+  return {
+    flagKey: coolKey,
+    modal: {
+      type: 'event',
+      data: {
+        label: `🎭 CREATIVE DIFFERENCES — ${a.name.toUpperCase()} × ${b.name.toUpperCase()}`,
+        message:
+          `On the set of "${prod.title}", creative tensions are rising between ${a.name} and ${b.name} `
+          + `(Chemistry: ${bestChem}).\n\n`
+          + `A heated artistic disagreement — friction that could either forge something brilliant or break the bond.\n\n`
+          + `⚡ CHOICE: Let them clash (−15 chemistry, but +8 quality boost on "${prod.title}") — `
+          + `or step in to keep the peace (no change).`,
+        choices: [
+          {
+            label: `🔥 Let them clash (−15 chem, +8 quality on "${prod.title}")`,
+            effect: (s, d) => {
+              const actorA = s.actors.find(x => x.id === a.id)
+              const actorB = s.actors.find(x => x.id === b.id)
+              if (actorA) d({ type: A.UPDATE_ACTOR, id: a.id, patch: {
+                chemistry_map: { ...(actorA.chemistry_map ?? {}),
+                  [b.id]: clamp((actorA.chemistry_map?.[b.id] ?? 0) - 15, 0, 100) },
+              } })
+              if (actorB) d({ type: A.UPDATE_ACTOR, id: b.id, patch: {
+                chemistry_map: { ...(actorB.chemistry_map ?? {}),
+                  [a.id]: clamp((actorB.chemistry_map?.[a.id] ?? 0) - 15, 0, 100) },
+              } })
+              d({ type: A.UPDATE_PRODUCTION, id: prod.id, patch: { qualityBonus: (prod.qualityBonus ?? 0) + 8 } })
+            },
+          },
+          {
+            label: '🤝 Keep the peace (no change)',
+            effect: () => {},
+          },
+        ],
+      },
+    },
+  }
+}
+
 // Returns array of CP event modals for this week. Called from weekAdvance.js.
 // Prompt 8: frequency scales by tier; always succeed; free:paid ratio by tier.
 // Prompt 1: tier now derived from numericRank (not week).
 export function rollCpEvents(state, week) {
   const modals = []
   const tier = getGameTierByRank(state.numericRank ?? 50)
+
+  // Creative Differences fires independently of normal CP event frequency
+  const cdEvent = rollCreativeDifferencesEvent(state, week)
+  if (cdEvent) {
+    modals.push({ flagKey: cdEvent.flagKey, modal: cdEvent.modal })
+    return modals   // one special event per week is enough
+  }
 
   // Tier-scaled event frequency
   if (Math.random() > tier.cpEventFreq) return modals

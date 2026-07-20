@@ -88,7 +88,7 @@ export default function Sidebar({ currentScreen, setScreen }) {
         disabled={advancing}
         aria-label="Advance one week (mobile)"
       >
-        {advancing ? '⏳' : '▶ NEXT WEEK'}
+        {advancing ? 'WAIT...' : '▶ NEXT WEEK'}
       </button>
 
       {/* ─── Mobile bottom tab bar ───────────────────────────────────────── */}

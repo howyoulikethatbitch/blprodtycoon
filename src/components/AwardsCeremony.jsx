@@ -1,8 +1,10 @@
 /**
- * AwardsCeremony.jsx — Full-screen BL Awards ceremony and summary
- * Triggered when state.awardsPhase === 'ceremony' | 'summary'
+ * AwardsCeremony.jsx — Cinematic BL Awards Night
+ * Phases: opening → (for each award: major-title? → award) → summary
+ * Minor awards: no cinematic title, clean card reveal
+ * Major awards: cinematic title card with gold shimmer → reveal with portrait
  */
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useGame, A, pushEventLog } from '../game/state.jsx'
 import {
   AWARD_DEFS,
@@ -12,13 +14,161 @@ import {
 } from '../game/awards.js'
 import { SFX } from '../game/audio.js'
 import { triggerConfetti } from './Confetti.jsx'
+import { ActorPortrait } from './ActorRoster.jsx'
+import { PORTRAIT_COLORS } from '../game/actors.js'
 
+const BASE = import.meta.env.BASE_URL
+
+// Inject ceremony CSS (keyframes + utility classes)
+if (typeof document !== 'undefined') {
+  const id = 'awards-css'
+  if (!document.getElementById(id)) {
+    const s = document.createElement('style')
+    s.id = id
+    s.textContent = `
+      @keyframes awards-fade-in {
+        from { opacity: 0; transform: translateY(12px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes gold-shimmer {
+        0%   { background-position: -200% center; }
+        100% { background-position:  200% center; }
+      }
+      @keyframes particle-rise {
+        0%   { opacity: 0.9; transform: translateY(0) scale(1); }
+        100% { opacity: 0;   transform: translateY(-80px) scale(0.5); }
+      }
+      @keyframes pulse-gold {
+        0%, 100% { opacity: 0.7; }
+        50%       { opacity: 1; }
+      }
+      @keyframes award-icon-drop {
+        0%   { opacity: 0; transform: scale(0.3) rotate(-15deg); }
+        60%  { transform: scale(1.15) rotate(3deg); }
+        100% { opacity: 1; transform: scale(1) rotate(0deg); }
+      }
+      @keyframes winner-slide {
+        from { opacity: 0; transform: translateX(-18px); }
+        to   { opacity: 1; transform: translateX(0); }
+      }
+      .shimmer-text {
+        background: linear-gradient(
+          90deg,
+          #FFD700 0%, #FFF5C3 35%, #FFD700 50%, #FFF5C3 65%, #FFD700 100%
+        );
+        background-size: 200% auto;
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: gold-shimmer 2.4s linear infinite;
+      }
+    `
+    document.head.appendChild(s)
+  }
+}
+
+// Animation speed multiplier (slow = longer delays)
+function useAnimMult() {
+  const { state } = useGame()
+  const speed = state.settings?.animSpeed ?? 'normal'
+  return { slow: 1.8, normal: 1.0, fast: 0.4 }[speed] ?? 1.0
+}
+
+// ─── Gold Particles ────────────────────────────────────────────────────────────
+function GoldParticles({ count = 18 }) {
+  const particles = useMemo(() => Array.from({ length: count }, (_, i) => ({
+    key: i,
+    left:  `${5 + (i * 94 / count)}%`,
+    delay: `${(i * 0.28) % 2.5}s`,
+    dur:   `${1.8 + (i % 4) * 0.4}s`,
+    size:  4 + (i % 3) * 3,
+  })), [count])
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+      {particles.map(p => (
+        <div key={p.key} style={{
+          position:        'absolute',
+          bottom:          '15%',
+          left:            p.left,
+          width:           p.size,
+          height:          p.size,
+          borderRadius:    '50%',
+          background:      'radial-gradient(circle, #FFD700, #FFC200)',
+          boxShadow:       '0 0 4px #FFD700',
+          animation:       `particle-rise ${p.dur} ${p.delay} ease-out infinite`,
+        }} />
+      ))}
+    </div>
+  )
+}
+
+// ─── Rival portrait fallback (uses free agents pool or color block) ─────────
+function RivalPortrait({ actorName, size = 72, freeAgents = [] }) {
+  // Try to find a free-agent portrait for flavour
+  const poolEntry = useMemo(() => {
+    const available = freeAgents.filter(e => e.portraitFile || e.type === 'new_talent')
+    if (!available.length) return null
+    // Deterministic pick based on name
+    const idx = Array.from(actorName).reduce((s, c) => s + c.charCodeAt(0), 0)
+    return available[idx % available.length]
+  }, [actorName, freeAgents])
+
+  const [imgFailed, setImgFailed] = useState(false)
+  const fallbackColor = PORTRAIT_COLORS[
+    Array.from(actorName).reduce((s, c) => s + c.charCodeAt(0), 0) % PORTRAIT_COLORS.length
+  ]
+
+  const src = poolEntry?.portraitFile
+    ? `${BASE}images/pool/${poolEntry.portraitFile}`
+    : null
+
+  return (
+    <div style={{
+      width: size, height: size,
+      borderRadius: 4,
+      overflow: 'hidden',
+      background: fallbackColor,
+      position: 'relative',
+      flexShrink: 0,
+      border: '2px solid var(--shadow)',
+    }}>
+      {src && !imgFailed && (
+        <img
+          src={src}
+          alt={actorName}
+          onError={() => setImgFailed(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+            imageRendering: 'pixelated', filter: 'brightness(0.88)' }}
+        />
+      )}
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: size * 0.34,
+        color: 'rgba(0,0,0,0.45)',
+        fontFamily: 'inherit',
+        fontWeight: 'bold',
+      }}>
+        {(!src || imgFailed) ? actorName[0] : null}
+      </div>
+    </div>
+  )
+}
+
+// ─── Main component ────────────────────────────────────────────────────────────
 export default function AwardsCeremony() {
   const { state, dispatch } = useGame()
   const { awardsData, awardsPhase } = state
-  const [view, setView]             = useState(awardsPhase === 'summary' ? 'summary' : 'ceremony')
-  const [revealIdx, setRevealIdx]   = useState(0)
+  const animMult = useAnimMult()
+
+  // 'opening' | 'major-title' | 'award' | 'summary'
+  const [phase, setPhase]             = useState(awardsPhase === 'summary' ? 'summary' : 'opening')
+  const [awardIdx, setAwardIdx]       = useState(0)
   const [winnerVisible, setWinnerVisible] = useState(false)
+  const [titleVisible, setTitleVisible]   = useState(false)
+  const [openingReady, setOpeningReady]   = useState(false)
+  const timerRef = useRef(null)
 
   if (!awardsData) return null
 
@@ -26,90 +176,221 @@ export default function AwardsCeremony() {
   const attended  = awardsData.attended ?? false
   const resultMap = Object.fromEntries(results.map(r => [r.awardId, r]))
 
-  // ── Leave: apply effects → push result modal → clear awards ────────────────
+  const currentAward  = AWARD_DEFS[awardIdx]
+  const currentResult = resultMap[currentAward?.id]
+  const isPlayerWin   = userWins.includes(currentAward?.id)
+  const isLast        = awardIdx >= AWARD_DEFS.length - 1
+  const isMajor       = currentAward?.category === 'major'
+
+  // Free agents for rival portraits
+  const freeAgents = state.freeAgentsPool ?? []
+
+  // Opening fade-in ready
+  useEffect(() => {
+    const t = setTimeout(() => setOpeningReady(true), 180)
+    return () => clearTimeout(t)
+  }, [])
+
+  // Auto-advance major-title → award
+  useEffect(() => {
+    if (phase !== 'major-title') return
+    setTitleVisible(false)
+    const t1 = setTimeout(() => setTitleVisible(true), 80)
+    const t2 = setTimeout(() => {
+      setPhase('award')
+      setWinnerVisible(false)
+    }, Math.round(2600 * animMult))
+    timerRef.current = t2
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [phase, awardIdx])
+
+  function clearTimer() { if (timerRef.current) clearTimeout(timerRef.current) }
+
+  // ── Leave handler ────────────────────────────────────────────────────────
   function handleLeave() {
+    clearTimer()
     SFX.click()
     const effects = calcAttendanceEffects(attended, userWins)
-
-    if (effects.repDelta !== 0) {
-      dispatch({ type: A.ADD_REPUTATION, amount: effects.repDelta })
-    }
-    if (effects.popDelta !== 0) {
-      dispatch({ type: A.SET_POPULARITY, value: Math.max(0, state.popularity + effects.popDelta) })
-    }
+    if (effects.repDelta !== 0) dispatch({ type: A.ADD_REPUTATION, amount: effects.repDelta })
+    if (effects.popDelta !== 0) dispatch({ type: A.SET_POPULARITY, value: Math.max(0, state.popularity + effects.popDelta) })
     if (effects.fameDelta > 0) {
       const yearH     = getYearHistory(state.history, state.week)
       const castIdSet = new Set(yearH.flatMap(h => h.castIds ?? []))
       state.actors
         .filter(a => a.signed && castIdSet.has(a.id))
-        .forEach(a => {
-          dispatch({ type: A.UPDATE_ACTOR, id: a.id, patch: { fame: (a.fame ?? 0) + effects.fameDelta } })
-        })
+        .forEach(a => dispatch({ type: A.UPDATE_ACTOR, id: a.id, patch: { fame: (a.fame ?? 0) + effects.fameDelta } }))
     }
-    if (userWins.length > 0) {
-      dispatch({ type: A.ADD_AWARD, amount: userWins.length })
-    }
-
-    pushEventLog(
-      dispatch,
+    if (userWins.length > 0) dispatch({ type: A.ADD_AWARD, amount: userWins.length })
+    pushEventLog(dispatch,
       `🏆 BL Awards Year ${year}: ${userWins.length} award(s) won. Rep ${effects.repDelta >= 0 ? '+' : ''}${effects.repDelta}`,
-      userWins.length > 0 ? 'gold' : 'red',
-      state.week,
-    )
-
+      userWins.length > 0 ? 'gold' : 'red', state.week)
     if (userWins.length > 0) triggerConfetti(userWins.length >= 3 ? 2.0 : 1.0)
-
     dispatch({ type: A.PUSH_MODAL, modal: buildResultModal(awardsData, state) })
     dispatch({ type: A.CLEAR_AWARDS })
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // CEREMONY VIEW — award-by-award reveal
-  // ═══════════════════════════════════════════════════════════════════════════
-  if (view === 'ceremony') {
-    const currentAward  = AWARD_DEFS[revealIdx]
-    const currentResult = resultMap[currentAward.id]
-    const isPlayerWin   = userWins.includes(currentAward.id)
-    const isLast        = revealIdx >= AWARD_DEFS.length - 1
-    const isMajor       = currentAward.category === 'major'
-
-    function handleReveal() {
-      SFX.modal()
-      setWinnerVisible(true)
-      if (isPlayerWin) {
-        triggerConfetti(isLast ? 1.5 : 0.6)
-        SFX.success && SFX.success()
-      }
+  // ── Award progression ────────────────────────────────────────────────────
+  function handleReveal() {
+    SFX.modal()
+    setWinnerVisible(true)
+    if (isPlayerWin) {
+      triggerConfetti(isLast ? 1.5 : 0.6)
+      SFX.success && SFX.success()
     }
+  }
 
-    function handleNext() {
-      SFX.click()
-      if (isLast) { setView('summary') }
-      else { setRevealIdx(i => i + 1); setWinnerVisible(false) }
+  function handleNext() {
+    clearTimer()
+    SFX.click()
+    if (isLast) {
+      setPhase('summary')
+      return
     }
+    const nextIdx  = awardIdx + 1
+    const nextDef  = AWARD_DEFS[nextIdx]
+    setAwardIdx(nextIdx)
+    setWinnerVisible(false)
+    if (nextDef?.category === 'major') {
+      setPhase('major-title')
+    } else {
+      setPhase('award')
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // OPENING PHASE
+  // ════════════════════════════════════════════════════════════════════════════
+  if (phase === 'opening') {
+    return (
+      <div style={S.fullscreen}>
+        <GoldParticles count={22} />
+        <div style={{
+          ...S.openingContent,
+          opacity:   openingReady ? 1 : 0,
+          transform: openingReady ? 'none' : 'translateY(20px)',
+          transition: `opacity ${0.9 * animMult}s ease, transform ${0.9 * animMult}s ease`,
+        }}>
+          {/* Divider top */}
+          <div style={S.divider} />
+
+          {/* Title */}
+          <div className="shimmer-text" style={S.openingTitle}>BL AWARDS</div>
+          <div style={S.openingYear}>{year}</div>
+
+          {/* Divider bottom */}
+          <div style={S.divider} />
+
+          <div style={{ fontSize: 7, color: 'var(--lav)', letterSpacing: 2, marginTop: 12, marginBottom: 28 }}>
+            {state.companyName ?? 'Your Studio'}
+          </div>
+
+          {/* Start button */}
+          <button
+            style={S.startBtn}
+            onClick={() => {
+              SFX.confirm && SFX.confirm()
+              // First award: major → cinematic title, minor → straight to award
+              setAwardIdx(0)
+              setWinnerVisible(false)
+              if (AWARD_DEFS[0]?.category === 'major') {
+                setPhase('major-title')
+              } else {
+                setPhase('award')
+              }
+            }}
+          >
+            ▶ START AWARDS NIGHT
+          </button>
+
+          <button style={S.ghostSmall} onClick={() => setPhase('summary')}>
+            📋 Skip to Summary
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // MAJOR TITLE CARD
+  // ════════════════════════════════════════════════════════════════════════════
+  if (phase === 'major-title') {
+    return (
+      <div style={S.fullscreen}>
+        <GoldParticles count={30} />
+        <div style={{
+          ...S.majorTitleContent,
+          opacity:   titleVisible ? 1 : 0,
+          transform: titleVisible ? 'none' : 'scale(0.92)',
+          transition: `opacity ${0.6 * animMult}s ease, transform ${0.6 * animMult}s ease`,
+        }}>
+          <div style={S.majorDividerTop} />
+          <div style={{ fontSize: 22, marginBottom: 10, animation: 'pulse-gold 2s ease-in-out infinite' }}>
+            {currentAward?.icon}
+          </div>
+          <div className="shimmer-text" style={S.majorTitleLabel}>
+            {currentAward?.label?.toUpperCase()}
+          </div>
+          <div style={S.majorDividerBottom} />
+          <div style={{ fontSize: 7, color: 'var(--gold)', letterSpacing: 3, marginTop: 14,
+            animation: 'pulse-gold 1.8s ease-in-out infinite' }}>
+            ⭐ MAIN AWARD ⭐
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // AWARD REVEAL PHASE
+  // ════════════════════════════════════════════════════════════════════════════
+  if (phase === 'award') {
+    const progressPct = ((awardIdx + 1) / AWARD_DEFS.length) * 100
 
     return (
-      <div style={S.overlay}>
-        {/* ── Header ── */}
-        <div style={S.header}>
-          <div style={S.headerTitle}>✨ BL AWARDS — YEAR {year} ✨</div>
-          <div style={S.headerSub}>{state.companyName ?? 'Your Studio'}</div>
-        </div>
+      <div style={S.fullscreen}>
+        {isMajor && <GoldParticles count={14} />}
 
-        {/* ── Progress bar ── */}
-        <div style={S.progressWrap}>
-          <div style={{ ...S.progressFill, width: `${((revealIdx + 1) / AWARD_DEFS.length) * 100}%` }} />
+        {/* Progress bar */}
+        <div style={S.progressTrack}>
+          <div style={{ ...S.progressFill, width: `${progressPct}%` }} />
         </div>
         <div style={S.progressLabel}>
-          Award {revealIdx + 1} of {AWARD_DEFS.length}
-          {isMajor && <span style={{ color: 'var(--gold)', marginLeft: 8 }}>⭐ MAJOR</span>}
+          {awardIdx + 1} / {AWARD_DEFS.length}
+          {isMajor && <span style={{ color: 'var(--gold)', marginLeft: 8 }}>⭐ MAIN AWARD</span>}
         </div>
 
-        {/* ── Award card ── */}
-        <div style={{ ...S.card, borderColor: isMajor ? 'var(--gold)' : 'var(--shadow)' }}>
-          <div style={{ fontSize: isMajor ? 52 : 40, lineHeight: 1 }}>{currentAward.icon}</div>
-          <div style={{ fontSize: isMajor ? 12 : 10, color: 'var(--white)', textAlign: 'center', letterSpacing: 0.5 }}>
-            {currentAward.label}
+        {/* Award card */}
+        <div style={{
+          ...S.awardCard,
+          borderColor: isMajor ? 'var(--gold)' : 'var(--shadow)',
+          boxShadow: isMajor ? '0 0 32px rgba(255,215,0,0.18), 4px 4px 0 var(--shadow)' : '4px 4px 0 var(--shadow)',
+        }}>
+          {/* Icon + label */}
+          <div style={{
+            fontSize: isMajor ? 54 : 40,
+            animation: 'award-icon-drop 0.5s ease both',
+          }}>
+            {currentAward?.icon}
+          </div>
+          <div style={{
+            fontSize: isMajor ? 11 : 9,
+            letterSpacing: 1.5,
+            textAlign: 'center',
+            ...(isMajor ? { className: 'shimmer-text' } : { color: 'var(--white)' }),
+          }}>
+            {isMajor
+              ? <span className="shimmer-text">{currentAward?.label?.toUpperCase()}</span>
+              : currentAward?.label}
+          </div>
+
+          {/* Category badge */}
+          <div style={{
+            fontSize: 6, letterSpacing: 2,
+            color: isMajor ? 'var(--gold)' : 'var(--lav)',
+            border: `1px solid ${isMajor ? 'var(--gold)' : 'var(--shadow)'}`,
+            padding: '3px 10px',
+          }}>
+            {isMajor ? '⭐ MAIN AWARD' : 'AWARD'}
           </div>
 
           {!winnerVisible ? (
@@ -117,13 +398,23 @@ export default function AwardsCeremony() {
               🎭 REVEAL WINNER
             </button>
           ) : (
-            <div style={{ ...S.winnerCard, borderColor: isPlayerWin ? 'var(--gold)' : 'var(--lav)' }}>
+            <div style={{
+              ...S.winnerCard,
+              borderColor: isPlayerWin ? 'var(--gold)' : 'var(--lav)',
+              animation: 'winner-slide 0.4s ease both',
+            }}>
               {isPlayerWin && (
                 <div style={S.playerBadge}>🏆 YOUR STUDIO WINS!</div>
               )}
-              <WinnerDisplay result={currentResult} award={currentAward} isPlayer={isPlayerWin} />
+              <AwardWinnerDisplay
+                result={currentResult}
+                award={currentAward}
+                isPlayer={isPlayerWin}
+                actors={state.actors}
+                freeAgents={freeAgents}
+              />
               <button
-                style={{ ...S.nextBtn, background: isLast ? 'var(--pink)' : 'var(--lav)' }}
+                style={{ ...S.nextBtn, background: isLast ? 'var(--pink)' : isMajor ? '#7B4FDB' : 'var(--lav)' }}
                 onClick={handleNext}
               >
                 {isLast ? '📋 VIEW FULL SUMMARY →' : 'NEXT AWARD →'}
@@ -132,9 +423,9 @@ export default function AwardsCeremony() {
           )}
         </div>
 
-        {/* ── Bottom controls ── */}
+        {/* Bottom controls */}
         <div style={S.bottomRow}>
-          <button style={S.ghostBtn} onClick={() => { SFX.click(); setView('summary') }}>
+          <button style={S.ghostBtn} onClick={() => { clearTimer(); setPhase('summary') }}>
             📋 Skip to Summary
           </button>
           <button style={{ ...S.ghostBtn, color: 'var(--red)' }} onClick={handleLeave}>
@@ -145,18 +436,20 @@ export default function AwardsCeremony() {
     )
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SUMMARY VIEW — full winners list
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════════════════════
+  // SUMMARY PHASE
+  // ════════════════════════════════════════════════════════════════════════════
   const minorAwards = AWARD_DEFS.filter(a => a.category === 'minor')
   const majorAwards = AWARD_DEFS.filter(a => a.category === 'major')
 
   return (
-    <div style={S.overlay}>
-      {/* ── Header ── */}
-      <div style={S.header}>
-        <div style={S.headerTitle}>✨ BL AWARDS — YEAR {year} ✨</div>
-        <div style={S.headerSub}>
+    <div style={S.fullscreen}>
+      {/* Header */}
+      <div style={S.summaryHeader}>
+        <div className="shimmer-text" style={{ fontSize: 11, letterSpacing: 2 }}>
+          BL AWARDS — YEAR {year}
+        </div>
+        <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 4 }}>
           {state.companyName ?? 'Your Studio'}
           {userWins.length > 0 && (
             <span style={{ color: 'var(--gold)', marginLeft: 10 }}>
@@ -169,9 +462,9 @@ export default function AwardsCeremony() {
         </div>
       </div>
 
-      {/* ── Awards list ── */}
+      {/* List */}
       <div style={S.summaryScroll}>
-        <div style={S.sectionHead}>— MINOR AWARDS —</div>
+        <div style={S.sectionHead}>— AWARDS —</div>
         {minorAwards.map(award => (
           <SummaryRow
             key={award.id}
@@ -180,9 +473,8 @@ export default function AwardsCeremony() {
             isPlayer={userWins.includes(award.id)}
           />
         ))}
-
-        <div style={{ ...S.sectionHead, marginTop: 20, color: 'var(--gold)' }}>
-          ⭐ MAJOR AWARDS ⭐
+        <div style={{ ...S.sectionHead, marginTop: 16, color: 'var(--gold)' }}>
+          ⭐ MAIN AWARDS ⭐
         </div>
         {majorAwards.map(award => (
           <SummaryRow
@@ -194,54 +486,86 @@ export default function AwardsCeremony() {
         ))}
       </div>
 
-      {/* ── Leave bar ── */}
+      {/* Leave */}
       <div style={S.leaveBar}>
         <button style={S.leaveBtn} onClick={handleLeave}>
-          🚪 LEAVE
+          🚪 LEAVE THE CEREMONY
         </button>
       </div>
     </div>
   )
 }
 
-// ─── Winner display (inside ceremony card) ────────────────────────────────────
-function WinnerDisplay({ result, award, isPlayer }) {
+// ─── Award winner display inside the ceremony card ────────────────────────────
+function AwardWinnerDisplay({ result, award, isPlayer, actors, freeAgents }) {
   if (!result) {
-    return <div style={{ color: 'var(--gray)', fontSize: 8, textAlign: 'center' }}>No eligible candidates this year.</div>
+    return (
+      <div style={{ color: 'var(--gray)', fontSize: 8, textAlign: 'center' }}>
+        No eligible candidates this year.
+      </div>
+    )
   }
   const { winner } = result
   const nameColor  = isPlayer ? 'var(--gold)' : 'var(--white)'
 
   if (award.kind === 'actor') {
+    const portraitActor = isPlayer
+      ? actors.find(a => a.name === winner.actorName || a.name === winner.name)
+      : null
+
     return (
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 22, marginBottom: 6 }}>🎭</div>
-        <div style={{ fontSize: 13, color: nameColor, marginBottom: 4 }}>
-          {winner.actorName ?? winner.name}
+      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+        {/* Portrait */}
+        <div style={{ position: 'relative' }}>
+          {portraitActor ? (
+            <ActorPortrait actor={portraitActor} size={88} />
+          ) : (
+            <RivalPortrait
+              actorName={winner.actorName ?? winner.name ?? '?'}
+              size={88}
+              freeAgents={freeAgents}
+            />
+          )}
+          {isPlayer && (
+            <div style={{
+              position: 'absolute', bottom: -8, left: '50%', transform: 'translateX(-50%)',
+              background: 'var(--gold)', color: 'var(--bg-deep)',
+              fontSize: 5, padding: '2px 8px', letterSpacing: 1, whiteSpace: 'nowrap',
+            }}>
+              ★ WINNER ★
+            </div>
+          )}
         </div>
-        <div style={{ fontSize: 8, color: 'var(--lav)' }}>{winner.company}</div>
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 14, color: nameColor, marginBottom: 3 }}>
+            {winner.actorName ?? winner.name}
+          </div>
+          <div style={{ fontSize: 7, color: 'var(--lav)' }}>{winner.company}</div>
+        </div>
       </div>
     )
   }
+
   if (award.kind === 'production') {
     return (
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 22, marginBottom: 6 }}>🎬</div>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>🎬</div>
         <div style={{ fontSize: 12, color: nameColor, marginBottom: 4, lineHeight: 1.5 }}>
           {winner.title ?? winner.name}
         </div>
-        <div style={{ fontSize: 8, color: 'var(--lav)' }}>{winner.company}</div>
+        <div style={{ fontSize: 7, color: 'var(--lav)' }}>{winner.company}</div>
         {winner.extra && (
-          <div style={{ fontSize: 7, color: 'var(--pink)', marginTop: 3 }}>{winner.extra}</div>
+          <div style={{ fontSize: 7, color: 'var(--pink)', marginTop: 4 }}>{winner.extra}</div>
         )}
       </div>
     )
   }
-  // company award
+
+  // Company award
   return (
     <div style={{ textAlign: 'center' }}>
-      <div style={{ fontSize: 22, marginBottom: 6 }}>🏢</div>
-      <div style={{ fontSize: 13, color: nameColor, marginBottom: 4 }}>{winner.name}</div>
+      <div style={{ fontSize: 28, marginBottom: 8 }}>🏢</div>
+      <div style={{ fontSize: 14, color: nameColor, marginBottom: 4 }}>{winner.name}</div>
     </div>
   )
 }
@@ -251,12 +575,9 @@ function SummaryRow({ award, result, isPlayer }) {
   const winner = result?.winner
   return (
     <div style={{
-      display:     'flex',
-      alignItems:  'center',
-      gap:         10,
-      padding:     '8px 10px',
-      border:      `2px solid ${isPlayer ? 'var(--gold)' : 'var(--shadow)'}`,
-      background:  isPlayer ? 'rgba(255,215,0,0.07)' : 'var(--bg-inset)',
+      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
+      border: `2px solid ${isPlayer ? 'var(--gold)' : 'var(--shadow)'}`,
+      background: isPlayer ? 'rgba(255,215,0,0.07)' : 'var(--bg-inset)',
     }}>
       <span style={{ fontSize: 18, flexShrink: 0 }}>{award.icon}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -264,8 +585,7 @@ function SummaryRow({ award, result, isPlayer }) {
         {winner ? (
           <>
             <div style={{
-              fontSize: 9,
-              color: isPlayer ? 'var(--gold)' : 'var(--white)',
+              fontSize: 9, color: isPlayer ? 'var(--gold)' : 'var(--white)',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {award.kind === 'actor'
@@ -303,9 +623,7 @@ function buildResultModal(awardsData, state) {
     message = `You have won ${wins.length} awards this Year ${year} season! ✨\n\nYour hard work and dedication have officially set a new standard in BL industry.\n\nKeep up the incredible momentum!`
   } else if (wins.length >= 1) {
     const names = wins.map(id => AWARD_DEFS.find(a => a.id === id)?.label ?? id)
-    const list  = names.length === 1
-      ? names[0]
-      : names.slice(0, -1).join(', ') + ' and ' + names.at(-1)
+    const list  = names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' and ' + names.at(-1)
     title   = 'Congratulations! 🎉'
     message = `You have won ${list} this Year ${year} season! ⚔️\n\nA beautiful performance, but you must keep up the momentum to stay the ultimate power couple next time.\n\nThe competition is fierce, and your rivals are closing in—don't let your guard down!`
   } else {
@@ -319,151 +637,159 @@ function buildResultModal(awardsData, state) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const S = {
-  overlay: {
-    position:       'fixed',
-    inset:          0,
-    background:     'var(--bg-deep)',
-    display:        'flex',
-    flexDirection:  'column',
-    zIndex:         9000,
-    fontFamily:     'inherit',
+  fullscreen: {
+    position: 'fixed', inset: 0,
+    background: 'var(--bg-deep)',
+    display: 'flex', flexDirection: 'column',
+    zIndex: 9000, fontFamily: 'inherit',
+    overflow: 'hidden',
   },
-  header: {
-    padding:        '16px 16px 12px',
-    borderBottom:   '2px solid var(--gold)',
-    background:     'linear-gradient(180deg,rgba(255,215,0,0.10) 0%,transparent 100%)',
-    textAlign:      'center',
-    flexShrink:     0,
+
+  // ── Opening ──
+  openingContent: {
+    flex: 1, display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center',
+    padding: '24px 20px', position: 'relative', zIndex: 1,
   },
-  headerTitle: {
-    fontSize:       12,
-    color:          'var(--gold)',
-    letterSpacing:  2,
-    marginBottom:   4,
+  openingTitle: {
+    fontSize: 'clamp(14px, 4vw, 22px)',
+    letterSpacing: 6,
+    textAlign: 'center',
+    marginBottom: 10,
   },
-  headerSub: {
-    fontSize:       8,
-    color:          'var(--lav)',
-    letterSpacing:  1,
+  openingYear: {
+    fontSize: 'clamp(11px, 3vw, 16px)',
+    color: 'rgba(255,215,0,0.7)',
+    letterSpacing: 4,
+    marginBottom: 10,
+    textAlign: 'center',
   },
-  progressWrap: {
-    height:         4,
-    background:     'var(--shadow)',
-    flexShrink:     0,
+  divider: {
+    width: '100%', maxWidth: 320,
+    height: 2,
+    background: 'linear-gradient(90deg, transparent, var(--gold), transparent)',
+    margin: '10px 0',
+  },
+  startBtn: {
+    fontSize: 10, padding: '16px 32px',
+    background: 'var(--pink)',
+    color: 'var(--bg-deep)',
+    border: '2px solid #8A2B52',
+    cursor: 'pointer', letterSpacing: 2,
+    boxShadow: '0 5px 0 #8A2B52, 0 0 24px rgba(255,107,157,0.4)',
+    marginBottom: 14,
+  },
+  ghostSmall: {
+    fontSize: 7, padding: '8px 16px',
+    color: 'var(--lav)', background: 'transparent',
+    border: '1px solid var(--shadow)', cursor: 'pointer',
+  },
+
+  // ── Major title card ──
+  majorTitleContent: {
+    flex: 1, display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center',
+    padding: '24px 20px', position: 'relative', zIndex: 1, gap: 10,
+  },
+  majorTitleLabel: {
+    fontSize: 'clamp(11px, 3.5vw, 16px)',
+    letterSpacing: 4,
+    textAlign: 'center',
+    lineHeight: 1.4,
+  },
+  majorDividerTop: {
+    width: '100%', maxWidth: 300, height: 2,
+    background: 'linear-gradient(90deg, transparent, var(--gold) 40%, #fff8dc 60%, var(--gold), transparent)',
+    marginBottom: 8,
+  },
+  majorDividerBottom: {
+    width: '100%', maxWidth: 300, height: 2,
+    background: 'linear-gradient(90deg, transparent, var(--gold) 40%, #fff8dc 60%, var(--gold), transparent)',
+    marginTop: 8,
+  },
+
+  // ── Award card ──
+  progressTrack: {
+    height: 3, background: 'var(--shadow)', flexShrink: 0,
   },
   progressFill: {
-    height:         '100%',
-    background:     'var(--gold)',
-    transition:     'width 0.4s ease',
+    height: '100%', background: 'var(--gold)',
+    transition: 'width 0.5s ease',
   },
   progressLabel: {
-    textAlign:      'center',
-    fontSize:       7,
-    color:          'var(--lav)',
-    padding:        '6px 16px 0',
-    flexShrink:     0,
+    textAlign: 'center', fontSize: 7, color: 'var(--lav)',
+    padding: '5px 0 0', flexShrink: 0,
   },
-  card: {
-    margin:         '12px 16px',
-    padding:        '20px 16px',
-    border:         '2px solid',
-    background:     'var(--bg-panel)',
-    display:        'flex',
-    flexDirection:  'column',
-    alignItems:     'center',
-    gap:            12,
-    flexShrink:     0,
-    overflowY:      'auto',
-    maxHeight:      'calc(100dvh - 240px)',
+  awardCard: {
+    margin: '10px 14px',
+    padding: '18px 14px',
+    border: '2px solid',
+    background: 'var(--bg-panel)',
+    display: 'flex', flexDirection: 'column',
+    alignItems: 'center', gap: 10,
+    flexShrink: 0,
+    overflowY: 'auto',
+    maxHeight: 'calc(100dvh - 140px)',
   },
   revealBtn: {
-    fontSize:       9,
-    padding:        '12px 24px',
-    background:     'var(--pink)',
-    color:          'var(--bg-deep)',
-    border:         '2px solid #8A2B52',
-    cursor:         'pointer',
-    letterSpacing:  1,
-    width:          '100%',
-    textAlign:      'center',
+    fontSize: 9, padding: '13px 26px',
+    background: 'var(--pink)', color: 'var(--bg-deep)',
+    border: '2px solid #8A2B52', cursor: 'pointer',
+    letterSpacing: 1, width: '100%', textAlign: 'center',
   },
   winnerCard: {
-    width:          '100%',
-    padding:        '14px 12px',
-    border:         '2px solid',
-    background:     'var(--bg-inset)',
-    display:        'flex',
-    flexDirection:  'column',
-    gap:            10,
-    alignItems:     'center',
+    width: '100%', padding: '14px 12px',
+    border: '2px solid', background: 'var(--bg-inset)',
+    display: 'flex', flexDirection: 'column',
+    gap: 12, alignItems: 'center',
   },
   playerBadge: {
-    fontSize:       8,
-    color:          'var(--bg-deep)',
-    background:     'var(--gold)',
-    padding:        '4px 12px',
-    letterSpacing:  1,
-    textAlign:      'center',
-    width:          '100%',
-    boxSizing:      'border-box',
+    fontSize: 8, color: 'var(--bg-deep)',
+    background: 'var(--gold)', padding: '4px 12px',
+    letterSpacing: 1, textAlign: 'center',
+    width: '100%', boxSizing: 'border-box',
   },
   nextBtn: {
-    width:          '100%',
-    fontSize:       9,
-    padding:        '12px',
-    color:          'var(--bg-deep)',
-    border:         'none',
-    cursor:         'pointer',
-    letterSpacing:  1,
-    textAlign:      'center',
+    width: '100%', fontSize: 9, padding: '12px',
+    color: 'var(--bg-deep)', border: 'none',
+    cursor: 'pointer', letterSpacing: 1, textAlign: 'center',
   },
   bottomRow: {
-    display:        'flex',
-    gap:            10,
-    padding:        '0 16px 16px',
-    justifyContent: 'center',
-    flexShrink:     0,
-    marginTop:      'auto',
+    display: 'flex', gap: 10, padding: '0 14px 14px',
+    justifyContent: 'center', flexShrink: 0, marginTop: 'auto',
   },
   ghostBtn: {
-    fontSize:       8,
-    padding:        '10px 16px',
-    color:          'var(--lav)',
-    background:     'transparent',
-    border:         '1px solid var(--shadow)',
-    cursor:         'pointer',
+    fontSize: 8, padding: '10px 14px',
+    color: 'var(--lav)', background: 'transparent',
+    border: '1px solid var(--shadow)', cursor: 'pointer',
   },
-  // Summary
+
+  // ── Summary ──
+  summaryHeader: {
+    padding: '14px 16px 10px',
+    borderBottom: '2px solid var(--gold)',
+    background: 'linear-gradient(180deg,rgba(255,215,0,0.08) 0%,transparent 100%)',
+    textAlign: 'center', flexShrink: 0,
+  },
   summaryScroll: {
-    flex:           1,
-    overflowY:      'auto',
-    padding:        '12px 16px',
-    display:        'flex',
-    flexDirection:  'column',
-    gap:            6,
+    flex: 1, overflowY: 'auto',
+    padding: '12px 14px',
+    display: 'flex', flexDirection: 'column', gap: 6,
   },
   sectionHead: {
-    fontSize:       7,
-    color:          'var(--lav)',
-    textAlign:      'center',
-    letterSpacing:  2,
-    padding:        '4px 0 6px',
-    borderBottom:   '1px solid var(--shadow)',
+    fontSize: 7, color: 'var(--lav)',
+    textAlign: 'center', letterSpacing: 2,
+    padding: '4px 0 6px',
+    borderBottom: '1px solid var(--shadow)',
   },
   leaveBar: {
-    padding:        '12px 16px 20px',
-    flexShrink:     0,
-    borderTop:      '2px solid var(--shadow)',
+    padding: '10px 14px 18px', flexShrink: 0,
+    borderTop: '2px solid var(--shadow)',
   },
   leaveBtn: {
-    width:          '100%',
-    fontSize:       10,
-    padding:        '14px',
-    background:     'var(--pink)',
-    color:          'var(--bg-deep)',
-    border:         '2px solid #8A2B52',
-    cursor:         'pointer',
-    textAlign:      'center',
-    letterSpacing:  1,
+    width: '100%', fontSize: 10, padding: '13px',
+    background: 'var(--pink)', color: 'var(--bg-deep)',
+    border: '2px solid #8A2B52', cursor: 'pointer',
+    textAlign: 'center', letterSpacing: 1,
   },
 }

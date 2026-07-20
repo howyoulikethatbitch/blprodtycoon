@@ -109,11 +109,30 @@ export function calcWrapDeltas(production, a1, a2) {
   return deltas
 }
 
+// ─── Soft-cap: gains above 75 apply at 35% rate ───────────────────────────────
+// This prevents chemistry from racing to 100 after only a few productions.
+function applyChemCap(current, delta) {
+  if (delta <= 0) return clamp(current + delta, 0, 100)   // losses are unaffected
+  const CAP_THRESHOLD = 75
+  const REDUCED_RATE  = 0.35
+  if (current >= CAP_THRESHOLD) {
+    // Entire gain is above cap — apply at reduced rate
+    return clamp(current + delta * REDUCED_RATE, 0, 100)
+  }
+  if (current + delta > CAP_THRESHOLD) {
+    // Split gain: part below cap (full rate) + part above cap (reduced rate)
+    const belowPart = CAP_THRESHOLD - current
+    const abovePart = delta - belowPart
+    return clamp(CAP_THRESHOLD + abovePart * REDUCED_RATE, 0, 100)
+  }
+  return clamp(current + delta, 0, 100)
+}
+
 // ─── Apply a net chemistry delta to a pair ────────────────────────────────────
 // Returns partial actor patches: { [idA]: { chemistry_map }, [idB]: { chemistry_map } }
 export function applyChemistryDelta(actorA, actorB, delta) {
   const cur    = getChem(actorA, actorB.id)
-  const newVal = clamp(cur + delta, 0, 100)
+  const newVal = Math.round(applyChemCap(cur, delta))
   return {
     [actorA.id]: { chemistry_map: { ...actorA.chemistry_map, [actorB.id]: newVal } },
     [actorB.id]: { chemistry_map: { ...actorB.chemistry_map, [actorA.id]: newVal } },
@@ -142,7 +161,7 @@ export function applyBondDeltas(actor, deltas) {
   if (!deltas[actor.id]) return actor.chemistry_map ?? {}
   const map = { ...(actor.chemistry_map ?? {}) }
   for (const [otherId, delta] of Object.entries(deltas[actor.id])) {
-    map[otherId] = clamp((map[otherId] ?? 0) + delta, 0, 100)
+    map[otherId] = Math.round(applyChemCap(map[otherId] ?? 0, delta))
   }
   return map
 }

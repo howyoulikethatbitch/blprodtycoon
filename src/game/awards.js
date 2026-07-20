@@ -62,6 +62,33 @@ function bestGrade(records) {
     (GRADE_RANK[h.grade] ?? 99) < (GRADE_RANK[best] ?? 99) ? h.grade : best, 'F')
 }
 
+// ─── Performance multiplier for actor awards ──────────────────────────────────
+// Ties an actor's award score to their best production grade this year.
+const PERF_MULTIPLIERS = { 'S+': 1.6, 'S': 1.3, 'A': 1.0, 'B': 0.75, 'C': 0.55, 'D': 0.35, 'F': 0.35 }
+const NO_PROD_MULT = 0.2   // actor had zero productions this year
+
+// Minimum grade an actor must have achieved to be eligible for each tier award
+const TIER_MIN_GRADE = {
+  'Rookie':      'B',
+  'Rising Star': 'A',
+  'Popular':     'S',
+  'Worldwide':   'S+',
+}
+
+/** Best production grade for an actor across all this-year records */
+function getBestActorGrade(actorId, yearHistory) {
+  const prods = yearHistory.filter(h => (h.castIds ?? []).includes(actorId))
+  if (!prods.length) return null
+  return bestGrade(prods)
+}
+
+/** Award score = fame × performanceMultiplier + 5 home bonus */
+function actorAwardScore(actor, yearHistory, homeBonus = 5) {
+  const grade = getBestActorGrade(actor.id, yearHistory)
+  const mult  = grade ? (PERF_MULTIPLIERS[grade] ?? 0.35) : NO_PROD_MULT
+  return (actor.fame ?? 0) * mult + homeBonus
+}
+
 // ─── Year helpers ─────────────────────────────────────────────────────────────
 export function getYearFromWeek(week)  { return Math.ceil(week / 52) }
 export function getYearStartWeek(year) { return (year - 1) * 52 + 1  }
@@ -123,8 +150,9 @@ function pickRivalTitle(usedTitles) {
 /**
  * Rival actor "fame score" for a tier, scaled by rival company's leaderboard score.
  * User actors receive a +5 home-company boost on top of their real fame.
+ * Competition grows harder each year (+4 per year, capped at +40).
  */
-function rivalActorScore(tier, rivalScore) {
+function rivalActorScore(tier, rivalScore, year = 1) {
   const ranges = {
     'Rookie':      [10, 35],
     'Rising Star': [30, 60],
@@ -134,7 +162,8 @@ function rivalActorScore(tier, rivalScore) {
   const [lo, hi] = ranges[tier] ?? [20, 55]
   const norm     = Math.min(1, (rivalScore ?? 100) / 1000)
   const base     = lo + (hi - lo) * norm
-  return base + (Math.random() * 10 - 5)   // ±5 noise
+  const yearBoost = Math.min((year - 1) * 4, 40)   // competition escalates yearly
+  return base + yearBoost + (Math.random() * 10 - 5)
 }
 
 // ─── Main awards computation ──────────────────────────────────────────────────
@@ -184,18 +213,25 @@ export function computeAllAwards(state, week, extraHistory = []) {
   const TIER_AIDS  = ['rookie_actor', 'rising_actor', 'popular_actor', 'worldwide_actor']
 
   TIERS.forEach((tier, i) => {
-    const awardId = TIER_AIDS[i]
+    const awardId  = TIER_AIDS[i]
+    const minGrade = TIER_MIN_GRADE[tier]
     const eligible = (state.actors ?? []).filter(a => a.tier === tier && isActorEligible(a))
+
+    // Pick player's best candidate only if they meet the minimum grade threshold
     const bestUser = eligible.length > 0
       ? eligible.reduce((best, a) => (a.fame ?? 0) > (best.fame ?? 0) ? a : best, eligible[0])
       : null
-    const userScore = bestUser ? (bestUser.fame ?? 0) + 5 : -1   // +5 home boost
+    const userActorGrade  = bestUser ? getBestActorGrade(bestUser.id, yearHistory) : null
+    const meetsThreshold  = userActorGrade && isGradeAtLeast(userActorGrade, minGrade)
+    const userScore       = bestUser && meetsThreshold
+      ? actorAwardScore(bestUser, yearHistory, 5)   // +5 home boost
+      : -1
 
     const topRivals = rivals.slice(0, 10)
     let bestRivalScore = -1
     let bestRivalIdx   = 0
     topRivals.forEach((r, idx) => {
-      const s = rivalActorScore(tier, r.score)
+      const s = rivalActorScore(tier, r.score, year)
       if (s > bestRivalScore) { bestRivalScore = s; bestRivalIdx = idx }
     })
 
@@ -210,10 +246,10 @@ export function computeAllAwards(state, week, extraHistory = []) {
     }
   })
 
-  // ── Best in Chemistry (≥1 production with chemScore ≥ 90) ─────────────────
+  // ── Best in Chemistry (≥2 productions with chemScore ≥ 90) ──────────────────
   if (companyEligible) {
     const chemProds = yearHistory.filter(h => (h.chemScore ?? 0) >= 90)
-    if (chemProds.length >= 1) {
+    if (chemProds.length >= 2) {
       const best = chemProds.reduce((a, b) => (b.chemScore ?? 0) > (a.chemScore ?? 0) ? b : a)
       playerWin('best_chemistry', { name: companyName, company: companyName, title: best.title, extra: `Chemistry: ${Math.round(best.chemScore)}` })
     } else rivalWin('best_chemistry', false)
@@ -254,17 +290,17 @@ export function computeAllAwards(state, week, extraHistory = []) {
     } else rivalWin('best_storyline', false)
   } else rivalWin('best_storyline', false)
 
-  // ── Best Lead Actor (highest-fame actor who appeared this year) ──────────────
+  // ── Best Lead Actor (highest scoring actor who appeared this year) ──────────
   const yearActors = (state.actors ?? []).filter(a => isActorEligible(a) && yearCastIds.has(a.id))
   const bestLead   = yearActors.length > 0
-    ? yearActors.reduce((best, a) => (a.fame ?? 0) > (best.fame ?? 0) ? a : best, yearActors[0])
+    ? yearActors.reduce((best, a) => actorAwardScore(a, yearHistory, 0) > actorAwardScore(best, yearHistory, 0) ? a : best, yearActors[0])
     : null
-  const userLeadScore = bestLead ? (bestLead.fame ?? 0) + 5 : -1
+  const userLeadScore = bestLead ? actorAwardScore(bestLead, yearHistory, 5) : -1
 
   const top5Rivals = rivals.slice(0, 5)
   let bestRivalLeadScore = -1, bestRivalLeadIdx = 0
   top5Rivals.forEach((r, idx) => {
-    const s = rivalActorScore('Popular', r.score)
+    const s = rivalActorScore('Popular', r.score, year)
     if (s > bestRivalLeadScore) { bestRivalLeadScore = s; bestRivalLeadIdx = idx }
   })
 
@@ -305,16 +341,16 @@ export function computeAllAwards(state, week, extraHistory = []) {
     } else rivalWin('movie_of_year', true)
   } else rivalWin('movie_of_year', true)
 
-  // ── Actor Of The Year (best actor across all this-year productions) ─────────
+  // ── Actor Of The Year (best performance-weighted actor this year) ──────────
   const bestAoY      = yearActors.length > 0
-    ? yearActors.reduce((best, a) => (a.fame ?? 0) > (best.fame ?? 0) ? a : best, yearActors[0])
+    ? yearActors.reduce((best, a) => actorAwardScore(a, yearHistory, 0) > actorAwardScore(best, yearHistory, 0) ? a : best, yearActors[0])
     : null
-  const userAoYScore = bestAoY ? (bestAoY.fame ?? 0) + 5 : -1
+  const userAoYScore = bestAoY ? actorAwardScore(bestAoY, yearHistory, 5) : -1
 
   const top3Rivals = rivals.slice(0, 3)
   let bestRivalAoY = -1, bestRivalAoYIdx = 0
   top3Rivals.forEach((r, idx) => {
-    const s = rivalActorScore('Worldwide', r.score)
+    const s = rivalActorScore('Worldwide', r.score, year)
     if (s > bestRivalAoY) { bestRivalAoY = s; bestRivalAoYIdx = idx }
   })
 

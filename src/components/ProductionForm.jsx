@@ -1325,9 +1325,9 @@ function SlotMachineModal({
       )
       case 'otherTrend': return (
         <div>
-          <div style={{ ...tagStyles, color: 'var(--pink)' }}>🔓 LOCKED GENRE (TREND)</div>
+          <div style={{ ...tagStyles, color: 'var(--pink)' }}>🔓 LUCKY UNLOCK!</div>
           <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 2 }}>
-            {outcome.genre} — normally locked, unlocked via spin!
+            {outcome.genre} is normally locked — the slot machine unlocked it for this production!
           </div>
         </div>
       )

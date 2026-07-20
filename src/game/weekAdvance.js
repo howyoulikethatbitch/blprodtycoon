@@ -30,6 +30,8 @@ export function useWeekAdvance() {
     SFX.nextTurn()
     setAdvancing(true)
 
+    // try-finally guarantees advancing is cleared even if an error is thrown
+    try {
     const week = state.week
     // Prompt 1: tier now derived from numeric rank, not week
     const tier = getGameTierByRank(state.numericRank ?? 101)
@@ -121,7 +123,9 @@ export function useWeekAdvance() {
       const chemBonus  = calcChemistryBonus(castActors)
       const baseScore  = calcScore(prod, castActors, chemBonus, state.productionsCompleted ?? 0)
       const comboMult  = prod.comboResult?.mult ?? 1.0
+      // Apply Creative Differences quality bonus before genre reuse check
       let adjBase      = Math.round(Math.min(100, baseScore * comboMult))
+      if (prod.qualityBonus) adjBase = Math.min(100, adjBase + prod.qualityBonus)
 
       // ── Prompt 4: Genre reuse penalty ─────────────────────────────────────
       const recentGenres    = (state.history ?? []).slice(-3).map(h => h.genre).filter(Boolean)
@@ -650,7 +654,9 @@ export function useWeekAdvance() {
     dispatch({ type: A.ADVANCE_WEEK })
     pushToast(dispatch, `Week ${state.week + 1} begins.`)
 
-    setAdvancing(false)
+    } finally {
+      setAdvancing(false)
+    }
   }
 
   return { advanceWeek, advancing }
