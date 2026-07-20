@@ -194,10 +194,10 @@ function ActiveProdCard({ prod, actors }) {
         </div>
       )}
 
-      {/* Wrap phase */}
+      {/* Wrap phase — reveal genre×theme combo label only, no numbers */}
       {prod.phase === 'wrap' && prod.comboResult && (
         <div style={{ fontSize: 8, color: prod.comboResult.color }}>
-          {prod.comboResult.emoji} Combo reveal: {prod.comboResult.label} (×{prod.comboResult.mult})
+          {prod.comboResult.emoji} {prod.genre} × {prod.theme || '—'}: {prod.comboResult.label}
         </div>
       )}
 

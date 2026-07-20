@@ -195,16 +195,8 @@ export default function ProductionForm({ setScreen }) {
   // TV blocks R rating
   const effectiveRating = platform === 'tv' && rating === 'r' ? 'pg13' : rating
 
-  // Combo preview — genre×type and genre×theme
-  const combo      = getComboResult(prodType, genre)
-  const themeCombo = getThemeComboResult(genre, theme)
-  const typThemeB  = getTypeThemeBonus(prodType, theme)
-  // Combined mult preview (mirrors tickProduction formula)
-  const combinedMult = Math.round(
-    Math.min(2.5, Math.max(0.4, (combo.mult + themeCombo.mult) / 2 + typThemeB)) * 100
-  ) / 100
-  const combinedLabel = combinedMult >= 1.45 ? 'PERFECT' : combinedMult < 0.85 ? 'BAD FIT' : 'GOOD'
-  const combinedColor = combinedMult >= 1.45 ? 'var(--gold)' : combinedMult < 0.85 ? 'var(--red)' : 'var(--green)'
+  // Combo preview — genre×type only (theme combo revealed after filming)
+  const combo = getComboResult(prodType, genre)
 
   // Prompt 1: tier now rank-based
   const gameTier = getGameTierByRank(state.numericRank ?? 50)
@@ -480,22 +472,6 @@ export default function ProductionForm({ setScreen }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <span style={{ fontSize: 18 }}>{THEME_EMOJI[theme] ?? '✨'}</span>
             <span style={{ fontSize: 10, color: 'var(--white)', fontWeight: 'bold' }}>{theme}</span>
-            <span style={{
-              fontSize: 7, padding: '2px 6px', marginLeft: 4,
-              background: themeCombo.color, color: 'var(--bg-deep)', fontWeight: 'bold',
-            }}>
-              {themeCombo.emoji} {themeCombo.label}
-            </span>
-            {typThemeB > 0 && (
-              <span style={{ fontSize: 7, color: 'var(--lav)' }}>+{typThemeB.toFixed(2)} format bonus</span>
-            )}
-          </div>
-          {/* Combined combo preview */}
-          <div style={{ fontSize: 7, color: combinedColor, marginBottom: 8, letterSpacing: 1 }}>
-            Combined: {combinedLabel} ×{combinedMult.toFixed(2)}
-            <span style={{ color: 'var(--lav)', marginLeft: 6 }}>
-              (Genre×Type {combo.mult} + Genre×Theme {themeCombo.mult}) ÷ 2{typThemeB > 0 ? ` + ${typThemeB}` : ''}
-            </span>
           </div>
           <button type="button" style={styles.genreBtn}
             onClick={() => { SFX.click(); setShowThemePick(true) }}
