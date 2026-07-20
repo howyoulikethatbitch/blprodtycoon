@@ -574,6 +574,8 @@ export function useWeekAdvance() {
       dispatch({ type: A.SET_FLAG, key: 'lastCompanyEvent', value: week })
     }
     for (const ev of companyEvents) {
+      // Challenge events (burnout, talent raid, fan backlash) carry their own cooldown flagKey
+      if (ev.flagKey) dispatch({ type: A.SET_FLAG, key: ev.flagKey, value: week })
       const lbl = ev.data?.label ?? 'Company Event'
       pushEventLog(dispatch, `[EVENT] ${lbl}`, 'pink', week)
       dispatch({ type: A.PUSH_MODAL, modal: ev })
@@ -582,6 +584,8 @@ export function useWeekAdvance() {
     // ── 7c. Actor event ───────────────────────────────────────────────────────
     const actorEvent = rollActorEvent(state)
     if (actorEvent) {
+      // Set per-event cooldown flag if provided (e.g. viral_chemistry per-actor cooldown)
+      if (actorEvent.flagKey) dispatch({ type: A.SET_FLAG, key: actorEvent.flagKey, value: week })
       const lbl = actorEvent.data?.label ?? 'Actor Event'
       pushEventLog(dispatch, `[ACTOR] ${lbl}`, 'pink', week)
       dispatch({ type: A.PUSH_MODAL, modal: actorEvent })

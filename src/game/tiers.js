@@ -12,8 +12,9 @@ export const GAME_TIERS = [
     maxWeek: 19,
     // CP events
     cpEventFreq: 0.50,
-    declineChemPenalty: 0,
+    declineChemPenalty: -5,   // spec: even Rookie should feel -5 chem on decline
     declineRepPenalty: 0,
+    tierPopMult: 1.0,          // tricky event pop scaling
     // Idle penalties
     idleHappinessThreshold: 40,
     idleLoyaltyThreshold: 56,
@@ -39,6 +40,7 @@ export const GAME_TIERS = [
     cpEventFreq: 0.45,
     declineChemPenalty: -5,
     declineRepPenalty: -5,
+    tierPopMult: 1.2,
     idleHappinessThreshold: 32,
     idleLoyaltyThreshold: 48,
     penaltyTickRate: 6,
@@ -59,6 +61,7 @@ export const GAME_TIERS = [
     cpEventFreq: 0.40,
     declineChemPenalty: -8,
     declineRepPenalty: -10,
+    tierPopMult: 1.5,
     idleHappinessThreshold: 28,
     idleLoyaltyThreshold: 42,
     penaltyTickRate: 5,
@@ -79,6 +82,7 @@ export const GAME_TIERS = [
     cpEventFreq: 0.35,
     declineChemPenalty: -15,
     declineRepPenalty: -15,
+    tierPopMult: 2.0,
     idleHappinessThreshold: 24,
     idleLoyaltyThreshold: 36,
     penaltyTickRate: 4,
