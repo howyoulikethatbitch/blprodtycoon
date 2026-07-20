@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import { useGame, A, pushToast, pushEventLog } from './state.jsx'
 import { tickProduction, calcRevenue, calcScore, popularityDeltaByPlatform } from './productions.js'
-import { weeklyActorRecovery, grantExp, NEW_TALENT_POOL } from './actors.js'
+import { weeklyActorRecovery, grantExp, NEW_TALENT_POOL, checkTierPromotion, applyTierPromotion } from './actors.js'
 import { calcChemistryBonus, calcBondGrowth, applyBondDeltas, getChem } from './chemistry.js'
 import { evaluateProduction } from './evaluators.js'
 import { rollWeeklyEvents, rollActorEvent, runChemPulse, rollCpEvents } from './events.js'
@@ -127,8 +127,12 @@ export function useWeekAdvance() {
       let adjBase      = Math.round(Math.min(100, baseScore * comboMult))
       if (prod.qualityBonus) adjBase = Math.min(100, adjBase + prod.qualityBonus)
 
-      // ── Prompt 4: Genre reuse penalty ─────────────────────────────────────
-      const recentGenres    = (state.history ?? []).slice(-3).map(h => h.genre).filter(Boolean)
+      // ── Genre reuse penalty — 13-week cooldown from each production's wrap ──
+      // Uses weekCompleted so the clock starts when filming ends, not when episodes finish airing.
+      const REUSE_COOLDOWN = 13
+      const recentGenres    = (state.history ?? [])
+        .filter(h => h.genre && h.weekCompleted != null && (week - h.weekCompleted) <= REUSE_COOLDOWN)
+        .map(h => h.genre)
       const genreReuseCount = recentGenres.filter(g => g === prod.genre).length
       const genreReuseMod   = genreReuseCount >= 2 ? 0.75 : genreReuseCount === 1 ? 0.85 : 1.0
       if (genreReuseMod < 1.0) {
@@ -448,6 +452,46 @@ export function useWeekAdvance() {
           )
         }
       }
+    }
+
+    // ── 5b. Actor tier promotion check ───────────────────────────────────────
+    // Runs every week for all signed actors below Worldwide.
+    // Uses the full history (including productions completed this week) so new grades count.
+    const fullHistory = [...(state.history ?? []), ...extraHistoryRecords]
+    for (const actor of state.actors) {
+      if (!actor.signed || actor.tier === 'Worldwide') continue
+
+      const promoResult = checkTierPromotion(actor, fullHistory)
+      if (!promoResult.eligible) continue
+
+      // One promotion per actor per game — flag prevents re-firing if dispatch is async
+      const promoFlagKey = `tierPromoted_${actor.id}_to_${promoResult.nextTier}`
+      if (state.flags?.[promoFlagKey]) continue
+
+      const promoPatch = applyTierPromotion(actor)
+      dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch: promoPatch })
+      dispatch({ type: A.SET_FLAG, key: promoFlagKey, value: week })
+
+      pushEventLog(dispatch,
+        `🌟 ${actor.name} promoted from ${actor.tier} → ${promoResult.nextTier}! All skills boosted.`,
+        'gold', week,
+      )
+      dispatch({
+        type: A.PUSH_MODAL,
+        modal: {
+          type: 'event',
+          data: {
+            label: `🌟 TIER PROMOTION — ${actor.name.toUpperCase()}`,
+            message:
+              `${actor.name} has risen from **${actor.tier}** to **${promoResult.nextTier}**!\n\n`
+              + `Their skills have been boosted across all areas and their confidence is at an all-time high.\n\n`
+              + `Loyalty +15 · Happiness +10 · All skills improved ✨`,
+            choices: [
+              { label: `🎉 Congratulations, ${actor.name.split(' ')[0]}!`, effect: () => {} },
+            ],
+          },
+        },
+      })
     }
 
     // ── 5.1 Tick pool entries (weeksInPool++, remove ex-actors after 24 weeks) ─

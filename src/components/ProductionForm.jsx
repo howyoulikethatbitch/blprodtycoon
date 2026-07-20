@@ -223,9 +223,16 @@ export default function ProductionForm({ setScreen }) {
   // Global week when filming actually begins (converts year-relative → global)
   const weekScheduled = yearStartGlobal + clampedStart - 1
 
-  // ── Prompt 3: Genre reuse warning ────────────────────────────────────────
-  const recentGenres  = (state.history ?? []).slice(-2).map(h => h.genre).filter(Boolean)
-  const isGenreReused = recentGenres.includes(genre)
+  // ── Genre reuse warning — 13-week cooldown from wrap/completion ──────────
+  // Only completed productions (in state.history, which has weekCompleted) count.
+  // In-progress productions that are still filming/airing are intentionally excluded
+  // so the cooldown starts from the moment the previous production wrapped.
+  const REUSE_COOLDOWN_WEEKS = 13
+  const isGenreReused = (state.history ?? []).some(h =>
+    h.genre === genre &&
+    h.weekCompleted != null &&
+    (state.week - h.weekCompleted) <= REUSE_COOLDOWN_WEEKS
+  )
 
   // 3.2: Fixed CP is only allowed if avg chemistry ≥ 20
   const avgChem = lead1 && lead2 ? Math.round((chemValue) ) : 0

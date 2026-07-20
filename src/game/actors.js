@@ -417,13 +417,168 @@ export const NEW_TALENT_POOL = [
 // Alias kept for TopBar compat
 export const weeklyActorRecovery = weeklyActorTick
 
-// ─── XP / level (stub — training system in Prompt 7) ─────────────────────────
+// ─── XP / level ───────────────────────────────────────────────────────────────
 export function grantExp(actor, amount) {
   return { exp: (actor.exp ?? 0) + (amount ?? 0), level: actor.level ?? 1 }
 }
 
 export function xpToNextLevel(level) {
   return Math.floor(100 * Math.pow(level, 1.4))
+}
+
+// ─── Tier Promotion System ─────────────────────────────────────────────────────
+// Grade rank helper (local — avoids circular import from awards.js)
+const _GRADE_RANK = { F: 0, D: 1, C: 2, B: 3, A: 4, S: 5, 'S+': 6 }
+function _gradeAtLeast(grade, min) {
+  return (_GRADE_RANK[grade] ?? -1) >= (_GRADE_RANK[min] ?? 99)
+}
+
+/**
+ * Promotion requirements for each tier transition.
+ * Difficulty: Rookie→Rising Star = medium, Rising Star→Popular = hard, Popular→Worldwide = extreme.
+ * All numeric thresholds are checked against live actor fields + their production history.
+ */
+export const TIER_PROMOTION_REQ = {
+  'Rookie': {          // ─── Medium ──────────────────────────────────────────
+    nextTier:       'Rising Star',
+    fame:           2_000,         // accumulated fame
+    exp:            300,           // XP earned from productions
+    completedProds: 3,             // total productions finished
+    gradeAMin:      1,             // ≥1 production graded A or better
+    gradeSMin:      0,             // (no S requirement at this tier)
+    gradeSPMin:     0,
+    awardsMin:      0,             // no award required yet
+    happiness:      55,
+    loyalty:        50,
+  },
+  'Rising Star': {     // ─── Hard ────────────────────────────────────────────
+    nextTier:       'Popular',
+    fame:           9_000,
+    exp:            900,
+    completedProds: 5,
+    gradeAMin:      2,             // ≥2 graded A+ OR ≥1 graded S+
+    gradeSMin:      1,             // satisfies if gradeA < 2
+    gradeSPMin:     0,
+    awardsMin:      1,             // at least one industry award
+    happiness:      65,
+    loyalty:        60,
+  },
+  'Popular': {         // ─── Extreme ─────────────────────────────────────────
+    nextTier:       'Worldwide',
+    fame:           38_000,
+    exp:            2_500,
+    completedProds: 8,
+    gradeAMin:      0,             // (A grade not enough here)
+    gradeSMin:      3,             // ≥3 graded S+ OR ≥1 graded S+
+    gradeSPMin:     1,             // satisfies if gradeSCount < 3
+    awardsMin:      3,
+    happiness:      75,
+    loyalty:        70,
+  },
+}
+
+// Skill boost applied to every skill on promotion (random per-skill, capped at new tier's skillMax)
+const _SKILL_BOOST_RANGE = {
+  'Rookie':      { min: 15, max: 22 },   // → Rising Star
+  'Rising Star': { min: 12, max: 18 },   // → Popular
+  'Popular':     { min: 15, max: 25 },   // → Worldwide
+}
+
+/**
+ * Check if an actor is ready for a tier promotion.
+ * Returns { eligible: bool, nextTier: string|null, met: string[], unmet: string[] }.
+ * Pass the full state.history array so grade checks can scan the actor's past productions.
+ */
+export function checkTierPromotion(actor, history) {
+  const req = TIER_PROMOTION_REQ[actor.tier]
+  if (!req) return { eligible: false, nextTier: null, met: [], unmet: [] }  // Worldwide — max tier
+
+  const actorHistory  = (history ?? []).filter(h => (h.castIds ?? []).includes(actor.id))
+  const gradeACount   = actorHistory.filter(h => _gradeAtLeast(h.grade, 'A')).length
+  const gradeSCount   = actorHistory.filter(h => _gradeAtLeast(h.grade, 'S')).length
+  const gradeSPCount  = actorHistory.filter(h => h.grade === 'S+').length
+
+  // Build individual pass/fail checks
+  const checks = [
+    {
+      ok:    (actor.fame ?? 0) >= req.fame,
+      label: `Fame ≥ ${req.fame.toLocaleString()}`,
+    },
+    {
+      ok:    (actor.exp ?? 0) >= req.exp,
+      label: `XP ≥ ${req.exp}`,
+    },
+    {
+      ok:    (actor.completedProds ?? 0) >= req.completedProds,
+      label: `${req.completedProds}+ productions completed`,
+    },
+    {
+      ok:    (actor.happiness ?? 0) >= req.happiness,
+      label: `Happiness ≥ ${req.happiness}`,
+    },
+    {
+      ok:    (actor.loyalty ?? 0) >= req.loyalty,
+      label: `Loyalty ≥ ${req.loyalty}`,
+    },
+  ]
+
+  // Grade condition — each tier uses a different combination
+  if (req.gradeAMin > 0 && req.gradeSMin > 0) {
+    // Rising Star→Popular: gradeA≥2 OR gradeS≥1
+    checks.push({
+      ok:    gradeACount >= req.gradeAMin || gradeSCount >= req.gradeSMin,
+      label: `${req.gradeAMin}× Grade A+  or  ${req.gradeSMin}× Grade S+`,
+    })
+  } else if (req.gradeAMin > 0) {
+    checks.push({
+      ok:    gradeACount >= req.gradeAMin,
+      label: `${req.gradeAMin}× Grade A+ production(s)`,
+    })
+  }
+  if (req.gradeSMin > 0 && req.gradeAMin === 0) {
+    // Popular→Worldwide: gradeS≥3 OR gradeS+≥1
+    checks.push({
+      ok:    gradeSCount >= req.gradeSMin || gradeSPCount >= req.gradeSPMin,
+      label: `${req.gradeSMin}× Grade S  or  ${req.gradeSPMin}× Grade S+`,
+    })
+  }
+  if (req.awardsMin > 0) {
+    checks.push({
+      ok:    (actor.awards ?? 0) >= req.awardsMin,
+      label: `${req.awardsMin}+ industry award(s)`,
+    })
+  }
+
+  const met   = checks.filter(c => c.ok).map(c => c.label)
+  const unmet = checks.filter(c => !c.ok).map(c => c.label)
+  return { eligible: unmet.length === 0, nextTier: req.nextTier, met, unmet }
+}
+
+/**
+ * Build the UPDATE_ACTOR patch that applies a tier promotion.
+ * Boosts every skill toward the new tier's range and gives a happiness/loyalty bump.
+ */
+export function applyTierPromotion(actor) {
+  const req = TIER_PROMOTION_REQ[actor.tier]
+  if (!req) return {}
+
+  const boost     = _SKILL_BOOST_RANGE[actor.tier] ?? { min: 10, max: 15 }
+  const nextStats = TIER_STATS[req.nextTier] ?? TIER_STATS['Worldwide']
+
+  const newSkills = {}
+  for (const key of SKILL_KEYS) {
+    const current  = actor.skills?.[key] ?? 0
+    const inc      = rndInt(boost.min, boost.max)
+    newSkills[key] = Math.min(nextStats.skillMax, current + inc)
+  }
+
+  return {
+    tier:      req.nextTier,
+    skills:    newSkills,
+    // Promotion boosts morale
+    happiness: Math.min(100, (actor.happiness ?? 70) + 10),
+    loyalty:   Math.min(100, (actor.loyalty   ?? 60) + 15),
+  }
 }
 
 // ─── Stat accessor (now reads from actor.skills) ──────────────────────────────
