@@ -20,6 +20,8 @@ export const INITIAL_STATE = {
   unlockedTiers: ['Rookie'],
   // Prompt 4: genre unlock system — default unlocked, expand by production grade
   unlockedGenres: ['Romance', 'School', 'Office'],
+  // Theme unlock system — default starter themes
+  unlockedThemes: ['Slow Burn', 'Friends-to-Lovers', 'Enemies-to-Lovers', 'Soulmates', 'Forbidden Love'],
   actors:        [],
   productions:   [],
   history:       [],
@@ -89,6 +91,8 @@ export const A = {
   INCREMENT_GRADE_COUNT:  'INCREMENT_GRADE_COUNT',
   SET_FIXED_CP_NAME:      'SET_FIXED_CP_NAME',
   SET_GENRE_TRENDS:       'SET_GENRE_TRENDS',
+  // Theme unlock system
+  UNLOCK_THEMES:          'UNLOCK_THEMES',
 }
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -317,6 +321,7 @@ function gameReducer(state, action) {
         gradeCounts:          action.saveData.gradeCounts          ?? {},
         fixedCPNames:         action.saveData.fixedCPNames         ?? {},
         genreTrends:          action.saveData.genreTrends          ?? [],
+        unlockedThemes:       action.saveData.unlockedThemes       ?? ['Slow Burn', 'Friends-to-Lovers', 'Enemies-to-Lovers', 'Soulmates', 'Forbidden Love'],
       }
 
     case A.MARK_SAVED:
@@ -339,6 +344,13 @@ function gameReducer(state, action) {
 
     case A.SET_GENRE_TRENDS:
       return { ...state, genreTrends: action.trends }
+
+    case A.UNLOCK_THEMES: {
+      const current  = state.unlockedThemes ?? ['Slow Burn', 'Friends-to-Lovers', 'Enemies-to-Lovers', 'Soulmates', 'Forbidden Love']
+      const incoming = (action.themes ?? []).filter(t => !current.includes(t))
+      if (!incoming.length) return state
+      return { ...state, unlockedThemes: [...current, ...incoming] }
+    }
 
     default:
       return state

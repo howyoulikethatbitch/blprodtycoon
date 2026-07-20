@@ -10,6 +10,10 @@ import {
   BUDGET_TIERS, TITLE_POOL, calcCost, createProduction,
   genCpName, getComboResult, DEFAULT_GENRES,
 } from '../game/productions.js'
+import {
+  THEMES, THEME_CATEGORIES, THEME_EMOJI, THEME_UNLOCK_BY_GRADE, DEFAULT_THEMES,
+  getThemeComboResult, getTypeThemeBonus,
+} from '../game/themes.js'
 import { getGameTierByRank } from '../game/tiers.js'
 import { calcChemistryBonus, chemTier, getChem, bondKey } from '../game/chemistry.js'
 import { canAssign, moodEmoji } from '../game/actors.js'
@@ -61,6 +65,8 @@ export default function ProductionForm({ setScreen }) {
   const [cpFixed,       setCpFixed]       = useState(false)
   const [showGenrePick, setShowGenrePick] = useState(false)  // genre select modal
   const [showSlotMachine, setShowSlotMachine] = useState(false)  // random genre modal
+  const [theme,         setTheme]         = useState('Slow Burn')  // narrative theme
+  const [showThemePick, setShowThemePick] = useState(false)        // theme select modal
 
   // Slot machine spin tracking — persists across cancel/reopen to prevent spin cheat
   const [slotSpinsUsed, setSlotSpinsUsed] = useState(0)
@@ -189,8 +195,16 @@ export default function ProductionForm({ setScreen }) {
   // TV blocks R rating
   const effectiveRating = platform === 'tv' && rating === 'r' ? 'pg13' : rating
 
-  // Combo preview
-  const combo = getComboResult(prodType, genre)
+  // Combo preview — genre×type and genre×theme
+  const combo      = getComboResult(prodType, genre)
+  const themeCombo = getThemeComboResult(genre, theme)
+  const typThemeB  = getTypeThemeBonus(prodType, theme)
+  // Combined mult preview (mirrors tickProduction formula)
+  const combinedMult = Math.round(
+    Math.min(2.5, Math.max(0.4, (combo.mult + themeCombo.mult) / 2 + typThemeB)) * 100
+  ) / 100
+  const combinedLabel = combinedMult >= 1.45 ? 'PERFECT' : combinedMult < 0.85 ? 'BAD FIT' : 'GOOD'
+  const combinedColor = combinedMult >= 1.45 ? 'var(--gold)' : combinedMult < 0.85 ? 'var(--red)' : 'var(--green)'
 
   // Prompt 1: tier now rank-based
   const gameTier = getGameTierByRank(state.numericRank ?? 50)
@@ -265,6 +279,7 @@ export default function ProductionForm({ setScreen }) {
       cpName,
       weekStarted:     state.week,
       weekScheduled:   weekScheduled,
+      theme:           theme,
       genreMultiplier: genreMultiplier,
       // Already-fixed pairs get fixedCP:true automatically (no extra fee charged).
       // New fixed CP contracts require the toggle + chemistry ≥ 20.
@@ -459,6 +474,36 @@ export default function ProductionForm({ setScreen }) {
           )}
         </div>
 
+        {/* Theme field */}
+        <div className="field" style={{ marginTop: 10 }}>
+          <label>THEME</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <span style={{ fontSize: 18 }}>{THEME_EMOJI[theme] ?? '✨'}</span>
+            <span style={{ fontSize: 10, color: 'var(--white)', fontWeight: 'bold' }}>{theme}</span>
+            <span style={{
+              fontSize: 7, padding: '2px 6px', marginLeft: 4,
+              background: themeCombo.color, color: 'var(--bg-deep)', fontWeight: 'bold',
+            }}>
+              {themeCombo.emoji} {themeCombo.label}
+            </span>
+            {typThemeB > 0 && (
+              <span style={{ fontSize: 7, color: 'var(--lav)' }}>+{typThemeB.toFixed(2)} format bonus</span>
+            )}
+          </div>
+          {/* Combined combo preview */}
+          <div style={{ fontSize: 7, color: combinedColor, marginBottom: 8, letterSpacing: 1 }}>
+            Combined: {combinedLabel} ×{combinedMult.toFixed(2)}
+            <span style={{ color: 'var(--lav)', marginLeft: 6 }}>
+              (Genre×Type {combo.mult} + Genre×Theme {themeCombo.mult}) ÷ 2{typThemeB > 0 ? ` + ${typThemeB}` : ''}
+            </span>
+          </div>
+          <button type="button" style={styles.genreBtn}
+            onClick={() => { SFX.click(); setShowThemePick(true) }}
+          >
+            ✨ Select Theme
+          </button>
+        </div>
+
         {/* Genre pick modal */}
         {showGenrePick && (
           <GenrePickModal
@@ -466,6 +511,16 @@ export default function ProductionForm({ setScreen }) {
             onSelect={g => { setGenre(g); setShowGenrePick(false); SFX.confirm() }}
             onClose={() => setShowGenrePick(false)}
             unlockedGenres={state.unlockedGenres ?? DEFAULT_GENRES}
+          />
+        )}
+
+        {/* Theme pick modal */}
+        {showThemePick && (
+          <ThemePickModal
+            current={theme}
+            onSelect={t => { setTheme(t); setShowThemePick(false); SFX.confirm() }}
+            onClose={() => setShowThemePick(false)}
+            unlockedThemes={state.unlockedThemes ?? DEFAULT_THEMES}
           />
         )}
 
@@ -1057,6 +1112,65 @@ function GenrePickModal({ current, onSelect, onClose, unlockedGenres }) {
             )
           })}
         </div>
+        <button type="button" style={modalStyles.closeBtn} onClick={onClose}>✕ CANCEL</button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Theme Pick Modal ─────────────────────────────────────────────────────────
+// Shows all 29 themes grouped by category; locked ones are dimmed with 🔒
+function ThemePickModal({ current, onSelect, onClose, unlockedThemes }) {
+  const unlocked = unlockedThemes ?? DEFAULT_THEMES
+  return (
+    <div style={modalStyles.overlay} onClick={onClose}>
+      <div style={{ ...modalStyles.box, maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+        <div style={modalStyles.title}>✨ SELECT THEME</div>
+        <div style={{ fontSize: 7, color: 'var(--lav)', textAlign: 'center', marginBottom: 8 }}>
+          {unlocked.length}/{THEMES.length} themes unlocked · Complete productions to unlock more
+        </div>
+        {Object.entries(THEME_CATEGORIES).map(([cat, themes]) => (
+          <div key={cat} style={{ width: '100%', marginBottom: 10 }}>
+            <div style={{ fontSize: 7, color: 'var(--pink)', letterSpacing: 1, marginBottom: 4 }}>
+              {cat.toUpperCase()}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+              {themes.map(t => {
+                const isUnlocked = unlocked.includes(t)
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    disabled={!isUnlocked}
+                    style={{
+                      ...modalStyles.genreCard,
+                      ...(current === t ? modalStyles.genreCardSel : {}),
+                      opacity: isUnlocked ? 1 : 0.35,
+                      cursor:  isUnlocked ? 'pointer' : 'not-allowed',
+                      padding: '8px 4px',
+                    }}
+                    onClick={() => isUnlocked && onSelect(t)}
+                  >
+                    <span style={{ fontSize: 18, display: 'block', marginBottom: 3 }}>
+                      {THEME_EMOJI[t] ?? '✨'}
+                    </span>
+                    <span style={{
+                      fontSize:     6,
+                      color:        current === t ? 'var(--bg-deep)' : isUnlocked ? 'var(--white)' : 'var(--gray)',
+                      lineHeight:   1.3,
+                      wordBreak:    'break-word',
+                      overflowWrap: 'break-word',
+                      textAlign:    'center',
+                      display:      'block',
+                    }}>
+                      {isUnlocked ? t : `🔒 ${t}`}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
         <button type="button" style={modalStyles.closeBtn} onClick={onClose}>✕ CANCEL</button>
       </div>
     </div>

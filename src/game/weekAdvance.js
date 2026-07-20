@@ -15,6 +15,7 @@ import { calcRank, computeNumericRank, playerScore } from './ranking.js'
 import { SFX, resumeAudio } from './audio.js'
 import { getGameTierByRank } from './tiers.js'
 import { GENRE_UNLOCK_BY_GRADE, GENRE_UNLOCK_COUNTS, GENRES } from './productions.js'
+import { THEME_UNLOCK_BY_GRADE, THEME_UNLOCK_COUNTS, DEFAULT_THEMES } from './themes.js'
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 
@@ -207,7 +208,7 @@ export function useWeekAdvance() {
         }
       }
 
-      // ── Grade count increment → count-based genre unlocks ─────────────────
+      // ── Grade count increment → count-based genre & theme unlocks ──────────
       const newGradeCount   = ((state.gradeCounts ?? {})[evalResult.grade] ?? 0) + 1
       dispatch({ type: A.INCREMENT_GRADE_COUNT, grade: evalResult.grade })
       const gradeThreshold  = GENRE_UNLOCK_COUNTS[evalResult.grade]
@@ -220,6 +221,19 @@ export function useWeekAdvance() {
           if (fresh.length > 0) {
             pushEventLog(dispatch,
               `🎭 Genres unlocked: ${fresh.join(', ')}! (${evalResult.grade}×${newGradeCount})`,
+              'gold', week)
+          }
+        }
+
+        // Theme unlocks — same count gate as genre unlocks
+        const themesToUnlock = THEME_UNLOCK_BY_GRADE[evalResult.grade] ?? []
+        if (themesToUnlock.length > 0) {
+          dispatch({ type: A.UNLOCK_THEMES, themes: themesToUnlock })
+          const currentThemes = state.unlockedThemes ?? DEFAULT_THEMES
+          const freshThemes   = themesToUnlock.filter(t => !currentThemes.includes(t))
+          if (freshThemes.length > 0) {
+            pushEventLog(dispatch,
+              `✨ Themes unlocked: ${freshThemes.join(', ')}! (${evalResult.grade}×${newGradeCount})`,
               'gold', week)
           }
         }

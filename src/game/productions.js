@@ -2,6 +2,7 @@
  * productions.js — Production types, cost formulas, progress logic
  * Prompt 4: new type/schedule/platform/rating schema, combo system, title pool, CP name.
  */
+import { getThemeComboResult, getTypeThemeBonus } from './themes.js'
 
 // ─── Production types ─────────────────────────────────────────────────────────
 export const PROD_TYPES = {
@@ -290,7 +291,7 @@ export function scoreToStars(score) {
 
 // ─── Create a new production record ──────────────────────────────────────────
 export function createProduction({
-  type, title, genre, budget, schedule,
+  type, title, genre, theme, budget, schedule,
   platform, rating, story, castIds, leadIds,
   cpName, weekStarted, weekScheduled, genreMultiplier,
 }) {
@@ -301,6 +302,7 @@ export function createProduction({
     type,
     title,
     genre,
+    theme:            theme          ?? '',    // narrative theme (e.g. 'Slow Burn')
     budget,           // number: budgetMult (0.5–2.5)
     schedule,         // '3m' | '6m' | '12m'
     platform:         platform ?? 'tv',
@@ -337,12 +339,26 @@ export function tickProduction(production) {
       ((production.weeksTotal - weeksLeft) / production.weeksTotal) * 100
     )
     if (weeksLeft === 0) {
-      // Move to wrap phase — apply genreMultiplier (2× slot bonus) to combo mult
-      const baseCombo = getComboResult(production.type, production.genre)
-      const gMult     = production.genreMultiplier ?? 1
-      const comboResult = gMult > 1
-        ? { ...baseCombo, mult: Math.round(baseCombo.mult * gMult * 100) / 100 }
-        : baseCombo
+      // Combined combo: average of (genre×type) + (genre×theme) + type×theme bonus
+      // then multiply by the 2× slot bonus if active.
+      const genreTypeCombo  = getComboResult(production.type, production.genre)
+      const themeComboResult = getThemeComboResult(production.genre, production.theme)
+      const typeThemeBonus   = getTypeThemeBonus(production.type, production.theme)
+
+      const hasTheme = !!production.theme
+      const rawMult  = hasTheme
+        ? (genreTypeCombo.mult + themeComboResult.mult) / 2 + typeThemeBonus
+        : genreTypeCombo.mult
+
+      const clampedMult = Math.round(Math.min(2.5, Math.max(0.4, rawMult)) * 100) / 100
+      const gMult       = production.genreMultiplier ?? 1
+      const finalMult   = gMult > 1 ? Math.round(clampedMult * gMult * 100) / 100 : clampedMult
+
+      const label = finalMult >= 1.45 ? 'PERFECT' : finalMult < 0.85 ? 'BAD FIT' : 'GOOD'
+      const emoji = finalMult >= 1.45 ? '✨'       : finalMult < 0.85 ? '💔'       : '💕'
+      const color = finalMult >= 1.45 ? 'var(--gold)' : finalMult < 0.85 ? 'var(--red)' : 'var(--green)'
+      const comboResult = { label, mult: finalMult, emoji, color }
+
       return { weeksLeft: 0, progressPct: 100, phase: 'wrap', comboResult, status: 'active' }
     }
     return { weeksLeft, progressPct, phase: 'filming', status: 'active' }

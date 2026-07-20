@@ -1,0 +1,63 @@
+Prompt 1: Theme System Data Structure
+
+Create a new file src/game/themes.js with the following structure:
+
+Export a THEMES array containing 29 themes organized by category:
+
+ROMANCE THEMES (10):
+- Slow Burn
+- Forbidden Love
+- Friends-to-Lovers
+- Enemies-to-Lovers
+- Fake Marriage/Relationship
+- Secret Romance
+- Soulmates
+- Love Triangle
+- Unrequited Love
+- Second Chance
+
+STORY TWISTS/SUPERNATURAL (7):
+- Time Travel
+- Reincarnation
+- Amnesia
+- Bodyswap
+- Curse/Magic
+- Possession
+- Fate/Prophecy
+
+CHARACTER DYNAMICS (6):
+- Mentor-Student
+- Boss-Employee
+- Rivals
+- Found Family
+- Power Imbalance
+- Star-Crossed
+
+TONE/VIBE (6):
+- Comedy Relief
+- Angst
+- Fluffy
+- Dark
+- Bittersweet
+- Wholesome
+
+Export DEFAULT_THEMES array with 5 starter themes: [Slow Burn, Friends-to-Lovers, Enemies-to-Lovers, Soulmates, Forbidden Love]
+
+Export THEME_UNLOCK_BY_GRADE object following this pattern:
+  C: [5 themes],
+  B: [6 themes],
+  A: [6 themes],
+  S: [6 themes],
+  'S+': [6 themes]
+
+Export THEME_UNLOCK_COUNTS object:
+  C: 2,
+  B: 2,
+  A: 3,
+  S: 2,
+  'S+': 1
+
+Export THEME_EMOJI object mapping each theme to an appropriate emoji (e.g., "Slow Burn": “🔥", "Time Travel": "⌛", etc.)
+
+Export themeTier(val) function that returns tier info similar to chemTier pattern
+Export themeLabel(val) function that returns { txt, color, emoji }

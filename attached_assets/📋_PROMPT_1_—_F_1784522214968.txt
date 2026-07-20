@@ -1,0 +1,65 @@
+## Prompt 1: Theme System Data Structure
+
+Create a new file `src/game/themes.js` with:
+- `THEMES` array (29 themes organized by category: Romance, Twists, Character Dynamics, Tone/Vibe)
+- `DEFAULT_THEMES` array (5 starter themes)
+- `THEME_UNLOCK_BY_GRADE` object (similar to `GENRE_UNLOCK_BY_GRADE`)
+- `THEME_UNLOCK_COUNTS` object (how many productions needed to unlock each grade's themes)
+- `THEME_EMOJI` object (emoji for each theme)
+- Export `themeTier()` and `themeLabel()` helper functions (matching chemistry tier pattern)
+
+---
+
+## Prompt 2: Genre × Theme Combo Table
+
+- Create `THEME_COMBO_TABLE` object structured as `{ genre: { theme: multiplier } }`
+- Multipliers follow same scale: **1.5 (PERFECT), 1.0 (GOOD), 0.6 (BAD FIT)**
+- Example logic:
+  - "Romance" + "Slow Burn" = 1.5 (PERFECT)
+  - "Horror" + "Forbidden Love" = 1.5 (PERFECT)
+  - "Sports" + "Amnesia" = 0.6 (BAD FIT)
+- Export `getThemeComboResult(genre, theme)` function (matching `getComboResult()` pattern)
+
+---
+
+## Prompt 3: Type × Theme Bonus Table
+
+- Create `TYPE_THEME_BONUS` object: `{ type: { theme: bonus } }`
+- Small bonuses only: +0.05 to +0.10 multiplier (secondary bonus)
+- Example:
+  - Mini Series excels with: Mystery, Psychological, Slice of Life (+0.05)
+  - Series excels with: Drama, Historical, Coming-of-Age (+0.05)
+  - Movie excels with: Action, Thriller, Sci-Fi (+0.05)
+- Export `getTypeThemeBonus(type, theme)` function returning bonus value
+
+---
+
+## Prompt 4: Update Production Schema
+
+- Add `theme` field to `createProduction()` function (alongside existing `genre`)
+- Update `calcScore()` to include theme combo multiplier in score calculation
+- Update `calcRevenue()` to apply theme combo multiplier (like genre × type currently does)
+- Update `tickProduction()` wrap phase to compute `comboResult` using BOTH genre×theme + type×theme bonus
+
+---
+
+## Prompt 5: Update Genre Unlock System
+
+- Add theme tracking to production completion counts
+- When a production completes, check if player unlocked new themes (similar to genre unlocks)
+- Update any UI that displays available genres to also display available themes
+
+---
+
+## Prompt 6: Update State/Game Logic
+
+- Add `unlockedThemes` array to initial game state (starts with `DEFAULT_THEMES`)
+- Add function to track theme unlocks on production completion
+- Export helpers for checking if a theme is unlocked
+
+---
+
+1. **Primary**: Genre × Theme combo (1.5/1.0/0.6 scale) drives story quality
+2. **Secondary**: Type × Theme bonus (+0.05/+0.10) provides format efficiency
+3. **Players unlock themes progressively** as they complete productions at different grades
+4. **Each production tracks both genre and theme** independently
