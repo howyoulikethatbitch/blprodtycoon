@@ -631,7 +631,28 @@ function makeActorEvent(type, actor, state) {
       const lastViralWk  = state.flags?.[viralCoolKey] ?? -999
       if ((state.week - lastViralWk) < 8) return null
 
-      const others = state.actors.filter(a => a.signed && a.id !== actor.id)
+      // Exclude existing Fixed CP partner (event would be meaningless with them)
+      const existingCpPartnerIds = new Set(
+        (state.fixedCPs ?? []).flatMap(([x, y]) =>
+          x === actor.id ? [y] : y === actor.id ? [x] : []
+        )
+      )
+
+      // Exclude current production co-leads (filming together = no viral "surprise")
+      const activeProd = state.productions.find(p =>
+        (p.leadIds ?? []).includes(actor.id)
+      )
+      const coLeadIds = new Set(
+        activeProd ? (activeProd.leadIds ?? []).filter(id => id !== actor.id) : []
+      )
+
+      const others = state.actors.filter(a =>
+        a.signed &&
+        a.id !== actor.id &&
+        !existingCpPartnerIds.has(a.id) &&
+        !coLeadIds.has(a.id)
+      )
+      // No eligible partner (actor is too committed) — skip event
       if (!others.length) return null
       let partner = others[0], bestChem = getChem(actor, others[0].id)
       for (const o of others) {
