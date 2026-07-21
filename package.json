@@ -8,18 +8,26 @@
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "npm run build",
-    "cap:init": "npx cap init \"BL Production Tycoon\" com.blproductiontycoon.app",
-    "generate-icons": "npx @capacitor/assets generate --iconPath icon.png --android --outDir android/app/src/main/res",
-    "cap:sync": "npx cap sync android",
-    "build:android": "npm run build && npx cap sync android && cd android && ./gradlew assembleDebug"
+    "cap:init": "npx @capacitor/cli@latest init",
+    "cap:add:android": "npx @capacitor/cli@latest add android",
+    "cap:sync": "npx @capacitor/cli@latest sync",
+    "cap:open:android": "npx @capacitor/cli@latest open android",
+    "build:android": "npm run build && npm run cap:sync && cd android && ./gradlew assembleRelease",
+    "build:android:debug": "npm run build && npm run cap:sync && cd android && ./gradlew assembleDebug",
+    "generate-icons": "npx @capacitor/assets@latest generate --iconPath icon.png --splashPath splash.png --android --outDir android/app/src/main/res"
   },
   "dependencies": {
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/app": "^6.2.0",
+    "@capacitor/status-bar": "^6.2.0",
+    "@capacitor/keyboard": "^6.2.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
     "vite": "^5.4.1",
+    "@capacitor/cli": "^6.2.0",
     "@capacitor/assets": "^1.0.0"
   }
 }
