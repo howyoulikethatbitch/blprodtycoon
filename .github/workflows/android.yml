@@ -23,52 +23,51 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          java-version: 17
 
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: 'pnpm'
 
-      - name: Clean previous builds
+      - name: Clean previous build artifacts
         run: |
-          rm -rf node_modules
           rm -rf android/app/build android/build android/.gradle
           rm -rf dist
 
-      - name: Install Node dependencies (npm)
-        run: npm install --no-audit --no-fund --legacy-peer-deps
+      - name: Install Node dependencies
+        run: pnpm install --no-frozen-lockfile
 
       - name: Build web assets (Vite → dist/)
-        run: npm run build
+        run: pnpm run build
 
-      - name: Add Capacitor Android platform (idempotent)
-        run: npx cap add android || echo "Android platform already exists"
+      - name: Add Capacitor Android platform (skips if already exists)
+        run: npx cap add android || echo "Android platform already present, continuing"
 
-      - name: Generate Android icons from icon.png
-        run: npx @capacitor/assets generate --iconPath icon.png --android --outDir android/app/src/main/res || echo "Icon generation skipped"
-
-      - name: Sync Capacitor (web → native)
+      - name: Sync Capacitor (copies web build → Android project)
         run: npx cap sync android
 
       - name: Build Android debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon --warning-mode=none
 
-      - name: Verify APK exists
+      - name: Verify APK was produced
         run: |
           ls -la android/app/build/outputs/apk/debug/
           if [ ! -f android/app/build/outputs/apk/debug/app-debug.apk ]; then
-            echo "::error::APK not produced — build failed"
+            echo "::error::APK not found — build failed"
             exit 1
           fi
 
-      - name: Upload APK artifact
+      - name: Upload APK as downloadable artifact
         uses: actions/upload-artifact@v4
         with:
           name: BL-Production-Tycoon-debug-APK
