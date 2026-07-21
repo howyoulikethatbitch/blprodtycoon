@@ -7,6 +7,7 @@ import { GameProvider, useGame } from './game/state.jsx'
 import TitleScreen from './components/TitleScreen.jsx'
 import TopBar from './components/TopBar.jsx'
 import Sidebar from './components/Sidebar.jsx'
+import { useWeekAdvance } from './game/weekAdvance.js'
 import Dashboard from './components/Dashboard.jsx'
 import ProductionForm from './components/ProductionForm.jsx'
 import ActorRoster from './components/ActorRoster.jsx'
@@ -23,6 +24,7 @@ function GameApp() {
   const { state } = useGame()
   const [screen, setScreen]             = useState('dashboard')
   const [profileActor, setProfileActor] = useState(null)
+  const { advanceWeek, advancing } = useWeekAdvance()
 
   // ── Wire settings → body classes + audio ─────────────────────────────────
   useEffect(() => {
@@ -73,6 +75,24 @@ function GameApp() {
   return (
     <div className="app-layout">
       <TopBar />
+      <div className="mobile-next-week-container">
+        <button
+          className="btn-primary"
+          style={{
+            width: '100%',
+            padding: '12px 16px',
+            fontSize: '10px',
+            letterSpacing: '2px',
+            animation: advancing ? 'none' : 'pulse-glow 2s ease-in-out infinite',
+            opacity: advancing ? 0.7 : 1,
+            boxShadow: '0 4px 0 #8A2B52',
+          }}
+          onClick={advanceWeek}
+          disabled={advancing}
+        >
+          {advancing ? '⏳ WAIT...' : '▶ NEXT WEEK'}
+        </button>
+      </div>
       <div className="app-body">
         <Sidebar currentScreen={screen} setScreen={setScreen} />
         <main className="app-main">

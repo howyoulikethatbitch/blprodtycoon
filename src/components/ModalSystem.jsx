@@ -301,11 +301,21 @@ function EventModal({ data, onClose, dispatch, state }) {
 
 // ── Generic ───────────────────────────────────────────────────────────────────
 function GenericModal({ data, onClose }) {
+  const isAward = data.isAwardMessage;
   return (
-    <div className="modal-box">
-      <div className="modal-title">{data.title ?? 'Notice'}</div>
+    <div className="modal-box" style={isAward ? { textAlign: 'center' } : {}}>
+      <div className="modal-title" style={isAward ? { textAlign: 'center', width: '100%', fontSize: '13px' } : {}}>
+        {data.title ?? 'Notice'}
+      </div>
       <button className="modal-close" onClick={onClose}>✕</button>
-      <div style={{ fontSize: 8, color: 'var(--white)', lineHeight: 2, marginBottom: 16, whiteSpace: 'pre-line' }}>
+      <div style={{
+        fontSize: isAward ? 11 : 8,
+        color: 'var(--white)',
+        lineHeight: 2,
+        marginBottom: 16,
+        whiteSpace: 'pre-line',
+        textAlign: isAward ? 'center' : 'left'
+      }}>
         {data.message}
       </div>
       <button className="btn-primary" style={styles.closeBtn} onClick={onClose}>OK</button>

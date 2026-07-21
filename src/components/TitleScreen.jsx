@@ -16,10 +16,12 @@ export default function TitleScreen() {
   const [blink, setBlink]             = useState(true)
   const [hasSave, setHasSave]         = useState(false)
   const [fading, setFading]           = useState(false)
+  const [showWarningModal, setShowWarningModal] = useState(false)
   const inputRef                      = useRef(null)
 
   useEffect(() => {
     const save = localStorage.getItem('bl_tycoon_save')
+    console.log("TitleScreen useEffect save detected:", !!save, save);
     setHasSave(!!save)
     const t = setInterval(() => setBlink(b => !b), 600)
     return () => clearInterval(t)
@@ -43,8 +45,7 @@ export default function TitleScreen() {
     }
   }
 
-  function handleNewGame(e) {
-    e.preventDefault()
+  function executeNewGame() {
     SFX.success()
     const rawActors = ACTOR_DATA.map(initActor)
     const actors    = initChemistry(rawActors)
@@ -57,6 +58,19 @@ export default function TitleScreen() {
         actors,
       })
     }, 400)
+  }
+
+  function handleNewGame(e) {
+    e.preventDefault()
+    console.log("handleNewGame called. hasSave is:", hasSave);
+    if (hasSave) {
+      console.log("hasSave is true, showing warning modal");
+      SFX.click()
+      setShowWarningModal(true)
+    } else {
+      console.log("hasSave is false, executing new game directly");
+      executeNewGame()
+    }
   }
 
   // ── Settings mini-screen ───────────────────────────────────────────────────
@@ -84,6 +98,72 @@ export default function TitleScreen() {
   if (phase === 'newgame') {
     return (
       <div style={{ ...styles.wrap, opacity: fading ? 0 : 1, transition: 'opacity 0.4s ease' }}>
+        {showWarningModal && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 16,
+          }}>
+            <div style={{
+              background: 'var(--bg-panel, #1F1338)',
+              border: '3px solid var(--pink, #FF6B9D)',
+              padding: '24px 16px',
+              maxWidth: 320,
+              width: '100%',
+              boxShadow: '0 0 20px rgba(255,107,157,0.5)',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}>
+              <div style={{
+                fontSize: 10,
+                color: 'var(--pink, #FF6B9D)',
+                letterSpacing: 2,
+                fontWeight: 'bold',
+                textAlign: 'center',
+              }}>
+                ⚠️ WARNING
+              </div>
+              <div style={{
+                fontSize: 8,
+                color: '#FFFFFF',
+                lineHeight: 1.8,
+                textAlign: 'center',
+              }}>
+                Are you sure you want to start a new game?<br /><br />All your progress will be lost
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="btn-danger"
+                  style={{ flex: 1, fontSize: 8, padding: '12px 8px', textAlign: 'center' }}
+                  onClick={() => {
+                    setShowWarningModal(false);
+                    executeNewGame();
+                  }}
+                >
+                  YES
+                </button>
+                <button
+                  type="button"
+                  style={{ flex: 1, fontSize: 8, padding: '12px 8px', textAlign: 'center' }}
+                  onClick={() => {
+                    SFX.click();
+                    setShowWarningModal(false);
+                  }}
+                >
+                  CANCEL
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div style={styles.box}>
           <div style={styles.bigTitle}>BL PRODUCTION<br />TYCOON</div>
           <div style={styles.subtitle}>— NEW STUDIO —</div>

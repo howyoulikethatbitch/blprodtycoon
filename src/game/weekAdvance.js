@@ -652,23 +652,28 @@ export function useWeekAdvance() {
     // ── 7d. BL Awards reminder — week 48 of each year ────────────────────────
     if (weekInYear === 48) {
       const awardsYear = getYearFromWeek(week)
+      const startYear = state.startYear ?? 2026
+      const calendarYear = startYear + awardsYear - 1
       const flagKey    = `awardsReminder_${awardsYear}`
       if (!state.flags?.[flagKey]) {
         dispatch({ type: A.SET_FLAG, key: flagKey, value: week })
         dispatch({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
           title: '✨ BL AWARDS COMING SOON',
           message:
-            `The Year ${awardsYear} BL Awards Night is in 4 weeks!\n\n`
+            `The Year ${calendarYear} BL Awards Night is in 4 weeks!\n\n`
             + `Prepare your productions — the industry is watching.\n`
             + `Make sure your actors are in top form and your recent work shines.`,
+          isAwardMessage: true,
         } } })
-        pushEventLog(dispatch, `🏆 BL Awards: ceremony in 4 weeks! (Year ${awardsYear})`, 'gold', week)
+        pushEventLog(dispatch, `🏆 BL Awards: ceremony in 4 weeks! (Year ${calendarYear})`, 'gold', week)
       }
     }
 
     // ── 7e. BL Awards ceremony — week 52 of each year ────────────────────────
     if (weekInYear === 52) {
       const awardsYear   = getYearFromWeek(week)
+      const startYear = state.startYear ?? 2026
+      const calendarYear = startYear + awardsYear - 1
       const awardsResult = computeAllAwards(state, week, extraHistoryRecords)
       dispatch({ type: A.SET_AWARDS_DATA, data: awardsResult })
       // Track AotY winner for consecutive-win penalty next year
@@ -680,9 +685,9 @@ export function useWeekAdvance() {
       dispatch({ type: A.PUSH_MODAL, modal: {
         type: 'event',
         data: {
-          label: `✨ BL AWARDS NIGHT — YEAR ${awardsYear} ✨`,
+          label: `✨ BL AWARDS NIGHT — YEAR ${calendarYear} ✨`,
           message:
-            `The Year ${awardsYear} BL Awards Night has arrived!\n\n`
+            `The Year ${calendarYear} BL Awards Night has arrived!\n\n`
             + `Your productions, actors, and studio are all under the spotlight.\n\n`
             + `Will you attend the ceremony? Attending boosts visibility but comes with risk.`,
           choices: [
@@ -697,7 +702,7 @@ export function useWeekAdvance() {
           ],
         },
       } })
-      pushEventLog(dispatch, `✨ BL Awards Night Year ${awardsYear} — the ceremony begins!`, 'gold', week)
+      pushEventLog(dispatch, `✨ BL Awards Night Year ${calendarYear} — the ceremony begins!`, 'gold', week)
     }
 
     // ── 8. Advance week ───────────────────────────────────────────────────────
