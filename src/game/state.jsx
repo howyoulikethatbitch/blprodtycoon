@@ -4,6 +4,7 @@
  */
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react'
 import { generateRivals } from './ranking.js'
+import { initActor, ACTOR_DATA, initChemistry } from './actors.js'
 
 // ─── Initial State ────────────────────────────────────────────────────────────
 export const INITIAL_STATE = {
@@ -22,7 +23,7 @@ export const INITIAL_STATE = {
   unlockedGenres: ['Romance', 'School', 'Office'],
   // Theme unlock system — default starter themes
   unlockedThemes: ['Slow Burn', 'Friends-to-Lovers', 'Enemies-to-Lovers', 'Soulmates', 'Forbidden Love'],
-  actors:        [],
+  actors:        initChemistry(ACTOR_DATA.map(initActor)),
   productions:   [],
   history:       [],
   events:        [],
@@ -326,7 +327,7 @@ function gameReducer(state, action) {
     case A.LOAD_SAVE:
       return {
         ...action.saveData,
-        started:        true,
+        started:        action.saveData.started !== undefined ? action.saveData.started : true,
         startYear:      action.saveData.startYear      ?? 2024,
         eventLog:       action.saveData.eventLog       ?? [],
         fixedCPs:       action.saveData.fixedCPs       ?? [],

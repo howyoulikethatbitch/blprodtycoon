@@ -33,6 +33,7 @@ export default function Dashboard({ setScreen }) {
   const recent      = [...state.history].reverse().slice(0, 6)
   const weekInYear  = ((state.week - 1) % 52) + 1
   const currentYear = Math.ceil(state.week / 52)
+  const calendarYear = (state.startYear ?? 2026) + currentYear - 1
   const showAwardsBanner = weekInYear >= 49 && weekInYear <= 51
 
   return (
@@ -44,7 +45,7 @@ export default function Dashboard({ setScreen }) {
           <span style={{ fontSize: 18 }}>✨</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 9, color: 'var(--gold)', letterSpacing: 1 }}>
-              BL AWARDS NIGHT — YEAR {currentYear}
+              BL AWARDS NIGHT — YEAR {calendarYear}
             </div>
             <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 2 }}>
               {52 - weekInYear} week{52 - weekInYear === 1 ? '' : 's'} until the ceremony. Prepare your studio!

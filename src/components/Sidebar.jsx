@@ -77,20 +77,6 @@ export default function Sidebar({ currentScreen, setScreen }) {
         </div>
       </nav>
 
-      {/* ─── Mobile: floating NEXT WEEK above bottom nav ─────────────────── */}
-      <button
-        className="btn-primary next-week-fab"
-        style={{
-          animation: advancing ? 'none' : 'pulse-glow 2s ease-in-out infinite',
-          opacity: advancing ? 0.7 : 1,
-        }}
-        onClick={advanceWeek}
-        disabled={advancing}
-        aria-label="Advance one week (mobile)"
-      >
-        {advancing ? 'WAIT...' : '▶ NEXT WEEK'}
-      </button>
-
       {/* ─── Mobile bottom tab bar ───────────────────────────────────────── */}
       <nav style={styles.bottomNav} aria-label="Bottom navigation">
         {NAV_ITEMS.map(item => (

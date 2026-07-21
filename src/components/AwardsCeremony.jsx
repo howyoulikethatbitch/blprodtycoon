@@ -15,7 +15,7 @@ import {
 import { SFX } from '../game/audio.js'
 import { triggerConfetti } from './Confetti.jsx'
 import { ActorPortrait } from './ActorRoster.jsx'
-import { PORTRAIT_COLORS } from '../game/actors.js'
+import { PORTRAIT_COLORS, NEW_TALENT_POOL } from '../game/actors.js'
 
 const BASE = import.meta.env.BASE_URL
 
@@ -104,15 +104,23 @@ function GoldParticles({ count = 18 }) {
 }
 
 // ─── Rival portrait fallback (uses free agents pool or color block) ─────────
-function RivalPortrait({ actorName, size = 72, freeAgents = [] }) {
+function RivalPortrait({ actorName, size = 72 }) {
+  const { state } = useGame()
+
+  const unsignedTalents = useMemo(() => {
+    const signedPoolIds = new Set(
+      state.actors.filter(a => a.poolId).map(a => a.poolId)
+    )
+    return NEW_TALENT_POOL.filter(nt => !signedPoolIds.has(nt.poolId))
+  }, [state.actors])
+
   // Try to find a free-agent portrait for flavour
   const poolEntry = useMemo(() => {
-    const available = freeAgents.filter(e => e.portraitFile || e.type === 'new_talent')
-    if (!available.length) return null
+    if (!unsignedTalents.length) return null
     // Deterministic pick based on name
     const idx = Array.from(actorName).reduce((s, c) => s + c.charCodeAt(0), 0)
-    return available[idx % available.length]
-  }, [actorName, freeAgents])
+    return unsignedTalents[idx % unsignedTalents.length]
+  }, [actorName, unsignedTalents])
 
   const [imgFailed, setImgFailed] = useState(false)
   const fallbackColor = PORTRAIT_COLORS[
@@ -172,7 +180,9 @@ export default function AwardsCeremony() {
 
   if (!awardsData) return null
 
-  const { results = [], userWins = [], year } = awardsData
+  const { results = [], userWins = [], year: relativeYear } = awardsData
+  const startYear = state.startYear ?? 2026
+  const year      = startYear + relativeYear - 1
   const attended  = awardsData.attended ?? false
   const resultMap = Object.fromEntries(results.map(r => [r.awardId, r]))
 
@@ -523,7 +533,6 @@ function AwardWinnerDisplay({ result, award, isPlayer, actors, freeAgents }) {
             <RivalPortrait
               actorName={winner.actorName ?? winner.name ?? '?'}
               size={88}
-              freeAgents={freeAgents}
             />
           )}
           {isPlayer && (
@@ -612,7 +621,9 @@ function SummaryRow({ award, result, isPlayer }) {
 function buildResultModal(awardsData, state) {
   const wins  = awardsData?.userWins ?? []
   const total = AWARD_DEFS.length
-  const year  = awardsData?.year ?? '?'
+  const relativeYear = awardsData?.year ?? 1
+  const startYear = state.startYear ?? 2026
+  const year = relativeYear === '?' ? '?' : (startYear + relativeYear - 1)
   let title, message
 
   if (wins.length === total) {
@@ -632,7 +643,7 @@ function buildResultModal(awardsData, state) {
     message = `Unfortunately, you didn't take home any trophies this time. 💔\n\nDon't lose heart—the fans are still cheering for your story! 📣\n\nWork on your ${lacking} and show them who truly rules the charts! 🔥`
   }
 
-  return { type: 'generic', data: { title, message } }
+  return { type: 'generic', data: { title, message, isAwardMessage: true } }
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
