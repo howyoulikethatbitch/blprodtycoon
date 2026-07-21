@@ -15,6 +15,9 @@ jobs:
       - name: Configure npm registry
         run: npm config set registry https://registry.npmjs.org/
 
+      - name: Clear npm cache
+        run: npm cache clean --force
+
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
