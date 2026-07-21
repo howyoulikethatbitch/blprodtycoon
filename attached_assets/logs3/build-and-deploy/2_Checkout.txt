@@ -1,4 +1,4 @@
-﻿2026-07-18T05:33:34.0609039Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-18T05:33:34.0609039Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
 2026-07-18T05:33:34.0615556Z ##[group]Run actions/checkout@v4
 2026-07-18T05:33:34.0616378Z with:
 2026-07-18T05:33:34.0616737Z   repository: howyoulikethatbitch/blprodtycoon
