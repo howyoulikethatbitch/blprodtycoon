@@ -12,20 +12,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure npm registry
-        run: npm config set registry https://registry.npmjs.org/
-
-      - name: Clear npm cache
-        run: npm cache clean --force
-
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: 'npm'
 
+      - name: Clear npm cache
+        run: npm cache clean --force
+
+      - name: Configure npm registry
+        run: npm config set registry https://registry.npmjs.org/
+
       - name: Install Node dependencies
-        run: npm install --legacy-peer-deps --no-audit --no-fund
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
 
       - name: Build web assets (Vite)
         run: npm run build
