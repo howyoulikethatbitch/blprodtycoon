@@ -51,6 +51,22 @@ jobs:
       - name: Add Capacitor Android platform (skips if already exists)
         run: npx cap add android || echo "Android platform already present, continuing"
 
+      - name: Generate Android launcher icons from icon.png
+        run: |
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            case $density in
+              mdpi)    size=48  ;;
+              hdpi)    size=72  ;;
+              xhdpi)   size=96  ;;
+              xxhdpi)  size=144 ;;
+              xxxhdpi) size=192 ;;
+            esac
+            dir="android/app/src/main/res/mipmap-${density}"
+            mkdir -p "$dir"
+            convert icon.png -resize ${size}x${size} "$dir/ic_launcher.png"
+            convert icon.png -resize ${size}x${size} "$dir/ic_launcher_round.png"
+          done
+
       - name: Sync Capacitor (copies web build → Android project)
         run: npx cap sync android
 
