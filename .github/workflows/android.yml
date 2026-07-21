@@ -1,1 +1,91 @@
+name: Build Android APK
 
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Node.js 20 (compatible with Capacitor 7) ────────────────────────
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # ── 3. Install all dependencies (incl. Capacitor from package.json) ────
+      - name: Install dependencies
+        run: npm ci
+
+      # ── 4. Build the web app ───────────────────────────────────────────────
+      - name: Build web app (Vite)
+        run: npm run build
+
+      # ── 5. Add Capacitor Android platform ─────────────────────────────────
+      #       capacitor.config.json is already committed; skip `cap init`.
+      - name: Add Capacitor Android platform
+        run: npx cap add android
+
+      # ── 6. Install icon-generation tool (pinned; not a project dep because
+      #       @capacitor/assets@3 carries its own @capacitor/cli@5 sub-dep) ──
+      - name: Install @capacitor/assets
+        run: npm install -g @capacitor/assets@3.0.5
+
+      # ── 7. Generate app icons from assets/icon.png ─────────────────────────
+      #       Default lookup path is ./assets/icon.png (committed to repo).
+      - name: Generate Android icons
+        run: |
+          capacitor-assets generate \
+            --iconBackgroundColor '#1a0a2e' \
+            --iconBackgroundColorDark '#1a0a2e' \
+            --splashBackgroundColor '#1a0a2e' \
+            --splashBackgroundColorDark '#1a0a2e' \
+            --android
+
+      # ── 8. Sync web assets into the Android project ────────────────────────
+      - name: Sync Capacitor assets
+        run: npx cap sync android
+
+      # ── 8. Java 17 (required by Android Gradle Plugin) ────────────────────
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # ── 9. Cache Gradle ────────────────────────────────────────────────────
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # ── 10. Make gradlew executable ────────────────────────────────────────
+      - name: Make Gradle wrapper executable
+        run: chmod +x android/gradlew
+
+      # ── 11. Build debug APK ────────────────────────────────────────────────
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      # ── 12. Upload APK artifact ────────────────────────────────────────────
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BL-Production-Tycoon-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+          
