@@ -26,11 +26,11 @@
     "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
-    "@capacitor/android": "6.0.3",
+    "@capacitor/android": "6.2.1",
     "@capacitor/app": "6.0.3",
-    "@capacitor/cli": "6.0.3",
-    "@capacitor/core": "6.0.3",
-    "@capacitor/keyboard": "6.0.3",
+    "@capacitor/cli": "6.2.1",
+    "@capacitor/core": "6.2.1",
+    "@capacitor/keyboard": "6.0.4",
     "@capacitor/status-bar": "6.0.3",
     "@vitejs/plugin-react": "^4.3.1",
     "vite": "^5.4.1"
