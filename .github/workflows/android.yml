@@ -51,6 +51,9 @@ jobs:
       - name: Add Capacitor Android platform (skips if already exists)
         run: npx cap add android || echo "Android platform already present, continuing"
 
+      - name: Install ImageMagick
+        run: sudo apt-get install -y imagemagick
+
       - name: Generate Android launcher icons from icon.png
         run: |
           for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
