@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "npm run build"
+    "deploy": "npm run build",
+    "cap:init": "npx cap init \"BL Production Tycoon\" com.blproductiontycoon.app",
+    "generate-icons": "npx @capacitor/assets generate --iconPath icon.png --android --outDir android/app/src/main/res",
+    "cap:sync": "npx cap sync android",
+    "build:android": "npm run build && npx cap sync android && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -15,6 +19,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^5.4.1"
+    "vite": "^5.4.1",
+    "@capacitor/assets": "^1.0.0"
   }
 }
