@@ -17,6 +17,9 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
+          
+      - name: Configure npm registry
+        run: npm config set registry https://registry.npmjs.org/
 
       - name: Install Node dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund
