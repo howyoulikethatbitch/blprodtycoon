@@ -19,7 +19,7 @@ jobs:
           cache: 'npm'
 
       - name: Install Node dependencies
-        run: npm ci
+        run: npm ci || npm install --no-audit --no-fund
 
       - name: Build web assets (Vite)
         run: npm run build
