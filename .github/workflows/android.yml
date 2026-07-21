@@ -1,0 +1,62 @@
+name: Android APK (Capacitor) Build
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build web assets (Vite)
+        run: npm run build
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          java-version: 17
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses
+
+      - name: Initialize Capacitor (if needed)
+        run: |
+          # init may fail if already initialized; continue on errors
+          npx cap init "BL Production Tycoon" com.blproductiontycoon.app || echo "Capacitor init skipped"
+          # add android platform if missing; continue if already present
+          npx cap add android || echo "Android platform already added"
+
+      - name: Generate Android icons from icon.png
+        run: npx @capacitor/assets generate --iconPath icon.png --android --outDir android/app/src/main/res
+
+      - name: Sync Capacitor (copy web assets to native)
+        run: npx cap sync android
+
+      - name: Build Android debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BL-Production-Tycoon-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
