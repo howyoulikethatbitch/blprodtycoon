@@ -1,11 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// Set base to your GitHub Pages repo name, e.g. '/bl-production-tycoon/'
-// Update this if deploying to a custom domain (use '/')
+// Use a relative base so assets are loaded correctly when packaged for Capacitor/Android
 export default defineConfig({
   plugins: [react()],
-  base: '/blprodtycoon/',
+  base: './',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
