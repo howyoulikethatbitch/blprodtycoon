@@ -84,8 +84,8 @@ export function calcWrapDeltas(production, a1, a2) {
   const filmingWeeks = production.weeksTotal ?? 0
   const isFixed      = production.fixedCP ?? false
 
-  // Per-week filming chemistry growth
-  const weekGain = Math.round((filmingWeeks * (isFixed ? 2.5 : 1.5)) * 10) / 10
+  // Per-week filming chemistry growth (reduced from 1.5/2.5 to feel more earned)
+  const weekGain = Math.round((filmingWeeks * (isFixed ? 1.5 : 1.0)) * 10) / 10
   deltas.push({ delta: weekGain, reason: `+${weekGain} filming weeks` })
 
   // Successful production

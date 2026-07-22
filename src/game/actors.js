@@ -266,8 +266,8 @@ export function weeklyActorTick(actor, tier) {
   const patch = {}
 
   if (actor.status === 'filming') {
-    // Slight happiness drain while working hard
-    patch.happiness = clamp((actor.happiness ?? 70) - 2, 0, 100)
+    // Slight happiness drain while working hard (−1/week — noticeable but not punishing)
+    patch.happiness = clamp((actor.happiness ?? 70) - 1, 0, 100)
     // Prompt 8: +5 loyalty per week while in active production
     patch.loyalty = clamp((actor.loyalty ?? 60) + 5, 0, 100)
     // Track consecutive filming weeks for "return to Happy" mechanic

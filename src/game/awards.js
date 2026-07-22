@@ -192,8 +192,8 @@ function pickRivalTitle(usedTitles) {
  */
 function rivalActorScore(tier, rivalScore, year = 1) {
   const ranges = {
-    'Rookie':      [25,  55],
-    'Rising Star': [45,  80],
+    'Rookie':      [38,  65],   // raised from [25,55] — harder to win tier awards early
+    'Rising Star': [52,  90],   // raised from [45,80]
     'Popular':     [65,  95],
     'Worldwide':   [80, 110],
     'BestLead':    [65,  95],
@@ -305,18 +305,18 @@ export function computeAllAwards(state, week, extraHistory = []) {
     } else rivalWin('best_quality', false)
   } else rivalWin('best_quality', false)
 
-  // ── Best in Originality (≥2 series with grade A or better) ─────────────────
+  // ── Best in Originality (≥2 series with grade S or better) ─────────────────
   if (companyEligible) {
-    const origProds = yearHistory.filter(h => h.type === 'series' && isGradeAtLeast(h.grade, 'A'))
+    const origProds = yearHistory.filter(h => h.type === 'series' && isGradeAtLeast(h.grade, 'S'))
     if (origProds.length >= 2) {
       const best = origProds.reduce((a, b) => (GRADE_RANK[a.grade] ?? 99) < (GRADE_RANK[b.grade] ?? 99) ? a : b)
       playerWin('best_originality', { name: companyName, company: companyName, title: best.title, extra: `Grade: ${best.grade}` })
     } else rivalWin('best_originality', false)
   } else rivalWin('best_originality', false)
 
-  // ── Best in Adaptation (≥2 movies with grade A or better) ───────────────────
+  // ── Best in Adaptation (≥2 movies with grade S or better) ───────────────────
   if (companyEligible) {
-    const adaptProds = yearHistory.filter(h => h.type === 'movie' && isGradeAtLeast(h.grade, 'A'))
+    const adaptProds = yearHistory.filter(h => h.type === 'movie' && isGradeAtLeast(h.grade, 'S'))
     if (adaptProds.length >= 2) {
       const best = adaptProds.reduce((a, b) => (GRADE_RANK[a.grade] ?? 99) < (GRADE_RANK[b.grade] ?? 99) ? a : b)
       playerWin('best_adaptation', { name: companyName, company: companyName, title: best.title, extra: `Grade: ${best.grade}` })

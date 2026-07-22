@@ -351,10 +351,11 @@ const TRICKY_COMPANY_EVENTS = [
         + 'Good money and a pop spike, but the community is divided. '
         + 'Declining protects your rep — but the planning fee is already spent.',
       choices: [
-        { label: '✅ Accept (+₩4,000, +15,000 pop, −5 rep)',
+        { label: '✅ Accept (+₩4,000, +pop, −5 rep)',
           effect: (s, d) => {
+            const t = getGameTierByRank(s.numericRank ?? 50)
             d({ type: A.ADD_MONEY,      amount: 4000 })
-            d({ type: A.SET_POPULARITY, value: s.popularity + 15000 })
+            d({ type: A.SET_POPULARITY, value: s.popularity + Math.round(15000 * t.tierPopMult) })
             d({ type: A.ADD_REPUTATION, amount: -5 })
           } },
         { label: '❌ Decline (−₩1,000 sunk cost, +4 rep)',
@@ -381,9 +382,10 @@ const TRICKY_COMPANY_EVENTS = [
           + `Confirming thrills fans and builds chemistry — but the spotlight strains their loyalty. `
           + `Denying protects them professionally but fans lose interest.`,
         choices: [
-          { label: `✅ Confirm (+20,000 pop, +15 chem, −10 loyalty each)`,
+          { label: `✅ Confirm (+pop, +15 chem, −10 loyalty each)`,
             effect: (s2, d) => {
-              d({ type: A.SET_POPULARITY, value: s2.popularity + 20000 })
+              const t = getGameTierByRank(s2.numericRank ?? 50)
+              d({ type: A.SET_POPULARITY, value: s2.popularity + Math.round(20000 * t.tierPopMult) })
               const curA = s2.actors.find(x => x.id === a.id)
               const curB = s2.actors.find(x => x.id === b.id)
               if (curA) d({ type: A.UPDATE_ACTOR, id: a.id, patch: {
@@ -639,6 +641,8 @@ function makeActorEvent(type, actor, state) {
     }
 
     case 'fan_meeting':
+      // Fan meetings only make sense once an actor has some on-screen experience
+      if ((actor.completedProds ?? 0) < 1) return null
       return {
         label: `🎤 FAN MEETING — ${actor.name.toUpperCase()}`,
         message:
@@ -647,8 +651,9 @@ function makeActorEvent(type, actor, state) {
         choices: [
           { label: '✅ Organise event (−₩1,500, +pop, +happiness)',
             effect: (s, d) => {
+              const t = getGameTierByRank(s.numericRank ?? 50)
               d({ type: A.ADD_MONEY,       amount: -1500 })
-              d({ type: A.SET_POPULARITY,  value: s.popularity + 8000 })
+              d({ type: A.SET_POPULARITY,  value: s.popularity + Math.round(8000 * t.tierPopMult) })
               d({ type: A.UPDATE_ACTOR, id: actor.id,
                   patch: { happiness: clamp(h + 20, 0, 100) } })
             } },
@@ -797,15 +802,17 @@ function makeActorEvent(type, actor, state) {
           {
             label: `💕 Form Fixed CP: ${actor.name} × ${partner.name} (++ pop, penalty ∝ betrayed bond strength)`,
             effect: (s, d) => {
+              const t = getGameTierByRank(s.numericRank ?? 50)
               d({ type: A.ADD_FIXED_CP, pair: [actor.id, partner.id] })
-              d({ type: A.SET_POPULARITY, value: s.popularity + 20000 })
+              d({ type: A.SET_POPULARITY, value: s.popularity + Math.round(20000 * t.tierPopMult) })
               applyPenalty(s, d, 0.35)   // 35% of prior chem
             },
           },
           {
             label: `🤷 Ride the moment (+ pop, smaller penalty ∝ bond strength)`,
             effect: (s, d) => {
-              d({ type: A.SET_POPULARITY, value: s.popularity + 10000 })
+              const t = getGameTierByRank(s.numericRank ?? 50)
+              d({ type: A.SET_POPULARITY, value: s.popularity + Math.round(10000 * t.tierPopMult) })
               applyPenalty(s, d, 0.20)   // 20% of prior chem
             },
           },
@@ -844,8 +851,9 @@ function makeActorEvent(type, actor, state) {
         choices: [
           { label: '🎤 Produce the single (−₩2,000, +pop, +happiness)',
             effect: (s, d) => {
+              const t = getGameTierByRank(s.numericRank ?? 50)
               d({ type: A.ADD_MONEY,      amount: -2000 })
-              d({ type: A.SET_POPULARITY, value: s.popularity + 10000 })
+              d({ type: A.SET_POPULARITY, value: s.popularity + Math.round(10000 * t.tierPopMult) })
               d({ type: A.UPDATE_ACTOR, id: actor.id,
                   patch: { happiness: clamp(h + 20, 0, 100) } })
             } },
@@ -907,7 +915,7 @@ const AFTER_PROD_EVENTS = [
 // CP events always succeed when accepted (unless risky). Decline penalties scale by tier.
 // Repeated declines with same pair → loyalty penalty. Risky events have 85%/15% chance.
 function rollCpEventData(ev, a, b, isDuring, tier) {
-  const chemDelta  = isDuring ? 8 : 5
+  const chemDelta  = isDuring ? 5 : 3
   const repDelta   = isDuring ? 4 : 0
   const coRepDelta = isDuring ? 0 : 5
   const declineChemD = tier.declineChemPenalty

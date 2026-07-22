@@ -11,13 +11,13 @@ export const GAME_TIERS = [
     minWeek: 0,
     maxWeek: 19,
     // CP events
-    cpEventFreq: 0.50,
+    cpEventFreq: 0.30,         // was 0.50 — fewer CP events at rookie stage
     declineChemPenalty: -5,   // spec: even Rookie should feel -5 chem on decline
     declineRepPenalty: 0,
     tierPopMult: 1.0,          // tricky event pop scaling
-    // Idle penalties
-    idleHappinessThreshold: 40,
-    idleLoyaltyThreshold: 56,
+    // Idle penalties — more lenient for rookies so actors stay happy longer
+    idleHappinessThreshold: 52,
+    idleLoyaltyThreshold: 60,
     penaltyTickRate: 8,
     // Financial
     freePaidRatio: 0.80,      // 80% free events
