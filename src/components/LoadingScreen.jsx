@@ -3,14 +3,16 @@
  * Loading screen for BL Production Tycoon.
  * Background: one of 5 pixel-art BGs, chosen randomly once per session.
  * Progress bar: pink with a pixelated heart cursor.
- * Loading feels slow on purpose — builds anticipation.
+ * Timer uses Date.now() + setInterval — reliable across all environments
+ * including Capacitor Android WebView where requestAnimationFrame timing
+ * can be unreliable during app startup.
  */
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import './LoadingScreen.css'
 
 const BASE = import.meta.env.BASE_URL
 
-// Backgrounds live in public/images/loading/ — served as static files (works offline in Capacitor)
+// Backgrounds live in public/images/loading/ — static files bundled in APK
 const BACKGROUNDS = [
   `${BASE}images/loading/bg-1.jpg`,
   `${BASE}images/loading/bg-2.jpg`,
@@ -39,6 +41,9 @@ const MESSAGES = [
   '🌎 Expanding your production company...',
   '✨ Almost ready, Producer...',
 ]
+
+// Loading duration in ms — intentionally long for atmosphere
+const LOAD_DURATION = 30000
 
 // ── Ambient canvas: petals + sparkles ─────────────────────────────────────────
 function useAmbientCanvas(canvasRef, reducedMotion) {
@@ -155,7 +160,6 @@ function useAmbientCanvas(canvasRef, reducedMotion) {
 
 // ── Pixelated heart SVG (inline, pink) ────────────────────────────────────────
 function PixelHeart({ size = 18 }) {
-  // 7×6 pixel grid heart shape
   const pixels = [
     [0,1,1,0,1,1,0],
     [1,1,1,1,1,1,1],
@@ -164,12 +168,11 @@ function PixelHeart({ size = 18 }) {
     [0,0,1,1,1,0,0],
     [0,0,0,1,0,0,0],
   ]
-  const px = size / 7
   return (
     <svg
       width={size}
       height={size * (6 / 7)}
-      viewBox={`0 0 7 6`}
+      viewBox="0 0 7 6"
       style={{ imageRendering: 'pixelated', display: 'block', filter: 'drop-shadow(0 0 4px #FF6B9D)' }}
       aria-hidden="true"
     >
@@ -188,7 +191,10 @@ export default function LoadingScreen({ onComplete }) {
   const [msgIndex,   setMsgIndex]   = useState(0)
   const [msgVisible, setMsgVisible] = useState(true)
   const [phase,      setPhase]      = useState('loading')
-  const canvasRef = useRef(null)
+  const canvasRef    = useRef(null)
+  // Keep a ref to onComplete so the timer effect never re-runs when App re-renders
+  const onCompleteRef = useRef(onComplete)
+  useEffect(() => { onCompleteRef.current = onComplete }, [onComplete])
 
   const reducedMotion =
     typeof window !== 'undefined' &&
@@ -199,39 +205,43 @@ export default function LoadingScreen({ onComplete }) {
   // ── Skip instantly for reduced-motion users ──
   useEffect(() => {
     if (!reducedMotion) return
-    const t = setTimeout(() => onComplete?.(), 300)
+    const t = setTimeout(() => onCompleteRef.current?.(), 300)
     return () => clearTimeout(t)
-  }, [reducedMotion, onComplete])
+  }, [reducedMotion])
 
-  // ── Simulated loading progress — intentionally slow ──
+  // ── Progress timer — Date.now() + setInterval, reliable in Capacitor ─────────
   useEffect(() => {
     if (reducedMotion) return
-    // Very slow: ~30 seconds total. Eased so it crawls early, then finishes.
-    const DURATION = 30000
-    const start = performance.now()
-    let raf
-    function tick(now) {
-      const t = Math.min((now - start) / DURATION, 1)
-      // Custom ease: slow start, slow middle, tiny burst at end
+
+    const startMs  = Date.now()
+    // Tick every 250ms — smooth enough, low overhead
+    const TICK_MS  = 250
+
+    const id = setInterval(() => {
+      const elapsed = Date.now() - startMs
+      const t = Math.min(elapsed / LOAD_DURATION, 1)
+
+      // Ease: crawls through first 70%, then finishes
       const eased = t < 0.7
-        ? 0.5 * Math.pow(t / 0.7, 1.6)          // crawls to ~50% in first 70%
-        : 0.5 + 0.5 * Math.pow((t - 0.7) / 0.3, 0.7) // finishes last 50% quickly
-      const p = Math.floor(eased * 100)
+        ? 0.5 * Math.pow(t / 0.7, 1.8)
+        : 0.5 + 0.5 * Math.pow((t - 0.7) / 0.3, 0.65)
+
+      const p = Math.min(Math.floor(eased * 100), 100)
       setProgress(p)
-      if (p < 100) {
-        raf = requestAnimationFrame(tick)
-      } else {
+
+      if (t >= 1) {
+        clearInterval(id)
         setProgress(100)
         setPhase('complete')
         setTimeout(() => {
           setPhase('exit')
-          setTimeout(() => onComplete?.(), 650)
+          setTimeout(() => onCompleteRef.current?.(), 650)
         }, 800)
       }
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [reducedMotion, onComplete])
+    }, TICK_MS)
+
+    return () => clearInterval(id)
+  }, [reducedMotion]) // stable — no onComplete dependency
 
   // ── Rotating messages ──
   useEffect(() => {
