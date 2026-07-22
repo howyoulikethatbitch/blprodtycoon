@@ -14,11 +14,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -81,6 +81,22 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon --warning-mode=none
 
+      - name: Verify APK was produced
+        run: |
+          ls -la android/app/build/outputs/apk/debug/
+          if [ ! -f android/app/build/outputs/apk/debug/app-debug.apk ]; then
+            echo "::error::APK not found — build failed"
+            exit 1
+          fi
+
+      - name: Upload APK as downloadable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BL-Production-Tycoon-debug-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+          
       - name: Verify APK was produced
         run: |
           ls -la android/app/build/outputs/apk/debug/
