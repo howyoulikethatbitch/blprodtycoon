@@ -54,7 +54,7 @@ jobs:
       - name: Install ImageMagick
         run: sudo apt-get install -y imagemagick
 
-      - name: Generate Android launcher icons from icon.png
+      - name: Generate Android launcher icons from icon.jpg
         run: |
           for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
             case $density in
@@ -66,8 +66,8 @@ jobs:
             esac
             dir="android/app/src/main/res/mipmap-${density}"
             mkdir -p "$dir"
-            convert icon.png -resize ${size}x${size} "$dir/ic_launcher.png"
-            convert icon.png -resize ${size}x${size} "$dir/ic_launcher_round.png"
+            convert icon.jpg -resize ${size}x${size} "$dir/ic_launcher.png"
+            convert icon.jpg -resize ${size}x${size} "$dir/ic_launcher_round.png"
           done
 
       - name: Sync Capacitor (copies web build → Android project)
