@@ -96,19 +96,5 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
+          overwrite: true
           
-      - name: Verify APK was produced
-        run: |
-          ls -la android/app/build/outputs/apk/debug/
-          if [ ! -f android/app/build/outputs/apk/debug/app-debug.apk ]; then
-            echo "::error::APK not found — build failed"
-            exit 1
-          fi
-
-      - name: Upload APK as downloadable artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: BL-Production-Tycoon-debug-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 30
