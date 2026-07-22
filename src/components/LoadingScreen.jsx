@@ -8,6 +8,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import './LoadingScreen.css'
 import gameLogo from '../assets/game-logo.png'
+import loadingBgVideo from '../assets/loading-bg.mp4'
 
 const MESSAGES = [
   '🎬 Building your dream studio...',
@@ -229,7 +230,7 @@ export default function LoadingScreen({ onComplete }) {
       <video
         ref={videoRef}
         className="ls-bg-video"
-        src="./loading-bg.mp4"
+        src={loadingBgVideo}
         autoPlay
         loop
         muted
