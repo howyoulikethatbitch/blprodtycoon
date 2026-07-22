@@ -1,5 +1,10 @@
 # Line ending normalisation
 * text=auto
 
-# Do NOT use LFS for any file type — all assets are committed as real binary files
-# so they are bundled correctly in Capacitor APK builds.
+# Image assets are stored in Git LFS.
+# GitHub Actions workflows must use actions/checkout@v4 with lfs: true
+# so the real image files are fetched (not the 131-byte pointer stubs).
+*.jpg filter=lfs diff=lfs merge=lfs -text
+*.jpeg filter=lfs diff=lfs merge=lfs -text
+*.png filter=lfs diff=lfs merge=lfs -text
+*.webp filter=lfs diff=lfs merge=lfs -text
