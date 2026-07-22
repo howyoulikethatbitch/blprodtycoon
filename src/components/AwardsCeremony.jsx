@@ -51,6 +51,10 @@ if (typeof document !== 'undefined') {
         from { opacity: 0; transform: translateX(-18px); }
         to   { opacity: 1; transform: translateX(0); }
       }
+      @keyframes announcer-fade {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
       .shimmer-text {
         background: linear-gradient(
           90deg,
@@ -176,7 +180,9 @@ export default function AwardsCeremony() {
   const [winnerVisible, setWinnerVisible] = useState(false)
   const [titleVisible, setTitleVisible]   = useState(false)
   const [openingReady, setOpeningReady]   = useState(false)
-  const timerRef = useRef(null)
+  const timerRef        = useRef(null)
+  const announceRef     = useRef(null)
+  const [announcerPhase, setAnnouncerPhase] = useState(null) // null|'part1'|'part2'|'done'
 
   if (!awardsData) return null
 
@@ -215,10 +221,61 @@ export default function AwardsCeremony() {
   }, [phase, awardIdx])
 
   function clearTimer() { if (timerRef.current) clearTimeout(timerRef.current) }
+  function clearAnnounce() { if (announceRef.current) clearTimeout(announceRef.current) }
+
+  // ── Announcer phase auto-advance ─────────────────────────────────────────
+  useEffect(() => {
+    if (!announcerPhase || announcerPhase === 'done') return
+    clearAnnounce()
+
+    const ms = (s) => Math.round(s * 1000 * animMult)
+    const reveal = () => {
+      setAnnouncerPhase('done')
+      setWinnerVisible(true)
+      if (isPlayerWin) {
+        triggerConfetti(isLast ? 1.5 : 0.6)
+        SFX.success && SFX.success()
+      }
+    }
+
+    if (!isMajor) {
+      // Minor: "And the winner for [category] goes to…" → 3 s → reveal
+      announceRef.current = setTimeout(reveal, ms(3))
+    } else if (isLast) {
+      // Last: "To present our final…" (3 s) → "The winner for [category] is…" (2 s) → reveal
+      if (announcerPhase === 'part1') {
+        announceRef.current = setTimeout(() => setAnnouncerPhase('part2'), ms(3))
+      } else if (announcerPhase === 'part2') {
+        announceRef.current = setTimeout(reveal, ms(2))
+      }
+    } else {
+      // Major (not last): "And now…" (2 s) → "…goes to…" (3 s) → reveal
+      if (announcerPhase === 'part1') {
+        announceRef.current = setTimeout(() => setAnnouncerPhase('part2'), ms(2))
+      } else if (announcerPhase === 'part2') {
+        announceRef.current = setTimeout(reveal, ms(3))
+      }
+    }
+
+    return clearAnnounce
+  }, [announcerPhase, isMajor, isLast, animMult])
+
+  function getAnnouncerText() {
+    const label = currentAward?.label ?? 'this award'
+    if (!isMajor) return `And the winner for ${label} goes to…`
+    if (isLast) {
+      if (announcerPhase === 'part1') return 'To present our final and most prestigious award of the night…'
+      return `The winner for ${label} is…`
+    }
+    // major, not last
+    if (announcerPhase === 'part1') return `And now, the moment you have all been waiting for. The winner for ${label}…`
+    return '…goes to…'
+  }
 
   // ── Leave handler ────────────────────────────────────────────────────────
   function handleLeave() {
     clearTimer()
+    clearAnnounce()
     SFX.click()
     const effects = calcAttendanceEffects(attended, userWins)
     if (effects.repDelta !== 0) dispatch({ type: A.ADD_REPUTATION, amount: effects.repDelta })
@@ -242,16 +299,14 @@ export default function AwardsCeremony() {
   // ── Award progression ────────────────────────────────────────────────────
   function handleReveal() {
     SFX.modal()
-    setWinnerVisible(true)
-    if (isPlayerWin) {
-      triggerConfetti(isLast ? 1.5 : 0.6)
-      SFX.success && SFX.success()
-    }
+    setAnnouncerPhase('part1')
   }
 
   function handleNext() {
     clearTimer()
+    clearAnnounce()
     SFX.click()
+    setAnnouncerPhase(null)
     if (isLast) {
       setPhase('summary')
       return
@@ -403,10 +458,33 @@ export default function AwardsCeremony() {
             {isMajor ? '⭐ MAIN AWARD' : 'AWARD'}
           </div>
 
-          {!winnerVisible ? (
+          {!winnerVisible && !announcerPhase ? (
             <button style={S.revealBtn} onClick={handleReveal}>
               🎭 REVEAL WINNER
             </button>
+          ) : !winnerVisible ? (
+            <div key={announcerPhase} style={{
+              padding: '22px 28px',
+              background: 'rgba(0,0,0,0.55)',
+              border: `1px solid ${isMajor ? 'var(--gold)' : 'var(--lav)'}`,
+              borderRadius: 10,
+              textAlign: 'center',
+              animation: 'announcer-fade 0.4s ease both',
+              minHeight: 64,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <span style={{
+                fontSize: isMajor ? 18 : 16,
+                color: isMajor ? 'var(--gold)' : 'var(--white)',
+                fontStyle: 'italic',
+                letterSpacing: '0.04em',
+                lineHeight: 1.5,
+              }}>
+                {getAnnouncerText()}
+              </span>
+            </div>
           ) : (
             <div style={{
               ...S.winnerCard,
