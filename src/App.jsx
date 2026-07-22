@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect } from 'react'
 import { GameProvider, useGame } from './game/state.jsx'
+import LoadingScreen from './components/LoadingScreen.jsx'
 import TitleScreen from './components/TitleScreen.jsx'
 import TopBar from './components/TopBar.jsx'
 import Sidebar from './components/Sidebar.jsx'
@@ -111,9 +112,15 @@ function GameApp() {
 }
 
 export default function App() {
+  const [appLoading, setAppLoading] = useState(true)
   return (
-    <GameProvider>
-      <GameApp />
-    </GameProvider>
+    <>
+      {appLoading && (
+        <LoadingScreen onComplete={() => setAppLoading(false)} />
+      )}
+      <GameProvider>
+        <GameApp />
+      </GameProvider>
+    </>
   )
 }
