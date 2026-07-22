@@ -1,14 +1,23 @@
 /**
  * LoadingScreen.jsx
  * Loading screen for BL Production Tycoon.
- * Background: loading-bg.mp4 (video, autoplay forced for Android WebView).
- * Title: game-logo.png
- * Ambient canvas: petals + sparkles.
+ * Background: one of 5 pixel-art BGs, chosen randomly once per session.
+ * Progress bar: pink with a pixelated heart cursor.
+ * Loading feels slow on purpose — builds anticipation.
  */
 import React, { useState, useEffect, useRef } from 'react'
 import './LoadingScreen.css'
-import gameLogo from '../assets/game-logo.png'
-import loadingBgVideo from '../assets/loading-bg.mp4'
+
+import bg1 from '../assets/bg-1.jpg'
+import bg2 from '../assets/bg-2.jpg'
+import bg3 from '../assets/bg-3.jpg'
+import bg4 from '../assets/bg-4.jpg'
+import bg5 from '../assets/bg-5.jpg'
+
+const BACKGROUNDS = [bg1, bg2, bg3, bg4, bg5]
+
+// Pick once per session — stable across re-renders
+const SESSION_BG = BACKGROUNDS[Math.floor(Math.random() * BACKGROUNDS.length)]
 
 const MESSAGES = [
   '🎬 Building your dream studio...',
@@ -141,6 +150,35 @@ function useAmbientCanvas(canvasRef, reducedMotion) {
   }, [canvasRef, reducedMotion])
 }
 
+// ── Pixelated heart SVG (inline, pink) ────────────────────────────────────────
+function PixelHeart({ size = 18 }) {
+  // 7×6 pixel grid heart shape
+  const pixels = [
+    [0,1,1,0,1,1,0],
+    [1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1],
+    [0,1,1,1,1,1,0],
+    [0,0,1,1,1,0,0],
+    [0,0,0,1,0,0,0],
+  ]
+  const px = size / 7
+  return (
+    <svg
+      width={size}
+      height={size * (6 / 7)}
+      viewBox={`0 0 7 6`}
+      style={{ imageRendering: 'pixelated', display: 'block', filter: 'drop-shadow(0 0 4px #FF6B9D)' }}
+      aria-hidden="true"
+    >
+      {pixels.flatMap((row, r) =>
+        row.map((on, c) =>
+          on ? <rect key={`${r}-${c}`} x={c} y={r} width={1} height={1} fill="#FF6B9D" /> : null
+        )
+      )}
+    </svg>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function LoadingScreen({ onComplete }) {
   const [progress,   setProgress]   = useState(0)
@@ -148,31 +186,12 @@ export default function LoadingScreen({ onComplete }) {
   const [msgVisible, setMsgVisible] = useState(true)
   const [phase,      setPhase]      = useState('loading')
   const canvasRef = useRef(null)
-  const videoRef  = useRef(null)
 
   const reducedMotion =
     typeof window !== 'undefined' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
   useAmbientCanvas(canvasRef, reducedMotion)
-
-  // ── Force video play on Android WebView (autoPlay attr alone is not enough) ──
-  useEffect(() => {
-    const vid = videoRef.current
-    if (!vid) return
-    const tryPlay = () => {
-      vid.muted = true
-      vid.play().catch(() => {/* silently ignore if still blocked */})
-    }
-    // Try immediately, then again on first user interaction as fallback
-    tryPlay()
-    document.addEventListener('touchstart', tryPlay, { once: true })
-    document.addEventListener('click',      tryPlay, { once: true })
-    return () => {
-      document.removeEventListener('touchstart', tryPlay)
-      document.removeEventListener('click',      tryPlay)
-    }
-  }, [])
 
   // ── Skip instantly for reduced-motion users ──
   useEffect(() => {
@@ -181,15 +200,19 @@ export default function LoadingScreen({ onComplete }) {
     return () => clearTimeout(t)
   }, [reducedMotion, onComplete])
 
-  // ── Simulated loading progress ──
+  // ── Simulated loading progress — intentionally slow ──
   useEffect(() => {
     if (reducedMotion) return
-    const DURATION = 4800
+    // Very slow: ~14 seconds total. Eased so it crawls early, then finishes.
+    const DURATION = 14000
     const start = performance.now()
     let raf
     function tick(now) {
       const t = Math.min((now - start) / DURATION, 1)
-      const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
+      // Custom ease: slow start, slow middle, tiny burst at end
+      const eased = t < 0.7
+        ? 0.5 * Math.pow(t / 0.7, 1.6)          // crawls to ~50% in first 70%
+        : 0.5 + 0.5 * Math.pow((t - 0.7) / 0.3, 0.7) // finishes last 50% quickly
       const p = Math.floor(eased * 100)
       setProgress(p)
       if (p < 100) {
@@ -226,25 +249,20 @@ export default function LoadingScreen({ onComplete }) {
       aria-label="Loading BL Production Tycoon"
       aria-live="polite"
     >
-      {/* Background video */}
-      <video
-        ref={videoRef}
-        className="ls-bg-video"
-        src={loadingBgVideo}
-        autoPlay
-        loop
-        muted
-        playsInline
+      {/* Background image — random, chosen once per session */}
+      <img
+        className="ls-bg-img"
+        src={SESSION_BG}
+        alt=""
         aria-hidden="true"
+        draggable="false"
       />
+
+      {/* Dark overlay so HUD stays readable over any background */}
+      <div className="ls-bg-overlay" aria-hidden="true" />
 
       {/* Ambient particles canvas */}
       <canvas ref={canvasRef} className="ls-canvas" aria-hidden="true" />
-
-      {/* Game title logo */}
-      <div className="ls-title-wrap" aria-hidden="true">
-        <img src={gameLogo} alt="BL Production Tycoon" className="ls-logo" />
-      </div>
 
       {/* Bottom HUD: message + progress bar */}
       <div className="ls-hud">
@@ -253,6 +271,16 @@ export default function LoadingScreen({ onComplete }) {
         </div>
 
         <div className="ls-bar-wrap">
+          {/* Heart cursor above the bar, positioned at fill edge */}
+          <div className="ls-heart-row" aria-hidden="true">
+            <div
+              className="ls-heart-cursor"
+              style={{ left: `calc(${progress}% - 9px)` }}
+            >
+              <PixelHeart size={18} />
+            </div>
+          </div>
+
           <div
             className="ls-bar-track"
             role="progressbar"
