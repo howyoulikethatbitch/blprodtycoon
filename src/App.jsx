@@ -113,10 +113,12 @@ function GameApp() {
 
 export default function App() {
   const [appLoading, setAppLoading] = useState(true)
+  // Stable ref so LoadingScreen's timer effect never restarts due to prop identity change
+  const onLoadComplete = React.useRef(() => setAppLoading(false)).current
   return (
     <>
       {appLoading && (
-        <LoadingScreen onComplete={() => setAppLoading(false)} />
+        <LoadingScreen onComplete={onLoadComplete} />
       )}
       <GameProvider>
         <GameApp />
