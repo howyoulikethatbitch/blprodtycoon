@@ -1,11 +1,13 @@
 /**
  * LoadingScreen.jsx
- * Premium pixel-art loading screen for BL Production Tycoon.
- * Pure CSS + Canvas animations — no video, no GIF, no Lottie.
+ * Loading screen for BL Production Tycoon.
+ * Uses loading-bg.mp4 as background video and game-logo.png as the title logo.
+ * Canvas animations for ambient particles (clouds, petals, sparkles).
  * Supports: PWA offline, Capacitor Android, prefers-reduced-motion, all viewports.
  */
 import React, { useState, useEffect, useRef } from 'react'
 import './LoadingScreen.css'
+import gameLogo from '../assets/game-logo.png'
 
 const MESSAGES = [
   '🎬 Building your dream studio...',
@@ -290,8 +292,16 @@ export default function LoadingScreen({ onComplete }) {
       aria-label="Loading BL Production Tycoon"
       aria-live="polite"
     >
-      {/* Sunset sky gradient */}
-      <div className="ls-sky" aria-hidden="true" />
+      {/* Background video */}
+      <video
+        className="ls-bg-video"
+        src="./loading-bg.mp4"
+        autoPlay
+        loop
+        muted
+        playsInline
+        aria-hidden="true"
+      />
 
       {/* Ambient particles canvas (clouds, petals, sparkles) */}
       <canvas ref={canvasRef} className="ls-canvas" aria-hidden="true" />
@@ -318,10 +328,9 @@ export default function LoadingScreen({ onComplete }) {
         <div className="ls-ground" />
       </div>
 
-      {/* Game title */}
+      {/* Game title logo */}
       <div className="ls-title-wrap" aria-hidden="true">
-        <div className="ls-title">BL PRODUCTION<br />TYCOON</div>
-        <div className="ls-subtitle">— produce love · build the dream —</div>
+        <img src={gameLogo} alt="BL Production Tycoon" className="ls-logo" />
       </div>
 
       {/* Chibi characters + hearts */}
