@@ -57,6 +57,9 @@ jobs:
       - name: Download app icon
         run: curl -L "https://i.imgur.com/xHSHlIM.jpeg" -o /tmp/icon_source.jpg
 
+      - name: Sync Capacitor (copies web build → Android project)
+        run: npx cap sync android
+
       - name: Generate Android launcher icons
         run: |
           for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
@@ -72,9 +75,6 @@ jobs:
             convert /tmp/icon_source.jpg -resize ${size}x${size} "$dir/ic_launcher.png"
             convert /tmp/icon_source.jpg -resize ${size}x${size} "$dir/ic_launcher_round.png"
           done
-
-      - name: Sync Capacitor (copies web build → Android project)
-        run: npx cap sync android
 
       - name: Build Android debug APK
         working-directory: android
