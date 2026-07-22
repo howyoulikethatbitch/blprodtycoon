@@ -62,6 +62,7 @@ jobs:
 
       - name: Generate Android launcher icons
         run: |
+          rm -rf android/app/src/main/res/mipmap-anydpi-v26
           for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
             case $density in
               mdpi)    size=48  ;;
