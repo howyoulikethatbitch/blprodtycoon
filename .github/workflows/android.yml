@@ -55,7 +55,7 @@ jobs:
         run: sudo apt-get install -y imagemagick
 
       - name: Download app icon
-        run: curl -L "https://i.imgur.com/a/3aJOCRC" -o /tmp/icon_source.png
+        run: curl -L "https://i.imgur.com/a/3aJOCRC" -o /tmp/icon_source.jpg
 
       - name: Generate Android launcher icons
         run: |
