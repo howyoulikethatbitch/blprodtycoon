@@ -246,7 +246,7 @@ export function moodEmoji(happiness) {
 // ─── Portrait URL helper ──────────────────────────────────────────────────────
 export function portraitUrl(actorId, base = '') {
   const padded = String(actorId).padStart(2, '0')
-  return `${base}images/actor_${padded}.jpg`
+  return `${base}images/actors-portraits/Actor_${padded}.jpg`
 }
 
 // ─── Can be assigned to a production ─────────────────────────────────────────

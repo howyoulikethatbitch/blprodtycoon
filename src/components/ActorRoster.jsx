@@ -180,7 +180,7 @@ export function ActorPortrait({ actor, size = 64, isLocked = false, style: extra
   // Pool talent actors carry a portraitFile field; use pool portrait dir
   const src = actor.portraitFile
     ? `${BASE}images/pool/${actor.portraitFile}`
-    : `${BASE}images/actor_${padded}.jpg`
+    : `${BASE}images/actors-portraits/Actor_${padded}.jpg`
   const fallback  = PORTRAIT_COLORS[(actor.id - 1) % PORTRAIT_COLORS.length]
   const initials  = (actor.name ?? '?')[0]
 

@@ -8,13 +8,16 @@
 import React, { useState, useEffect, useRef } from 'react'
 import './LoadingScreen.css'
 
-import bg1 from '../assets/bg-1.jpg'
-import bg2 from '../assets/bg-2.jpg'
-import bg3 from '../assets/bg-3.jpg'
-import bg4 from '../assets/bg-4.jpg'
-import bg5 from '../assets/bg-5.jpg'
+const BASE = import.meta.env.BASE_URL
 
-const BACKGROUNDS = [bg1, bg2, bg3, bg4, bg5]
+// Backgrounds live in public/images/loading/ — served as static files (works offline in Capacitor)
+const BACKGROUNDS = [
+  `${BASE}images/loading/bg-1.jpg`,
+  `${BASE}images/loading/bg-2.jpg`,
+  `${BASE}images/loading/bg-3.jpg`,
+  `${BASE}images/loading/bg-4.jpg`,
+  `${BASE}images/loading/bg-5.jpg`,
+]
 
 // Pick once per session — stable across re-renders
 const SESSION_BG = BACKGROUNDS[Math.floor(Math.random() * BACKGROUNDS.length)]
@@ -203,8 +206,8 @@ export default function LoadingScreen({ onComplete }) {
   // ── Simulated loading progress — intentionally slow ──
   useEffect(() => {
     if (reducedMotion) return
-    // Very slow: ~14 seconds total. Eased so it crawls early, then finishes.
-    const DURATION = 14000
+    // Very slow: ~30 seconds total. Eased so it crawls early, then finishes.
+    const DURATION = 30000
     const start = performance.now()
     let raf
     function tick(now) {
