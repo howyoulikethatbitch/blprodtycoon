@@ -112,7 +112,7 @@ function ProductionResultModal({ data, onClose }) {
       {/* ── Header ── */}
       <div style={styles.header}>
         <div style={styles.headerTitle}>🎬 FINAL CRITIQUE</div>
-        <button className="modal-close" onClick={onClose} style={{ position: 'static', marginLeft: 'auto' }}>✕</button>
+
       </div>
 
       <div style={{ padding: '0 14px 14px' }}>
@@ -267,7 +267,7 @@ function RankUpModal({ data, onClose }) {
   return (
     <div className="modal-box" style={{ textAlign: 'center' }}>
       <div className="modal-title">🏆 RANK UP!</div>
-      <button className="modal-close" onClick={onClose}>✕</button>
+
       <div style={{ fontSize: 32, margin: '16px 0' }}>🎉</div>
       <div style={{ fontSize: 10, color: 'var(--gold)', marginBottom: 8 }}>STUDIO STATUS INCREASED</div>
       <div style={{ fontSize: 14, color: rank.color, marginBottom: 20 }}>{rank.label}</div>
@@ -314,7 +314,7 @@ function GenericModal({ data, onClose }) {
       <div className="modal-title" style={isAward ? { textAlign: 'center', width: '100%', fontSize: '13px' } : {}}>
         {data.title ?? 'Notice'}
       </div>
-      <button className="modal-close" onClick={onClose}>✕</button>
+
       <div style={{
         fontSize: isAward ? 11 : 8,
         color: 'var(--white)',
@@ -379,7 +379,7 @@ function AuditionModal({ data, onClose, dispatch, state }) {
       {/* Header */}
       <div style={{ ...styles.header, position: 'sticky', top: 0, zIndex: 2 }}>
         <div style={styles.headerTitle}>🎭 AUDITION WEEK</div>
-        <button className="modal-close" onClick={onClose} style={{ position: 'static', marginLeft: 'auto' }}>✕</button>
+
       </div>
 
       <div style={{ padding: '10px 14px 14px' }}>
@@ -477,7 +477,7 @@ function ActorQuitNoticeModal({ data, onClose }) {
   return (
     <div className="modal-box" style={{ textAlign: 'center' }}>
       <div className="modal-title" style={{ color: 'var(--red)' }}>💥 ACTOR QUIT</div>
-      <button className="modal-close" onClick={onClose}>✕</button>
+
 
       {actor && (
         <div style={{ display: 'flex', justifyContent: 'center', margin: '14px 0 8px' }}>
@@ -509,7 +509,7 @@ function ActorBurnLetterModal({ data, onClose }) {
   return (
     <div className="modal-box">
       <div className="modal-title">🧳 {data.actorName} — FAREWELL</div>
-      <button className="modal-close" onClick={onClose}>✕</button>
+
 
       <div style={{
         fontSize: 8,
