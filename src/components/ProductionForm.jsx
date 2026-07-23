@@ -49,11 +49,11 @@ export default function ProductionForm({ setScreen }) {
   const yearStartGlobal  = (currentYear - startYear) * 52 + 1    // global week of year start
 
   // ── Form state ──────────────────────────────────────────────────────────────
-  const [prodType,  setProdType]  = useState('series')
+  const [prodType,  setProdType]  = useState('mini_series')
   const [title,     setTitle]     = useState('')
   const [genre,     setGenre]     = useState('Romance')
   const [story,     setStory]     = useState('original')
-  const [schedule,  setSchedule]  = useState('6m')
+  const [schedule,  setSchedule]  = useState('3m')
   const [platform,  setPlatform]  = useState('tv')
   const [rating,    setRating]    = useState('pg13')
   const [budgetMult,setBudgetMult]= useState(DEFAULT_BUDGET)
@@ -111,6 +111,60 @@ export default function ProductionForm({ setScreen }) {
   // automatically fill the partner slot.
   const [lead2FixedLocked, setLead2FixedLocked] = useState(false)
   const [lead1FixedLocked, setLead1FixedLocked] = useState(false)
+
+  // ── Unlock Criteria Checks ──────────────────────────────────────────────────
+  const getGradeCount = (g) => state.gradeCounts?.[g] ?? 0
+
+  const isTypeUnlocked = (id) => {
+    if (id === 'mini_series') return true
+    if (id === 'series') {
+      return getGradeCount('C') >= 2 && getGradeCount('B') >= 1
+    }
+    if (id === 'movie') {
+      return getGradeCount('A') >= 2 && getGradeCount('S') >= 1 && getGradeCount('S+') >= 1
+    }
+    return true
+  }
+
+  const isSelectGenreUnlocked = getGradeCount('C') >= 3 && getGradeCount('B') >= 3 && getGradeCount('A') >= 2
+
+  const isStoryUnlocked = (id) => {
+    if (id === 'original') return true
+    if (id === 'adaptation') {
+      return getGradeCount('C') >= 3 && getGradeCount('B') >= 3 && getGradeCount('A') >= 2
+    }
+    return true
+  }
+
+  const isScheduleUnlocked = (id) => {
+    if (id === '3m') return true
+    if (id === '6m') {
+      return getGradeCount('C') >= 2 && getGradeCount('B') >= 2
+    }
+    if (id === '12m') {
+      const hasGrades = getGradeCount('C') >= 3 && getGradeCount('B') >= 2 && getGradeCount('A') >= 2
+      const hasTier = gameTier.id === 'popular' || gameTier.id === 'worldwide'
+      return hasGrades && hasTier
+    }
+    return true
+  }
+
+  const isPlatformUnlocked = (id) => {
+    if (id === 'tv') return true
+    if (id === 'streaming') {
+      return getGradeCount('C') >= 2 && getGradeCount('B') >= 2 && getGradeCount('A') >= 1
+    }
+    return true
+  }
+
+  const isMaxBudgetUnlocked = getGradeCount('C') >= 2 && getGradeCount('B') >= 2 && getGradeCount('A') >= 1
+  const isCustomBudgetUnlocked = getGradeCount('C') >= 3 && getGradeCount('B') >= 3 && getGradeCount('A') >= 2 && getGradeCount('S') >= 2
+
+  const isBudgetPickUnlocked = (v) => {
+    if (v <= 1.0) return true
+    if (v === 2.0) return isMaxBudgetUnlocked
+    return true
+  }
 
   function findFixedPartner(actorId) {
     if (!actorId) return null
@@ -313,11 +367,11 @@ export default function ProductionForm({ setScreen }) {
     pushToast(dispatch, `"${prod.title}" production started!${fixedMsg}`, 'green')
 
     // Reset form — only here, after a confirmed submission (not on tab switch)
-    setProdType('series')
+    setProdType('mini_series')
     setTitle('')
     setGenre('Romance')
     setStory('original')
-    setSchedule('6m')
+    setSchedule('3m')
     setPlatform('tv')
     setRating('pg13')
     setBudgetMult(DEFAULT_BUDGET)
@@ -409,14 +463,19 @@ export default function ProductionForm({ setScreen }) {
         <div className="field">
           <label>TYPE</label>
           <div className="seg">
-            {Object.entries(PROD_TYPES).map(([id, t]) => (
-              <button key={id} type="button"
-                className={prodType === id ? 'sel' : ''}
-                onClick={() => { SFX.click(); setProdType(id) }}
-              >
-                {t.icon} {t.label}
-              </button>
-            ))}
+            {Object.entries(PROD_TYPES).map(([id, t]) => {
+              const unlocked = isTypeUnlocked(id);
+              return (
+                <button key={id} type="button"
+                  className={prodType === id ? 'sel' : ''}
+                  onClick={() => { SFX.click(); setProdType(id) }}
+                  disabled={!unlocked}
+                  style={!unlocked ? { opacity: 0.5, cursor: 'not-allowed', filter: 'grayscale(100%)' } : {}}
+                >
+                  {t.icon} {t.label}
+                </button>
+              );
+            })}
           </div>
           <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 4 }}>
             {typeInfo?.episodes} episode{typeInfo?.episodes !== 1 ? 's' : ''}
@@ -460,8 +519,13 @@ export default function ProductionForm({ setScreen }) {
           </div>
           {/* Two action buttons */}
           <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <button type="button" style={styles.genreBtn}
-              onClick={() => { SFX.click(); setShowGenrePick(true) }}
+            <button type="button"
+              style={{
+                ...styles.genreBtn,
+                ...(!isSelectGenreUnlocked ? { opacity: 0.5, cursor: 'not-allowed', background: 'var(--gray)', color: 'var(--bg-deep)' } : {})
+              }}
+              onClick={() => { if (isSelectGenreUnlocked) { SFX.click(); setShowGenrePick(true) } }}
+              disabled={!isSelectGenreUnlocked}
             >
               🎭 Select Genre
             </button>
@@ -722,14 +786,19 @@ export default function ProductionForm({ setScreen }) {
         <div className="field">
           <label>STORY</label>
           <div className="seg">
-            {STORY_TYPES.map(s => (
-              <button key={s.id} type="button"
-                className={story === s.id ? 'sel' : ''}
-                onClick={() => { SFX.click(); setStory(s.id) }}
-              >
-                {s.label}
-              </button>
-            ))}
+            {STORY_TYPES.map(s => {
+              const unlocked = isStoryUnlocked(s.id);
+              return (
+                <button key={s.id} type="button"
+                  className={story === s.id ? 'sel' : ''}
+                  onClick={() => { SFX.click(); setStory(s.id) }}
+                  disabled={!unlocked}
+                  style={!unlocked ? { opacity: 0.5, cursor: 'not-allowed', filter: 'grayscale(100%)' } : {}}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -737,14 +806,19 @@ export default function ProductionForm({ setScreen }) {
         <div className="field">
           <label>SCHEDULE</label>
           <div className="seg">
-            {SCHEDULES.map(s => (
-              <button key={s.id} type="button"
-                className={schedule === s.id ? 'sel' : ''}
-                onClick={() => { SFX.click(); setSchedule(s.id) }}
-              >
-                {s.label}
-              </button>
-            ))}
+            {SCHEDULES.map(s => {
+              const unlocked = isScheduleUnlocked(s.id);
+              return (
+                <button key={s.id} type="button"
+                  className={schedule === s.id ? 'sel' : ''}
+                  onClick={() => { SFX.click(); setSchedule(s.id) }}
+                  disabled={!unlocked}
+                  style={!unlocked ? { opacity: 0.5, cursor: 'not-allowed', filter: 'grayscale(100%)' } : {}}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
           </div>
           <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 4 }}>
             {schedInfo?.weeks} filming weeks · quality ×{schedInfo?.qMult}
@@ -793,14 +867,19 @@ export default function ProductionForm({ setScreen }) {
         <div className="field">
           <label>PLATFORM</label>
           <div className="seg">
-            {PLATFORMS.map(p => (
-              <button key={p.id} type="button"
-                className={platform === p.id ? 'sel' : ''}
-                onClick={() => { SFX.click(); setPlatform(p.id) }}
-              >
-                {p.icon} {p.label}
-              </button>
-            ))}
+            {PLATFORMS.map(p => {
+              const unlocked = isPlatformUnlocked(p.id);
+              return (
+                <button key={p.id} type="button"
+                  className={platform === p.id ? 'sel' : ''}
+                  onClick={() => { SFX.click(); setPlatform(p.id) }}
+                  disabled={!unlocked}
+                  style={!unlocked ? { opacity: 0.5, cursor: 'not-allowed', filter: 'grayscale(100%)' } : {}}
+                >
+                  {p.icon} {p.label}
+                </button>
+              );
+            })}
           </div>
           <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 4 }}>
             {platInfo?.label === 'TV'
@@ -837,24 +916,35 @@ export default function ProductionForm({ setScreen }) {
 
         {/* Quick-pick */}
         <div className="seg" style={{ marginBottom: 10 }}>
-          {[{ label: 'Min ×0.5', v: 0.5 }, { label: 'Standard ×1.0', v: 1.0 }, { label: 'Max ×2.0', v: 2.0 }].map(b => (
-            <button key={b.v} type="button"
-              className={budgetMult === b.v ? 'sel' : ''}
-              onClick={() => { SFX.click(); setBudgetMult(b.v) }}
-            >
-              {b.label}
-            </button>
-          ))}
+          {[{ label: 'Min ×0.5', v: 0.5 }, { label: 'Standard ×1.0', v: 1.0 }, { label: 'Max ×2.0', v: 2.0 }].map(b => {
+            const unlocked = isBudgetPickUnlocked(b.v);
+            return (
+              <button key={b.v} type="button"
+                className={budgetMult === b.v ? 'sel' : ''}
+                onClick={() => { SFX.click(); setBudgetMult(b.v) }}
+                disabled={!unlocked}
+                style={!unlocked ? { opacity: 0.5, cursor: 'not-allowed', filter: 'grayscale(100%)' } : {}}
+              >
+                {b.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Custom slider */}
-        <div className="field">
+        <div className="field" style={!isCustomBudgetUnlocked ? { opacity: 0.5 } : {}}>
           <label>CUSTOM: ×{budgetMult.toFixed(2)}</label>
           <input
             type="range"
             min={BUDGET_MIN} max={BUDGET_MAX} step={0.05}
             value={budgetMult}
-            onChange={e => setBudgetMult(Number(e.target.value))}
+            onChange={e => {
+              if (isCustomBudgetUnlocked) {
+                setBudgetMult(Number(e.target.value));
+              }
+            }}
+            disabled={!isCustomBudgetUnlocked}
+            style={!isCustomBudgetUnlocked ? { cursor: 'not-allowed' } : {}}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7, color: 'var(--lav)' }}>
             <span>×0.5 (min)</span><span>×3.0 (blockbuster)</span>
