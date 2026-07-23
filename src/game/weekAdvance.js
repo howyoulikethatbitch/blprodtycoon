@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import { useGame, A, pushToast, pushEventLog } from './state.jsx'
 import { tickProduction, calcRevenue, calcScore, popularityDeltaByPlatform } from './productions.js'
-import { weeklyActorRecovery, grantExp, NEW_TALENT_POOL, checkTierPromotion, applyTierPromotion } from './actors.js'
+import { weeklyActorRecovery, grantExp, NEW_TALENT_POOL, checkTierPromotion, applyTierPromotion, actorDisplayName } from './actors.js'
 import { calcChemistryBonus, calcBondGrowth, applyBondDeltas, getChem } from './chemistry.js'
 import { evaluateProduction } from './evaluators.js'
 import { rollWeeklyEvents, rollActorEvent, runChemPulse, rollCpEvents } from './events.js'
@@ -63,18 +63,6 @@ export function useWeekAdvance() {
       if (prod.status !== 'active') continue
       // Prompt 1 (Year Lineup): skip productions not yet at their scheduled start week
       if (prod.weekScheduled && week < prod.weekScheduled) continue
-
-      // ── Filming-start happiness boost (+8) on the very first tick ─────────
-      if (prod.weeksLeft === prod.weeksTotal && (prod.castIds ?? []).length > 0) {
-        for (const actorId of prod.castIds) {
-          const a = state.actors.find(x => x.id === actorId)
-          if (a?.signed) {
-            dispatch({ type: A.UPDATE_ACTOR, id: a.id,
-              patch: { happiness: clamp((a.happiness ?? 70) + 8, 0, 100) } })
-          }
-        }
-      }
-
       const patch = tickProduction(prod)
       dispatch({ type: A.UPDATE_PRODUCTION, id: prod.id, patch })
 
@@ -199,119 +187,6 @@ export function useWeekAdvance() {
             completedProds: (actor.completedProds ?? 0) + 1,
           },
         })
-
-        // ── Injury / fatigue: fires at every 3rd completed production ─────────
-        const newCompleted = (actor.completedProds ?? 0) + 1
-        if (newCompleted % 3 === 0) {
-          const schedMap      = { '3m': 12, '6m': 24, '12m': 48 }
-          const recoveryWeeks = schedMap[prod.schedule] ?? 12
-          const weekInYear    = ((week - 1) % 52) + 1
-          const overflowWeeks = Math.max(0, weekInYear + recoveryWeeks - 52)
-          const isWorsened    = actor.worsened ?? false
-
-          const overflowMsg = overflowWeeks > 0
-            ? `\n\n⚠️ Rest extends ${overflowWeeks} week(s) past year-end — unable to film that period. `
-              + `−${Math.min(overflowWeeks * 5, Math.max(0, (actor.loyalty ?? 30) - 10))} loyalty · −15 happiness deducted.`
-            : ''
-
-          const restEffect = (s, d) => {
-            const loyLoss = overflowWeeks > 0
-              ? Math.min(overflowWeeks * 5, Math.max(0, (actor.loyalty ?? 30) - 10)) : 0
-            const hapLoss = overflowWeeks > 0 ? 15 : 0
-            d({ type: A.UPDATE_ACTOR, id: actor.id, patch: {
-              status:       'injured',
-              injuredWeeks: recoveryWeeks,
-              assignedTo:   null,
-              worsened:     false,
-              idleWeeks:    -8,
-              loyalty:      clamp((actor.loyalty  ?? 30) - loyLoss, 10, 100),
-              happiness:    clamp((actor.happiness ?? 70) - hapLoss,  0, 100),
-            } })
-          }
-
-          const ordinal = n => n === 3 ? '3rd' : `${n}th`
-
-          dispatch({
-            type: A.PUSH_MODAL,
-            modal: {
-              type: 'event',
-              data: {
-                label: isWorsened
-                  ? `🚨 SERIOUS INJURY — ${actor.name.toUpperCase()}`
-                  : `🤕 FATIGUE WARNING — ${actor.name.toUpperCase()}`,
-                message: isWorsened
-                  ? `${actor.name} is carrying a worsened injury and has just finished another production without resting.\n\n`
-                    + `They MUST rest for ${recoveryWeeks} weeks. Forcing them to continue risks permanent departure.${overflowMsg}`
-                  : `${actor.name} has completed their ${ordinal(newCompleted)} production. `
-                    + `The physical and mental toll of repeated filming schedules is beginning to show.\n\n`
-                    + `Recommended recovery: ${recoveryWeeks} weeks.${overflowMsg}`,
-                choices: isWorsened
-                  ? [
-                      { label: `🏥 Mandatory rest — ${recoveryWeeks}-week recovery`,
-                        effect: restEffect },
-                      { label: `😤 Force continue — HIGH risk of permanent departure`,
-                        effect: (s, d) => {
-                          const boostedSkills = {}
-                          for (const [k, v] of Object.entries(actor.skills ?? {}))
-                            boostedSkills[k] = Math.min(100, Math.round(v * 1.5))
-                          d({ type: A.PUSH_MODAL, modal: { type: 'event', data: {
-                            label: `💔 ACTOR WALKOUT — ${actor.name.toUpperCase()}`,
-                            message:
-                              `${actor.name} refuses to go on. After being forced through injury twice, `
-                              + `they are leaving the studio.\n\nThey will enter the Free Agents Pool after a 12-week cooldown.`,
-                            choices: [
-                              { label: `👋 Accept their departure`,
-                                effect: (s2, d2) => {
-                                  d2({ type: A.UPDATE_ACTOR, id: actor.id,
-                                    patch: { signed: false, status: 'locked', loyalty: 0, worsened: false } })
-                                  d2({ type: A.ADD_FREE_AGENT, entry: {
-                                    poolId:          `ex_${actor.id}_${week}_inj`,
-                                    type:            'ex_actor',
-                                    originalActorId: actor.id,
-                                    name:            actor.name,
-                                    tier:            actor.tier,
-                                    skills:          boostedSkills,
-                                    signCost:        Math.round((actor.signCost ?? 200) * 3 * (tier.resignCostMult ?? 1.0)),
-                                    happiness:       20,
-                                    loyalty:         0,
-                                    weeksInPool:     0,
-                                    availableWeek:   week + 12,
-                                    permanentlyGone: false,
-                                    idleReturnCount: 0,
-                                  } })
-                                  pushEventLog(d2,
-                                    `💔 ${actor.name} walked out — forced through injury twice → Free Agents Pool`,
-                                    'red', week)
-                                } },
-                            ],
-                          } } })
-                        } },
-                    ]
-                  : [
-                      { label: `🏥 Rest — ${recoveryWeeks}-week recovery (recommended)`,
-                        effect: restEffect },
-                      { label: `🎬 Push through — continue filming (fatigue will worsen)`,
-                        effect: (s, d) => {
-                          d({ type: A.UPDATE_ACTOR, id: actor.id, patch: {
-                            worsened:  true,
-                            happiness: clamp((actor.happiness ?? 70) - 10, 0, 100),
-                            loyalty:   clamp((actor.loyalty   ?? 60) -  8, 0, 100),
-                          } })
-                          d({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
-                            title:   `⚠️ ${actor.name} — FATIGUE WORSENED`,
-                            message: `${actor.name} is pushing through the fatigue. `
-                                     + `If they complete another production without resting first, `
-                                     + `the consequences will be severe — they may leave the studio permanently.`,
-                          } } })
-                        } },
-                    ],
-              },
-            },
-          })
-          pushEventLog(dispatch,
-            `🤕 ${actor.name} fatigue warning after ${ordinal(newCompleted)} production — rest advised.`,
-            'red', week)
-        }
       }
 
       // Record completion (chemScore stored for BL Awards chemistry check)
@@ -537,36 +412,101 @@ export function useWeekAdvance() {
                     } },
                   { label: `👋 Let ${actor.name} leave → Free Agents Pool`,
                     effect: (s, d) => {
-                      // Move actor to free agents pool as ex-actor (Type A)
+                      const displayName = actorDisplayName(actor)
+                      const idleWks     = actor.idleWeeks ?? 0
+
+                      // ── Burn letter: find recent co-actor from history ───────
+                      const actorHistory = (s.history ?? [])
+                        .filter(h => (h.castIds ?? []).includes(actor.id))
+                        .sort((a, b) => (b.weekCompleted ?? 0) - (a.weekCompleted ?? 0))
+                      const mostRecent = actorHistory[0]
+                      let recentCoActorObj = null
+                      if (mostRecent) {
+                        const otherId = (mostRecent.castIds ?? []).find(id => id !== actor.id)
+                        if (otherId) recentCoActorObj = s.actors.find(a => a.id === otherId) ?? null
+                      }
+                      const completedProds = actor.completedProds ?? 0
+                      const coName = recentCoActorObj ? actorDisplayName(recentCoActorObj) : null
+
+                      let letterText
+                      if (completedProds > 0 && coName) {
+                        letterText = `"Consider this my final goodbye, CEO. 👋 You wasted my time for ${idleWks} weeks. After starring in ${completedProds} production${completedProds !== 1 ? 's' : ''}, even ${coName} told me this studio never treated me right. You couldn't pay me enough to ever come back here!'"`
+                      } else if (completedProds === 0 && coName) {
+                        letterText = `"Consider this my final goodbye, CEO. 👋 You wasted my time for ${idleWks} weeks. I'm taking ${coName}'s advice: "This studio never treated me right". You couldn't pay me enough to ever come back here!'"`
+                      } else if (completedProds > 0 && !coName) {
+                        letterText = `"Consider this my final goodbye, CEO. 👋 You wasted my time for ${idleWks} weeks. After starring in ${completedProds} production${completedProds !== 1 ? 's' : ''}, this studio never treated me right. You couldn't pay me enough to ever come back here!'"`
+                      } else {
+                        letterText = `"I'm out, CEO. 🤬 ${idleWks} weeks of being ignored proved everything I needed to know. Your studio doesn't appreciate talent, and I'm never stepping foot on your company again.'"`
+                      }
+
+                      // ── Co-star loyalty/happiness penalty ───────────────────
+                      if (recentCoActorObj?.signed) {
+                        d({ type: A.UPDATE_ACTOR, id: recentCoActorObj.id, patch: {
+                          loyalty:   clamp((recentCoActorObj.loyalty   ?? 60) - 10, 0, 100),
+                          happiness: clamp((recentCoActorObj.happiness ?? 70) - 10, 0, 100),
+                        } })
+                        pushEventLog(d,
+                          `😞 ${actorDisplayName(recentCoActorObj)} is affected by ${displayName}'s departure. (−10 loyalty, −10 happiness)`,
+                          'red', week)
+                      }
+
+                      // ── Move actor to free agents pool ──────────────────────
                       const boostedSkills = {}
                       for (const [k, v] of Object.entries(actor.skills ?? {})) {
                         boostedSkills[k] = Math.min(100, Math.round(v * 2))
                       }
-                      // Prompt 8: resign cost scales by tier for original 20 actors
-                      const baseCost = Math.round((actor.signCost ?? 200) * 3)
+                      const baseCost   = Math.round((actor.signCost ?? 200) * 3)
                       const resignCost = Math.round(baseCost * (tier.resignCostMult ?? 1.0))
+                      const returnWk   = week + 16   // 16 weeks for loyalty walkouts (was 12)
                       d({ type: A.UPDATE_ACTOR, id: actor.id,
                         patch: { signed: false, status: 'locked', loyalty: 0 } })
                       d({ type: A.ADD_FREE_AGENT, entry: {
-                        poolId:           `ex_${actor.id}_${week}`,
-                        type:             'ex_actor',
-                        originalActorId:  actor.id,
-                        name:             actor.name,
-                        tier:             actor.tier,
-                        skills:           boostedSkills,
-                        characteristics:  actor.characteristics ?? [],
-                        signCost:         resignCost,
-                        happiness:        actor.happiness ?? 20,
-                        loyalty:          0,
-                        weeksInPool:      0,
-                        availableWeek:    week + 12,  // 12-week cooldown
-                        permanentlyGone:  false,
-                        idleReturnCount:  0,
+                        poolId:          `ex_${actor.id}_${week}`,
+                        type:            'ex_actor',
+                        originalActorId: actor.id,
+                        name:            actor.name,
+                        tier:            actor.tier,
+                        skills:          boostedSkills,
+                        characteristics: actor.characteristics ?? [],
+                        signCost:        resignCost,
+                        happiness:       actor.happiness ?? 20,
+                        loyalty:         0,
+                        weeksInPool:     0,
+                        availableWeek:   returnWk,
+                        permanentlyGone: false,
+                        idleReturnCount: 0,
                       } })
                       pushEventLog(d,
-                        `💔 ${actor.name} left the studio (loyalty=0) → Free Agents Pool`,
-                        'red', week,
-                      )
+                        `💔 ${displayName} left the studio (loyalty=0) → Free Agents Pool (returns Wk ${returnWk})`,
+                        'red', week)
+
+                      // ── Quit notice modal + burn letter ──────────────────────
+                      d({ type: A.PUSH_MODAL, modal: {
+                        type: 'actorQuitNotice',
+                        data: { actorId: actor.id, actorName: displayName, returnWeek: returnWk, idleWeeks: idleWks },
+                      } })
+                      d({ type: A.PUSH_MODAL, modal: {
+                        type: 'actorBurnLetter',
+                        data: { actorName: displayName, letterText },
+                      } })
+
+                      // ── Studio Reputation Crisis on 3rd quit ────────────────
+                      const newExCount = (s.freeAgentsPool ?? []).filter(e => e.type === 'ex_actor').length + 1
+                      if (newExCount >= 3 && !s.flags?.studioRepCrisisTriggered) {
+                        d({ type: A.SET_FLAG, key: 'studioRepCrisisTriggered', value: true })
+                        d({ type: A.ADD_REPUTATION, amount: -50 })
+                        d({ type: A.SET_POPULARITY, value: Math.max(0, s.popularity - 100000) })
+                        d({ type: A.SET_FLAG, key: 'signCostPenaltyUntilWeek', value: week + 8 })
+                        d({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
+                          title: '📢 STUDIO REPUTATION CRISIS',
+                          message:
+                            'Word is spreading that your studio burns through talent. Industry insiders are watching.\n\n'
+                            + '−50 Reputation · −100,000 Popularity\n'
+                            + 'New actor sign costs +40% for the next 8 weeks.',
+                        } } })
+                        pushEventLog(d,
+                          '📢 STUDIO REPUTATION CRISIS: −50 rep, −100K pop, +40% sign costs for 8 weeks.', 'red', week)
+                      }
                     } },
                 ],
               },

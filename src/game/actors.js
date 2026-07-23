@@ -200,8 +200,18 @@ export function initActor(data) {
   }
 }
 
+// ─── Tier-gap chemistry multipliers (applied at initChemistry time) ───────────
+// Same-tier pairs get full random base + full shared-trait contribution.
+// Each tier gap step reduces both components — cross-tier sparks are rarer.
+const TIER_GAP_MULTS = [
+  { random: 1.00, trait: 1.00 },   // gap 0 — same tier
+  { random: 0.80, trait: 0.90 },   // gap 1 — e.g. Rookie × Rising Star
+  { random: 0.60, trait: 0.78 },   // gap 2 — e.g. Rookie × Popular
+  { random: 0.40, trait: 0.65 },   // gap 3 — e.g. Rookie × Worldwide
+]
+
 // ─── Build chemistry maps for all actors ──────────────────────────────────────
-// Formula: base = random(0-30) + (shared characteristics × 20), capped 0-100
+// Formula: base = random(0-30)×gapMult + (shared × 20)×traitMult, capped 0-100
 // Must be called AFTER all actors are initActor'd.
 export function initChemistry(actors) {
   const result = actors.map(a => ({ ...a, chemistry_map: {} }))
@@ -210,7 +220,11 @@ export function initChemistry(actors) {
       const a = result[i]
       const b = result[j]
       const shared = a.characteristics.filter(c => b.characteristics.includes(c)).length
-      const base   = clamp(rndInt(0, 30) + shared * 20, 0, 100)
+      const gap    = Math.abs(TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier))
+      const mult   = TIER_GAP_MULTS[Math.min(gap, 3)]
+      const randomPart = Math.round(rndInt(0, 30) * mult.random)
+      const traitPart  = Math.round(shared * 20 * mult.trait)
+      const base   = clamp(randomPart + traitPart, 0, 100)
       result[i].chemistry_map[b.id] = base
       result[j].chemistry_map[a.id] = base
     }
@@ -233,6 +247,11 @@ export const STATUS_COLOR = {
   resting:   'var(--gold)',
   injured:   'var(--red)',
   locked:    'var(--gray)',
+}
+
+// ─── Display name — respects player's custom rename, falls back to original ────
+export function actorDisplayName(actor) {
+  return (actor && actor.customName) ? actor.customName : (actor?.name ?? '')
 }
 
 // ─── Mood emoji — surface of the hidden happiness stat ────────────────────────
@@ -266,8 +285,8 @@ export function weeklyActorTick(actor, tier) {
   const patch = {}
 
   if (actor.status === 'filming') {
-    // Slight happiness drain while working hard (−1/week — noticeable but not punishing)
-    patch.happiness = clamp((actor.happiness ?? 70) - 1, 0, 100)
+    // Slight happiness drain while working hard
+    patch.happiness = clamp((actor.happiness ?? 70) - 2, 0, 100)
     // Prompt 8: +5 loyalty per week while in active production
     patch.loyalty = clamp((actor.loyalty ?? 60) + 5, 0, 100)
     // Track consecutive filming weeks for "return to Happy" mechanic
@@ -317,10 +336,7 @@ export function weeklyActorTick(actor, tier) {
   } else if (actor.status === 'injured') {
     const weeks = Math.max(0, (actor.injuredWeeks ?? 1) - 1)
     patch.injuredWeeks = weeks
-    if (weeks === 0) {
-      patch.status   = 'available'
-      patch.idleWeeks = -8  // 8-week grace buffer — actor just recovered, don't immediately drain loyalty
-    }
+    if (weeks === 0) patch.status = 'available'
   }
 
   return patch
