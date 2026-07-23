@@ -40,22 +40,223 @@ export const GENRES = [
   'Post-Apocalyptic', 'Coming-of-Age',
 ]
 
+export const GENRE_DETAILS = {
+  Romance: {
+    tier: 'Starter',
+    difficulty: 1,
+    qualityBonus: 0.0,
+    criticExpectations: 1,
+    cost: 'Low',
+    costMult: 0.8,
+    identity: 'Emotional & Accessible',
+  },
+  School: {
+    tier: 'Starter',
+    difficulty: 1,
+    qualityBonus: 0.0,
+    criticExpectations: 1,
+    cost: 'Low',
+    costMult: 0.8,
+    identity: 'Youth & Nostalgic',
+  },
+  Office: {
+    tier: 'Starter',
+    difficulty: 1,
+    qualityBonus: 0.0,
+    criticExpectations: 1,
+    cost: 'Low',
+    costMult: 0.8,
+    identity: 'Mature Relationships',
+  },
+  Music: {
+    tier: 'C',
+    difficulty: 2,
+    qualityBonus: 0.02,
+    criticExpectations: 2,
+    cost: 'Medium',
+    costMult: 1.0,
+    identity: 'Artistic Expression',
+  },
+  Sports: {
+    tier: 'C',
+    difficulty: 2,
+    qualityBonus: 0.02,
+    criticExpectations: 2,
+    cost: 'Medium',
+    costMult: 1.0,
+    identity: 'Competition & Growth',
+  },
+  'Slice of Life': {
+    tier: 'B',
+    difficulty: 2,
+    qualityBonus: 0.04,
+    criticExpectations: 2,
+    cost: 'Low',
+    costMult: 0.8,
+    identity: 'Character-Driven',
+  },
+  Comedy: {
+    tier: 'B',
+    difficulty: 2,
+    qualityBonus: 0.04,
+    criticExpectations: 2,
+    cost: 'Medium',
+    costMult: 1.0,
+    identity: 'Lighthearted Entertainment',
+  },
+  Horror: {
+    tier: 'A',
+    difficulty: 4,
+    qualityBonus: 0.07,
+    criticExpectations: 4,
+    cost: 'High',
+    costMult: 1.25,
+    identity: 'Fear & Suspense',
+  },
+  Fantasy: {
+    tier: 'A',
+    difficulty: 3,
+    qualityBonus: 0.07,
+    criticExpectations: 3,
+    cost: 'High',
+    costMult: 1.25,
+    identity: 'Worldbuilding',
+  },
+  Action: {
+    tier: 'A',
+    difficulty: 3,
+    qualityBonus: 0.07,
+    criticExpectations: 3,
+    cost: 'High',
+    costMult: 1.25,
+    identity: 'Spectacle & Excitement',
+  },
+  Crime: {
+    tier: 'A',
+    difficulty: 3,
+    qualityBonus: 0.07,
+    criticExpectations: 3,
+    cost: 'Medium',
+    costMult: 1.0,
+    identity: 'Investigation',
+  },
+  Idol: {
+    tier: 'A',
+    difficulty: 3,
+    qualityBonus: 0.07,
+    criticExpectations: 3,
+    cost: 'Medium',
+    costMult: 1.0,
+    identity: 'Performance & Fame',
+  },
+  Mystery: {
+    tier: 'A',
+    difficulty: 3,
+    qualityBonus: 0.07,
+    criticExpectations: 3,
+    cost: 'Medium',
+    costMult: 1.0,
+    identity: 'Puzzle Solving',
+  },
+  Historical: {
+    tier: 'S',
+    difficulty: 4,
+    qualityBonus: 0.10,
+    criticExpectations: 4,
+    cost: 'High',
+    costMult: 1.25,
+    identity: 'Period Authenticity',
+  },
+  Supernatural: {
+    tier: 'S',
+    difficulty: 4,
+    qualityBonus: 0.10,
+    criticExpectations: 4,
+    cost: 'High',
+    costMult: 1.25,
+    identity: 'Paranormal Elements',
+  },
+  Psychological: {
+    tier: 'S',
+    difficulty: 5,
+    qualityBonus: 0.10,
+    criticExpectations: 5,
+    cost: 'Very High',
+    costMult: 1.5,
+    identity: 'Mind Games',
+  },
+  Omegaverse: {
+    tier: 'S',
+    difficulty: 5,
+    qualityBonus: 0.10,
+    criticExpectations: 5,
+    cost: 'Very High',
+    costMult: 1.5,
+    identity: 'High-Risk Niche',
+  },
+  'Post-Apocalyptic': {
+    tier: 'S',
+    difficulty: 5,
+    qualityBonus: 0.10,
+    criticExpectations: 5,
+    cost: 'Very High',
+    costMult: 1.5,
+    identity: 'Survival & Hope',
+  },
+  'Sci-Fi': {
+    tier: 'S+',
+    difficulty: 5,
+    qualityBonus: 0.13,
+    criticExpectations: 5,
+    cost: 'Very High',
+    costMult: 1.5,
+    identity: 'Innovation & Concepts',
+  },
+  Thriller: {
+    tier: 'S+',
+    difficulty: 5,
+    qualityBonus: 0.13,
+    criticExpectations: 5,
+    cost: 'Very High',
+    costMult: 1.5,
+    identity: 'Tension & Pace',
+  },
+  Drama: {
+    tier: 'S+',
+    difficulty: 5,
+    qualityBonus: 0.13,
+    criticExpectations: 5,
+    cost: 'Very High',
+    costMult: 1.5,
+    identity: 'Emotional Depth',
+  },
+  'Coming-of-Age': {
+    tier: 'S+',
+    difficulty: 5,
+    qualityBonus: 0.13,
+    criticExpectations: 5,
+    cost: 'Very High',
+    costMult: 1.5,
+    identity: 'Personal Growth',
+  },
+}
+
 // Default genres + what each grade unlocks (count-based — see GENRE_UNLOCK_COUNTS)
 export const DEFAULT_GENRES   = ['Romance', 'School', 'Office']
 export const GENRE_UNLOCK_BY_GRADE = {
   C:    ['Music', 'Sports'],
   B:    ['Slice of Life', 'Comedy'],
-  A:    ['Supernatural', 'Historical', 'Horror', 'Mystery', 'Idol'],
-  S:    ['Fantasy', 'Crime', 'Action', 'Omegaverse', 'Post-Apocalyptic'],
-  'S+': ['Sci-Fi', 'Thriller', 'Drama', 'Psychological', 'Coming-of-Age'],
+  A:    ['Horror', 'Fantasy', 'Action', 'Crime', 'Idol', 'Mystery'],
+  S:    ['Historical', 'Supernatural', 'Psychological', 'Omegaverse', 'Post-Apocalyptic'],
+  'S+': ['Sci-Fi', 'Thriller', 'Drama', 'Coming-of-Age'],
 }
 // Productions-at-grade required to unlock that grade's genre group
 export const GENRE_UNLOCK_COUNTS = {
-  C:    2,
-  B:    2,
-  A:    3,
-  S:    2,
-  'S+': 1,
+  C:    3,
+  B:    3,
+  A:    4,
+  S:    3,
+  'S+': 2,
 }
 
 export const GENRE_EMOJI = {
@@ -195,13 +396,14 @@ export const BUDGET_TIERS = [
 
 // ─── Cost formula ─────────────────────────────────────────────────────────────
 // costMod: tier-based production cost modifier (default 1.0 = no change)
-export function calcCost(type, budgetMult, scheduleId, castSize, costMod = 1.0) {
+export function calcCost(type, budgetMult, scheduleId, castSize, costMod = 1.0, genre = 'Romance') {
   const t = PROD_TYPES[type]
   const s = SCHEDULES.find(sc => sc.id === scheduleId)
   if (!t || !s) return 0
-  const base     = t.baseCost * budgetMult
+  const genreCostMult = GENRE_DETAILS[genre]?.costMult ?? 1.0
+  const base     = t.baseCost * budgetMult * genreCostMult
   const weekCost = base * 0.055 * s.weeks
-  const castCost = castSize * 1500 * budgetMult
+  const castCost = castSize * 1500 * budgetMult * genreCostMult
   return Math.round((base + weekCost + castCost) * costMod)
 }
 
@@ -233,7 +435,7 @@ function studioQualityMult(productionsCompleted) {
 export function calcScore(production, castActors, chemistryBonus = 0, productionsCompleted = 0) {
   if (!castActors.length) return 0
 
-  const { type, budget, schedule, story } = production
+  const { type, budget, schedule, story, genre } = production
   const budgetMult = typeof budget === 'number' ? budget : 1.0
   const s = SCHEDULES.find(sc => sc.id === schedule)
   const qMult = s?.qMult ?? 1.0
@@ -252,7 +454,21 @@ export function calcScore(production, castActors, chemistryBonus = 0, production
 
   const budgetMod  = 0.5 + budgetMult * 0.2
   const sqMult     = studioQualityMult(productionsCompleted)
-  const raw = (statScore * budgetMod * qMult + chemistryBonus * 5 + storyMod) * sqMult
+  const baseRaw = (statScore * budgetMod * qMult + chemistryBonus * 5 + storyMod) * sqMult
+
+  // Genre-based Redesign metrics (Difficulty execution penalty & Risk variance)
+  const genreDetails = GENRE_DETAILS[genre] ?? {}
+  const difficulty = genreDetails.difficulty ?? 1
+  const diffPenaltyMult = 1.0 - (difficulty - 1) * 0.04
+  const riskVariance = (difficulty - 1) * 0.02 * (Math.random() - 0.5)
+
+  // Apply difficulty and risk modifiers
+  const modifiedRaw = baseRaw * (diffPenaltyMult + riskVariance)
+
+  // Apply Quality Bonus
+  const qualityBonus = genreDetails.qualityBonus ?? 0
+  const raw = modifiedRaw * (1.0 + qualityBonus)
+
   return Math.round(Math.max(0, Math.min(100, raw)))
 }
 
@@ -339,10 +555,10 @@ export function tickProduction(production) {
       ((production.weeksTotal - weeksLeft) / production.weeksTotal) * 100
     )
     if (weeksLeft === 0) {
-      // Combined combo: average of (genre×type) + (genre×theme) + type×theme bonus
-      // then multiply by the 2× slot bonus if active.
       const genreTypeCombo  = getComboResult(production.type, production.genre)
-      const themeComboResult = getThemeComboResult(production.genre, production.theme)
+      // Pass whether the 2x slot multiplier was applied
+      const isMultiplied = (production.genreMultiplier ?? 1) > 1
+      const themeComboResult = getThemeComboResult(production.genre, production.theme, isMultiplied)
       const typeThemeBonus   = getTypeThemeBonus(production.type, production.theme)
 
       const hasTheme = !!production.theme
@@ -350,14 +566,13 @@ export function tickProduction(production) {
         ? (genreTypeCombo.mult + themeComboResult.mult) / 2 + typeThemeBonus
         : genreTypeCombo.mult
 
-      const clampedMult = Math.round(Math.min(2.5, Math.max(0.4, rawMult)) * 100) / 100
-      const gMult       = production.genreMultiplier ?? 1
-      const finalMult   = gMult > 1 ? Math.round(clampedMult * gMult * 100) / 100 : clampedMult
+      const finalMult = Math.round(Math.min(2.5, Math.max(0.4, rawMult)) * 100) / 100
 
-      const label = finalMult >= 1.45 ? 'PERFECT' : finalMult < 0.85 ? 'BAD FIT' : 'GOOD'
-      const emoji = finalMult >= 1.45 ? '✨'       : finalMult < 0.85 ? '💔'       : '💕'
-      const color = finalMult >= 1.45 ? 'var(--gold)' : finalMult < 0.85 ? 'var(--red)' : 'var(--green)'
-      const comboResult = { label, mult: finalMult, emoji, color }
+      const label = themeComboResult.label ?? 'GOOD'
+      const emoji = themeComboResult.emoji ?? '💕'
+      const color = themeComboResult.color ?? 'var(--green)'
+      const fitLabel = themeComboResult.fitLabel ?? 'Good Fit'
+      const comboResult = { label, mult: finalMult, emoji, color, fitLabel }
 
       return { weeksLeft: 0, progressPct: 100, phase: 'wrap', comboResult, status: 'active' }
     }

@@ -20,6 +20,7 @@ export const INITIAL_STATE = {
   awards:        0,
   unlockedTiers: ['Rookie'],
   unlockedGenres: ['Romance', 'School', 'Office'],
+  unlockedMilestones: ['Romance', 'School', 'Office'],
   unlockedThemes: ['Slow Burn', 'Friends-to-Lovers', 'Enemies-to-Lovers', 'Soulmates', 'Forbidden Love'],
   actors:        initChemistry(ACTOR_DATA.map(initActor)),
   productions:   [],
@@ -56,7 +57,7 @@ export const A = {
   SET_COMPANY_NAME: 'SET_COMPANY_NAME', SET_SETTINGS: 'SET_SETTINGS', SET_FLAG: 'SET_FLAG',
   LOAD_SAVE: 'LOAD_SAVE', MARK_SAVED: 'MARK_SAVED', ADD_FREE_AGENT: 'ADD_FREE_AGENT',
   REMOVE_FREE_AGENT: 'REMOVE_FREE_AGENT', UPDATE_FREE_AGENT: 'UPDATE_FREE_AGENT',
-  INIT_FREE_AGENTS: 'INIT_FREE_AGENTS', UNLOCK_GENRES: 'UNLOCK_GENRES',
+  INIT_FREE_AGENTS: 'INIT_FREE_AGENTS', UNLOCK_GENRES: 'UNLOCK_GENRES', DISCOVER_GENRE: 'DISCOVER_GENRE',
   INCREMENT_GRADE_COUNT: 'INCREMENT_GRADE_COUNT', SET_FIXED_CP_NAME: 'SET_FIXED_CP_NAME',
   SET_GENRE_TRENDS: 'SET_GENRE_TRENDS', UNLOCK_THEMES: 'UNLOCK_THEMES',
   SET_AWARDS_DATA: 'SET_AWARDS_DATA', SET_AWARDS_PHASE: 'SET_AWARDS_PHASE', CLEAR_AWARDS: 'CLEAR_AWARDS',
@@ -77,7 +78,8 @@ function gameReducer(state, action) {
     case A.ADD_AWARD: return { ...state, awards: state.awards + (action.amount ?? 1) }
     case A.INCREMENT_PRODS_COMPLETED: return { ...state, productionsCompleted: (state.productionsCompleted ?? 0) + (action.count ?? 1) }
     case A.UNLOCK_TIER: if (state.unlockedTiers.includes(action.tier)) return state; return { ...state, unlockedTiers: [...state.unlockedTiers, action.tier] }
-    case A.UNLOCK_GENRES: { const c = state.unlockedGenres ?? ['Romance', 'School', 'Office']; const i = (action.genres ?? []).filter(g => !c.includes(g)); if (!i.length) return state; return { ...state, unlockedGenres: [...c, ...i] } }
+    case A.UNLOCK_GENRES: { const c = state.unlockedMilestones ?? ['Romance', 'School', 'Office']; const i = (action.genres ?? []).filter(g => !c.includes(g)); if (!i.length) return state; return { ...state, unlockedMilestones: [...c, ...i] } }
+    case A.DISCOVER_GENRE: { const c = state.unlockedGenres ?? ['Romance', 'School', 'Office']; if (c.includes(action.genre)) return state; return { ...state, unlockedGenres: [...c, action.genre] } }
     case A.SET_ACTORS: return { ...state, actors: action.actors }
     case A.UPDATE_ACTOR: return { ...state, actors: state.actors.map(a => { if (a.id !== action.id) return a; const u = { ...a, ...action.patch }; if (action.patch.status === 'injured' && a.status !== 'injured') u.injuredThisYear = (a.injuredThisYear ?? 0) + 1; if (action.patch.signed === false && a.signed === true) u.hasLeft = true; return u }) }
     case A.SIGN_ACTOR: return { ...state, money: state.money - action.cost, actors: state.actors.map(a => a.id === action.id ? { ...a, signed: true, status: 'available', ...startHoneymoon(a, state.week, HONEYMOON_NEW_RECRUIT_WEEKS) } : a) }
@@ -102,7 +104,7 @@ function gameReducer(state, action) {
     case A.REMOVE_FREE_AGENT: return { ...state, freeAgentsPool: (state.freeAgentsPool ?? []).filter(e => e.poolId !== action.poolId) }
     case A.UPDATE_FREE_AGENT: return { ...state, freeAgentsPool: (state.freeAgentsPool ?? []).map(e => e.poolId === action.poolId ? { ...e, ...action.patch } : e) }
     case A.INIT_FREE_AGENTS: return { ...state, freeAgentsPool: action.pool }
-    case A.LOAD_SAVE: return { ...action.saveData, started: action.saveData.started !== undefined ? action.saveData.started : true, startYear: action.saveData.startYear ?? 2024, eventLog: action.saveData.eventLog ?? [], fixedCPs: action.saveData.fixedCPs ?? [], freeAgentsPool: action.saveData.freeAgentsPool ?? [], rivals: action.saveData.rivals?.length ? action.saveData.rivals : generateRivals(), productionsCompleted: action.saveData.productionsCompleted ?? 0, gradeCounts: action.saveData.gradeCounts ?? {}, fixedCPNames: action.saveData.fixedCPNames ?? {}, genreTrends: action.saveData.genreTrends ?? [], unlockedThemes: action.saveData.unlockedThemes ?? ['Slow Burn', 'Friends-to-Lovers', 'Enemies-to-Lovers', 'Soulmates', 'Forbidden Love'], awardsPhase: null, awardsData: null }
+    case A.LOAD_SAVE: return { ...action.saveData, started: action.saveData.started !== undefined ? action.saveData.started : true, startYear: action.saveData.startYear ?? 2024, eventLog: action.saveData.eventLog ?? [], fixedCPs: action.saveData.fixedCPs ?? [], freeAgentsPool: action.saveData.freeAgentsPool ?? [], rivals: action.saveData.rivals?.length ? action.saveData.rivals : generateRivals(), productionsCompleted: action.saveData.productionsCompleted ?? 0, gradeCounts: action.saveData.gradeCounts ?? {}, fixedCPNames: action.saveData.fixedCPNames ?? {}, genreTrends: action.saveData.genreTrends ?? [], unlockedMilestones: action.saveData.unlockedMilestones ?? action.saveData.unlockedGenres ?? ['Romance', 'School', 'Office'], unlockedThemes: action.saveData.unlockedThemes ?? ['Slow Burn', 'Friends-to-Lovers', 'Enemies-to-Lovers', 'Soulmates', 'Forbidden Love'], awardsPhase: null, awardsData: null }
     case A.MARK_SAVED: return { ...state, lastSaved: action.ts }
     case A.INCREMENT_GRADE_COUNT: return { ...state, gradeCounts: { ...(state.gradeCounts ?? {}), [action.grade]: ((state.gradeCounts ?? {})[action.grade] ?? 0) + 1 } }
     case A.SET_FIXED_CP_NAME: return { ...state, fixedCPNames: { ...(state.fixedCPNames ?? {}), [action.key]: action.name } }
