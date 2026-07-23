@@ -31,19 +31,23 @@ function buildRosterAlerts(actors) {
     const loyLvl = loyaltyLabel(l)
     let severity = 0, message = '', color = 'var(--gold)'
 
+    // Emergency warning at ≤10 Loyalty — preserved exactly
     if (l <= 10) {
       severity = 4
       message  = `‼️ FINAL WARNING‼️: ${name} is walking out! 🤬 (Loyalty: ${loyLvl}) ⚠️`
       color    = 'var(--red)'
-    } else if (h >= 10 && h <= 24 && idle >= 14) {
+    } else if (h < 25) {
+      // Angry (0–24): loyalty is declining fast — act now
       severity = 3
-      message  = `❗ROSTER IDLE❗ ${idle} weeks with no work. 😡 Keep ${name} acting before they quit! (Loyalty: ${loyLvl}) 📢`
+      message  = `❗UNHAPPY❗ ${name} is angry after ${idle} weeks with no work! 😢 Cast them before they quit! (Loyalty: ${loyLvl}) 📢`
       color    = '#FF5470'
-    } else if (h >= 25 && h <= 49 && idle >= 10) {
+    } else if (h < 50) {
+      // Sad (25–49): loyalty has begun to decline
       severity = 2
-      message  = `Roster Idle: ${name} feels forgotten after ${idle} weeks! 😢 Keep them acting! (Loyalty: ${loyLvl}) 📉`
+      message  = `${name} feels forgotten after ${idle} weeks! 😠 Keep them acting or loyalty will drop! (Loyalty: ${loyLvl}) 📉`
       color    = '#FF9F68'
-    } else if (h >= 50 && h <= 74 && idle >= 6) {
+    } else if (h < 75) {
+      // Neutral (50–74): early visible warning
       severity = 1
       message  = `Roster idle: Keep ${name} acting! 😐 It has been ${idle} weeks. (Loyalty: ${loyLvl}) ⏳`
       color    = 'var(--gold)'
@@ -124,7 +128,6 @@ export default function Dashboard({ setScreen }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* ── BL Awards countdown banner (weeks 49–51) ── */}
       {showAwardsBanner && (
         <div style={styles.awardsBanner}>
           <span style={{ fontSize: 18 }}>✨</span>
@@ -140,7 +143,6 @@ export default function Dashboard({ setScreen }) {
         </div>
       )}
 
-      {/* ── Studio snapshot ── */}
       <div className="panel">
         <div className="panel-title">📊 STUDIO STATUS</div>
         <div style={styles.statsGrid}>
@@ -149,8 +151,6 @@ export default function Dashboard({ setScreen }) {
           <BigStat label="POPULARITY" value={fmtPop(state.popularity)}  color="var(--blue)" />
           <BigStat label="WEEK"       value={`#${state.week}`}          color="var(--lav)"  />
         </div>
-
-        {/* Rank bar */}
         <div style={{ marginTop: 14 }}>
           <div style={styles.rankRow}>
             <span style={{ color: rank.color, fontSize: 9 }}>{rank.label}</span>
@@ -164,12 +164,10 @@ export default function Dashboard({ setScreen }) {
         </div>
       </div>
 
-      {/* ── Roster alerts ── */}
       {rosterAlerts.length > 0 && (
         <RosterAlertsPanel alerts={rosterAlerts} />
       )}
 
-      {/* ── Active productions ── */}
       <div className="panel">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <div className="panel-title" style={{ margin: 0, border: 'none', padding: 0 }}>
@@ -183,7 +181,6 @@ export default function Dashboard({ setScreen }) {
             + NEW
           </button>
         </div>
-
         {active.length === 0 ? (
           <div style={styles.empty}>
             No productions running.
@@ -203,7 +200,6 @@ export default function Dashboard({ setScreen }) {
         )}
       </div>
 
-      {/* ── Quick actions ── */}
       <div style={styles.actionRow}>
         <button style={styles.actionBtn} onClick={() => { SFX.click(); setScreen('actors') }}>
           ⭐ ACTORS
@@ -213,7 +209,6 @@ export default function Dashboard({ setScreen }) {
         </button>
       </div>
 
-      {/* ── Completed productions ── */}
       {recent.length > 0 && (
         <div className="panel">
           <div className="panel-title">🏆 RECENT RESULTS</div>
@@ -223,7 +218,6 @@ export default function Dashboard({ setScreen }) {
         </div>
       )}
 
-      {/* ── Event Log ── */}
       {(state.eventLog?.length ?? 0) > 0 && (
         <EventLogPanel log={state.eventLog} />
       )}
@@ -232,7 +226,6 @@ export default function Dashboard({ setScreen }) {
   )
 }
 
-// ─── Active production card ───────────────────────────────────────────────────
 function ActiveProdCard({ prod, actors }) {
   const typeInfo  = PROD_TYPES[prod.type] ?? {}
   const sched     = SCHEDULES.find(s => s.id === prod.schedule)
@@ -243,7 +236,6 @@ function ActiveProdCard({ prod, actors }) {
 
   return (
     <div style={styles.prodCard}>
-      {/* Top row: type icon + title + phase badge */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
         <span style={{ fontSize: 22, flexShrink: 0 }}>{typeInfo.icon ?? '🎬'}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -261,8 +253,6 @@ function ActiveProdCard({ prod, actors }) {
           </div>
         </div>
       </div>
-
-      {/* Lead portraits */}
       {leads.length > 0 && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center' }}>
           {leads.map(a => (
@@ -278,8 +268,6 @@ function ActiveProdCard({ prod, actors }) {
           )}
         </div>
       )}
-
-      {/* Filming progress */}
       {prod.phase === 'filming' && (
         <>
           <div style={styles.progTrack}>
@@ -291,8 +279,6 @@ function ActiveProdCard({ prod, actors }) {
           </div>
         </>
       )}
-
-      {/* Releasing progress */}
       {prod.phase === 'releasing' && (
         <div style={{ fontSize: 8, color: 'var(--pink)' }}>
           Ep {prod.episodesReleased ?? 0} / {prod.episodesTotal} released
@@ -303,15 +289,11 @@ function ActiveProdCard({ prod, actors }) {
           )}
         </div>
       )}
-
-      {/* Wrap phase — reveal genre×theme combo label only, no numbers */}
       {prod.phase === 'wrap' && prod.comboResult && (
         <div style={{ fontSize: 8, color: prod.comboResult.color }}>
           {prod.comboResult.emoji} {prod.genre} × {prod.theme || '—'}: {prod.comboResult.label}
         </div>
       )}
-
-      {/* Schedule line */}
       {sched && (
         <div style={{ fontSize: 6, color: 'var(--gray)', marginTop: 4 }}>
           {sched.label} schedule · q×{sched.qMult}
@@ -321,7 +303,6 @@ function ActiveProdCard({ prod, actors }) {
   )
 }
 
-// ─── Completed production row ─────────────────────────────────────────────────
 function CompletedRow({ record }) {
   const gradeColor = {
     'S+': '#FFD700', S: '#FFD700', A: '#5CE1A0',
@@ -350,15 +331,11 @@ function CompletedRow({ record }) {
   )
 }
 
-// ─── Event log panel ──────────────────────────────────────────────────────────
 function EventLogPanel({ log }) {
   const scrollRef = useRef(null)
-
-  // Keep scrolled to top (newest first, already ordered by state)
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0
   }, [log.length])
-
   return (
     <div className="panel">
       <div className="panel-title">📋 EVENT LOG</div>
@@ -378,7 +355,6 @@ function EventLogPanel({ log }) {
   )
 }
 
-// ─── Shared components ────────────────────────────────────────────────────────
 function BigStat({ label, value, color }) {
   return (
     <div style={styles.bigStat}>
@@ -389,104 +365,21 @@ function BigStat({ label, value, color }) {
 }
 
 const styles = {
-  awardsBanner: {
-    display:        'flex',
-    alignItems:     'center',
-    gap:            12,
-    padding:        '12px 14px',
-    border:         '2px solid var(--gold)',
-    background:     'linear-gradient(90deg,rgba(255,215,0,0.10) 0%,rgba(255,215,0,0.04) 100%)',
-    animation:      'pulse 2.5s ease-in-out infinite',
-  },
-  statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: 12,
-  },
-  bigStat: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-  },
-  rankRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  rankTrack: {
-    height: 10,
-    background: 'var(--bg-inset)',
-    border: '2px solid var(--shadow)',
-  },
-  rankFill: {
-    height: '100%',
-    transition: 'width 0.5s ease',
-  },
-  empty: {
-    fontSize: 8,
-    color: 'var(--gray)',
-    textAlign: 'center',
-    padding: '20px 0',
-    lineHeight: 2.5,
-  },
-  actionRow: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: 10,
-  },
-  actionBtn: {
-    textAlign: 'center',
-    fontSize: 9,
-    padding: '14px 8px',
-  },
-  prodCard: {
-    background: 'var(--bg-inset)',
-    padding: 10,
-    border: '2px solid var(--shadow)',
-  },
-  phaseBadge: {
-    fontSize:     7,
-    padding:      '2px 5px',
-    border:       '1px solid',
-    letterSpacing: 0.5,
-    flexShrink:   0,
-  },
-  progTrack: {
-    height: 8,
-    background: 'var(--bg-deep)',
-    border: '1px solid var(--shadow)',
-  },
-  progFill: {
-    height: '100%',
-    background: 'var(--pink)',
-    transition: 'width 0.4s ease',
-  },
-  histRow: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: 10,
-    padding: '7px 0',
-    borderBottom: '1px solid var(--shadow)',
-  },
-  logScroll: {
-    maxHeight: 200,
-    overflowY: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-  },
-  logEntry: {
-    display: 'flex',
-    gap: 8,
-    alignItems: 'flex-start',
-    padding: '4px 0',
-    borderBottom: '1px solid var(--shadow)',
-  },
-  logWeek: {
-    fontSize: 6,
-    color: 'var(--gray)',
-    flexShrink: 0,
-    minWidth: 24,
-  },
+  awardsBanner: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', border: '2px solid var(--gold)', background: 'linear-gradient(90deg,rgba(255,215,0,0.10) 0%,rgba(255,215,0,0.04) 100%)', animation: 'pulse 2.5s ease-in-out infinite' },
+  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 },
+  bigStat: { display: 'flex', flexDirection: 'column', gap: 4 },
+  rankRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  rankTrack: { height: 10, background: 'var(--bg-inset)', border: '2px solid var(--shadow)' },
+  rankFill: { height: '100%', transition: 'width 0.5s ease' },
+  empty: { fontSize: 8, color: 'var(--gray)', textAlign: 'center', padding: '20px 0', lineHeight: 2.5 },
+  actionRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
+  actionBtn: { textAlign: 'center', fontSize: 9, padding: '14px 8px' },
+  prodCard: { background: 'var(--bg-inset)', padding: 10, border: '2px solid var(--shadow)' },
+  phaseBadge: { fontSize: 7, padding: '2px 5px', border: '1px solid', letterSpacing: 0.5, flexShrink: 0 },
+  progTrack: { height: 8, background: 'var(--bg-deep)', border: '1px solid var(--shadow)' },
+  progFill: { height: '100%', background: 'var(--pink)', transition: 'width 0.4s ease' },
+  histRow: { display: 'flex', alignItems: 'flex-start', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--shadow)' },
+  logScroll: { maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 },
+  logEntry: { display: 'flex', gap: 8, alignItems: 'flex-start', padding: '4px 0', borderBottom: '1px solid var(--shadow)' },
+  logWeek: { fontSize: 6, color: 'var(--gray)', flexShrink: 0, minWidth: 24 },
 }
