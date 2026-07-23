@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import { useGame, A, pushToast, pushEventLog } from './state.jsx'
 import { tickProduction, calcRevenue, calcScore, popularityDeltaByPlatform } from './productions.js'
-import { weeklyActorRecovery, grantExp, NEW_TALENT_POOL, checkTierPromotion, applyTierPromotion, actorDisplayName } from './actors.js'
+import { weeklyActorRecovery, grantExp, NEW_TALENT_POOL, checkTierPromotion, applyTierPromotion, actorDisplayName, startHoneymoon, HONEYMOON_NEW_RECRUIT_WEEKS } from './actors.js'
 import { calcChemistryBonus, calcBondGrowth, applyBondDeltas, getChem } from './chemistry.js'
 import { evaluateProduction } from './evaluators.js'
 import { rollWeeklyEvents, rollActorEvent, runChemPulse, rollCpEvents } from './events.js'
@@ -341,7 +341,7 @@ export function useWeekAdvance() {
       if (!actor.signed) continue
       if (completedThisWeek.find(p => p.castIds.includes(actor.id))) continue
       // Prompt 8: pass tier to weeklyActorTick for threshold scaling
-      const patch = weeklyActorRecovery(actor, tier)
+      const patch = weeklyActorRecovery(actor, tier, week)
       dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch })
 
       // ── Prompt 8: Emergency save event at loyalty ≤ 10 (one-time) ────────
@@ -588,7 +588,7 @@ export function useWeekAdvance() {
         // Find all actors of this tier not yet signed and auto-sign them for free
         const newActors = state.actors.filter(a => a.tier === tierName && !a.signed)
         for (const actor of newActors) {
-          dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch: { signed: true, status: 'available' } })
+          dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch: { signed: true, status: 'available', ...startHoneymoon(actor, week, HONEYMOON_NEW_RECRUIT_WEEKS) } })
         }
         const names = newActors.map(a => a.name).join(', ')
         pushEventLog(dispatch,
