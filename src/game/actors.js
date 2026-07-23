@@ -197,6 +197,9 @@ export function initActor(data) {
     isNewTalent:    false,
     poolId:         null,
     idleReturnCount: 0,
+    // Contract Honeymoon — starting Rookies enter with a full new-recruit honeymoon
+    honeymoonStartWeek: isSigned ? 1 : 0,
+    honeymoonWeeks:     isSigned ? HONEYMOON_NEW_RECRUIT_WEEKS : 0,
   }
 }
 
@@ -273,23 +276,62 @@ export function canAssign(actor) {
   return actor.signed && actor.status === 'available'
 }
 
-// ─── Weekly actor tick (called on NEXT WEEK) ──────────────────────────────────
-// Prompt 8: idle thresholds and tick rate scale by game tier.
-// tier: result of getGameTier(week) — pass from weekAdvance.
-export function weeklyActorTick(actor, tier) {
-  // Use tier values or sensible defaults (Popular-tier if no tier provided)
-  const happThreshold  = tier?.idleHappinessThreshold ?? 28
-  const loyThreshold   = tier?.idleLoyaltyThreshold   ?? 42
-  const tickRate       = tier?.penaltyTickRate         ?? 5
+// ─── Contract Honeymoon ───────────────────────────────────────────────────────
+// HONEYMOON_*_WEEKS: grace period after signing where an actor's happiness
+// cannot drop from being idle and loyalty cannot drop from happiness.
+export const HONEYMOON_NEW_RECRUIT_WEEKS = 4   // brand-new actor
+export const HONEYMOON_RESIGN_WEEKS      = 2   // re-signed former actor (Free Agents Pool)
 
+// Returns a patch that starts a honeymoon at `currentWeek` lasting `weeks`.
+export function startHoneymoon(actor, currentWeek, weeks) {
+  return {
+    honeymoonStartWeek: currentWeek ?? (actor.honeymoonStartWeek ?? 0),
+    honeymoonWeeks:     weeks,
+    happiness:          Math.max(actor.happiness ?? 80, 80),  // enter at Happy
+  }
+}
+
+// True while the contract honeymoon is still active for `actor` at `currentWeek`.
+export function isHoneymoonActive(actor, currentWeek) {
+  const weeks = actor.honeymoonWeeks ?? 0
+  if (weeks <= 0) return false
+  const start = actor.honeymoonStartWeek ?? 0
+  return (currentWeek ?? 0) < start + weeks
+}
+
+// ─── Happiness state bands (must match moodEmoji) ─────────────────────────────
+//   Happy   ≥ 75   😊
+//   Neutral 50–74  😐
+//   Sad     25–49  😠   ← loyalty decline begins
+//   Angry   0–24   😢   ← loyalty decline accelerates
+export const HAPPY_MIN = 75
+export const NEUTRAL_MIN = 50
+export const SAD_MIN = 25
+
+// Per-week idle happiness decay, scaled by actor tier.
+// Higher-tier actors have greater expectations and sour faster.
+const IDLE_HAPPINESS_DECAY_BY_TIER = {
+  'Rookie':      3,
+  'Rising Star': 4,
+  'Popular':     5,
+  'Worldwide':   6,
+}
+
+// ─── Weekly actor tick (called on NEXT WEEK) ──────────────────────────────────
+// Happiness-driven loyalty: loyalty begins declining once happiness reaches Sad
+// and declines much faster once happiness reaches Angry.
+// tier: result of getGameTier(week) — pass from weekAdvance.
+// currentWeek: the week this tick runs for (drives honeymoon expiry).
+export function weeklyActorTick(actor, tier, currentWeek) {
   const patch = {}
+  const week = currentWeek ?? 0
+  const honeymoon = isHoneymoonActive(actor, week)
 
   if (actor.status === 'filming') {
     // Slight happiness drain while working hard
     patch.happiness = clamp((actor.happiness ?? 70) - 2, 0, 100)
-    // Prompt 8: +5 loyalty per week while in active production
+    // +5 loyalty per week while in active production
     patch.loyalty = clamp((actor.loyalty ?? 60) + 5, 0, 100)
-    // Track consecutive filming weeks for "return to Happy" mechanic
     patch.activeFilmingWeeks = (actor.activeFilmingWeeks ?? 0) + 1
     // If actor was Happy before going idle, restore to Happy after 4 filming weeks
     if (actor.wasHappyBeforeIdle && (actor.activeFilmingWeeks ?? 0) >= 4) {
@@ -307,31 +349,24 @@ export function weeklyActorTick(actor, tier) {
     let h = actor.happiness ?? 70
     let l = actor.loyalty ?? 60
 
-    // ── Idle happiness penalty — thresholds scale by tier ─────────────────
-    const ph1 = happThreshold               // gentle drift starts here
-    const ph2 = Math.round(happThreshold * 0.8)  // force Neutral
-    const ph3 = Math.round(happThreshold * 0.7)  // force Sad
-    // ph4 = ph3+ → force Angry
-
-    if (idle < ph2) {
-      if (idle >= Math.round(ph1 * 0.3)) h = clamp(h - 1, 0, 100)
-      h = clamp(h + (h > 62 ? -0.4 : 0.4), 0, 100)
-    } else if (idle < ph3) {
-      h = clamp(h, 0, 62)
-      h = clamp(h - 1, 0, 100)
-    } else if (idle < happThreshold) {
-      h = clamp(h, 0, 45)
-      h = clamp(h - 1, 0, 100)
+    if (honeymoon) {
+      // Contract Honeymoon: happiness cannot decrease from being idle,
+      // and loyalty cannot decrease from happiness.
+      patch.happiness = Math.round(h)
     } else {
-      h = clamp(h, 0, 22)
-      h = clamp(h - 0.5, 0, 100)
-    }
-    patch.happiness = Math.round(h)
+      // ── Idle happiness decay — scales by actor's own tier ──────────────
+      const decay = IDLE_HAPPINESS_DECAY_BY_TIER[actor.tier] ?? 3
+      h = clamp(h - decay, 0, 100)
+      patch.happiness = Math.round(h)
 
-    // ── Idle loyalty drain — threshold + tick rate scale by tier ──────────
-    if (idle >= loyThreshold && (idle - loyThreshold) % tickRate === 0) {
-      l = clamp(l - 8, 0, 100)
-      patch.loyalty = Math.round(l)
+      // ── Loyalty decline driven by happiness state ──────────────────────
+      // Sad (25–49): loyalty begins to decline.
+      // Angry (0–24): loyalty declines much faster.
+      if (h < NEUTRAL_MIN) {
+        const loyaltyDrop = h < SAD_MIN ? 8 : 4   // Angry: 8, Sad: 4
+        l = clamp(l - loyaltyDrop, 0, 100)
+        patch.loyalty = Math.round(l)
+      }
     }
   } else if (actor.status === 'injured') {
     const weeks = Math.max(0, (actor.injuredWeeks ?? 1) - 1)
@@ -428,7 +463,7 @@ export const NEW_TALENT_POOL = [
     skills: { act:93, sing:85, dance:80, visual:88, lang:91, comedy:78, art:87, fitness:82 },
     characteristics: ['Elegant','Mature','Calm'] },
   { poolId: 'nt_w05', tier: 'Worldwide',   name: 'Akira',  signCost: 3600,
-    portraitFile: 'Akira_Worldwide.jpg',
+    portraitFile: 'Akira_Wordwide.jpg',
     skills: { act:83, sing:90, dance:84, visual:93, lang:80, comedy:88, art:91, fitness:86 },
     characteristics: ['Charming','Handsome','Sexy'] },
 ]
