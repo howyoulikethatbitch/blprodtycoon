@@ -39,7 +39,7 @@ function buildRosterAlerts(actors) {
     } else if (h < 25) {
       // Angry (0–24): loyalty is declining fast — act now
       severity = 3
-      message  = `❗UNHAPPY❗ ${name} is angry after ${idle} weeks with no work! 😢 Cast them before they quit! (Loyalty: ${loyLvl}) 📢`
+      message  = `❗ROSTER IDLE❗ ${name} is angry after ${idle} weeks with no work! 😢 Cast them before they quit! (Loyalty: ${loyLvl}) 📢`
       color    = '#FF5470'
     } else if (h < 50) {
       // Sad (25–49): loyalty has begun to decline
