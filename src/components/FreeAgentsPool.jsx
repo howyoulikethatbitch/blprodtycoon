@@ -5,7 +5,7 @@
  */
 import React, { useMemo, useState } from 'react'
 import { useGame, A, pushToast, pushEventLog } from '../game/state.jsx'
-import { TIER_COLOR, moodEmoji, NEW_TALENT_POOL, TIER_ORDER } from '../game/actors.js'
+import { TIER_COLOR, moodEmoji, NEW_TALENT_POOL, TIER_ORDER, startHoneymoon, HONEYMOON_NEW_RECRUIT_WEEKS, HONEYMOON_RESIGN_WEEKS } from '../game/actors.js'
 import { SFX } from '../game/audio.js'
 import { fmtMoney } from '../game/ranking.js'
 import { ActorPortrait } from './ActorRoster.jsx'
@@ -75,6 +75,7 @@ export default function FreeAgentsPool() {
       happiness:  80,
       loyalty:    50,
       idleWeeks:  0,
+      ...startHoneymoon({ happiness: 80 }, week, HONEYMOON_RESIGN_WEEKS),
     } })
     dispatch({ type: A.ADD_MONEY, amount: -cost })
     dispatch({ type: A.REMOVE_FREE_AGENT, poolId: entry.poolId })
@@ -119,6 +120,7 @@ export default function FreeAgentsPool() {
       poolId:         nt.poolId,
       portraitFile:   nt.portraitFile ?? null,
       idleReturnCount: 0,
+      ...startHoneymoon({ happiness: 80 }, week, HONEYMOON_NEW_RECRUIT_WEEKS),
     }
     dispatch({ type: A.SET_ACTORS, actors: [...state.actors, newActor] })
     dispatch({ type: A.ADD_MONEY, amount: -cost })
@@ -163,6 +165,7 @@ export default function FreeAgentsPool() {
       poolId:         entry.poolId,
       portraitFile:   entry.portraitFile ?? null,
       idleReturnCount: entry.idleReturnCount + 1,
+      ...startHoneymoon({ happiness: 80 }, week, HONEYMOON_RESIGN_WEEKS),
     }
     dispatch({ type: A.SET_ACTORS, actors: [...state.actors, newActor] })
     dispatch({ type: A.ADD_MONEY, amount: -cost })
