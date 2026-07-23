@@ -17,6 +17,9 @@ export default function FreeAgentsPool() {
   const [pendingSign, setPendingSign] = useState(null)  // { kind, data }
 
   const week = state.week
+  // Sign cost penalty: +40% for 8 weeks after a Studio Reputation Crisis
+  const signCostMult = (state.flags?.signCostPenaltyUntilWeek ?? 0) > week ? 1.4 : 1.0
+  const effCost = (base) => Math.round(base * signCostMult)
 
   // ── Ex-actors (Type A) ────────────────────────────────────────────────────
   const exActors = useMemo(() => {
@@ -59,9 +62,10 @@ export default function FreeAgentsPool() {
   }, [state.freeAgentsPool])
 
   function doSignExActor(entry) {
-    if (state.money < entry.signCost) {
+    const cost = effCost(entry.signCost)
+    if (state.money < cost) {
       SFX.fail()
-      pushToast(dispatch, `Need ${fmtMoney(entry.signCost)} to re-sign ${entry.name}.`, 'red')
+      pushToast(dispatch, `Need ${fmtMoney(cost)} to re-sign ${entry.name}.`, 'red')
       return
     }
     SFX.confirm()
@@ -72,19 +76,20 @@ export default function FreeAgentsPool() {
       loyalty:    50,
       idleWeeks:  0,
     } })
-    dispatch({ type: A.ADD_MONEY, amount: -entry.signCost })
+    dispatch({ type: A.ADD_MONEY, amount: -cost })
     dispatch({ type: A.REMOVE_FREE_AGENT, poolId: entry.poolId })
     pushEventLog(dispatch,
-      `🎉 Re-signed ${entry.name} from Free Agents Pool! (₩${entry.signCost.toLocaleString()})`,
+      `🎉 Re-signed ${entry.name} from Free Agents Pool! (₩${cost.toLocaleString()})`,
       'pink', week,
     )
     pushToast(dispatch, `Welcome back, ${entry.name}!`, 'green')
   }
 
   function doSignNewTalent(nt) {
-    if (state.money < nt.signCost) {
+    const cost = effCost(nt.signCost)
+    if (state.money < cost) {
       SFX.fail()
-      pushToast(dispatch, `Need ${fmtMoney(nt.signCost)} to sign ${nt.name}.`, 'red')
+      pushToast(dispatch, `Need ${fmtMoney(cost)} to sign ${nt.name}.`, 'red')
       return
     }
     SFX.confirm()
@@ -116,7 +121,7 @@ export default function FreeAgentsPool() {
       idleReturnCount: 0,
     }
     dispatch({ type: A.SET_ACTORS, actors: [...state.actors, newActor] })
-    dispatch({ type: A.ADD_MONEY, amount: -nt.signCost })
+    dispatch({ type: A.ADD_MONEY, amount: -cost })
     pushEventLog(dispatch,
       `✨ Signed new talent ${nt.name} (${nt.tier}) from Free Agents Pool!`,
       'pink', week,
@@ -125,9 +130,10 @@ export default function FreeAgentsPool() {
   }
 
   function doSignReturnedTalent(entry) {
-    if (state.money < entry.signCost) {
+    const cost = effCost(entry.signCost)
+    if (state.money < cost) {
       SFX.fail()
-      pushToast(dispatch, `Need ${fmtMoney(entry.signCost)} to re-sign ${entry.name}.`, 'red')
+      pushToast(dispatch, `Need ${fmtMoney(cost)} to re-sign ${entry.name}.`, 'red')
       return
     }
     SFX.confirm()
@@ -159,7 +165,7 @@ export default function FreeAgentsPool() {
       idleReturnCount: entry.idleReturnCount + 1,
     }
     dispatch({ type: A.SET_ACTORS, actors: [...state.actors, newActor] })
-    dispatch({ type: A.ADD_MONEY, amount: -entry.signCost })
+    dispatch({ type: A.ADD_MONEY, amount: -cost })
     dispatch({ type: A.REMOVE_FREE_AGENT, poolId: entry.poolId })
     pushEventLog(dispatch,
       `🔄 Re-signed ${entry.name} from Free Agents Pool!`, 'pink', week,
@@ -187,9 +193,7 @@ export default function FreeAgentsPool() {
       <div className="panel" style={{ padding: '12px 14px' }}>
         <div className="panel-title" style={{ marginBottom: 6 }}>🌟 FREE AGENTS POOL</div>
         <div style={{ fontSize: 7, color: 'var(--lav)' }}>
-          Ex-actors and new talent available for signing.
-          Ex-actors have 2× boosted stats while in the pool.
-          New talent join permanently once their tier is unlocked.
+          Former studio talent and emerging actors between contracts.
         </div>
       </div>
 

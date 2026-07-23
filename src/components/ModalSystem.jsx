@@ -8,6 +8,7 @@ import { fmtMoney } from '../game/ranking.js'
 import { SFX } from '../game/audio.js'
 import { TIER_COLOR } from '../game/actors.js'
 import { triggerConfetti } from './Confetti.jsx'
+import { ActorPortrait } from './ActorRoster.jsx'
 
 export default function ModalSystem() {
   const { state, dispatch } = useGame()
@@ -85,6 +86,12 @@ export default function ModalSystem() {
       )}
       {modal.type === 'audition' && (
         <AuditionModal data={modal.data} onClose={dismiss} dispatch={dispatch} state={state} />
+      )}
+      {modal.type === 'actorQuitNotice' && (
+        <ActorQuitNoticeModal data={modal.data} onClose={dismiss} />
+      )}
+      {modal.type === 'actorBurnLetter' && (
+        <ActorBurnLetterModal data={modal.data} onClose={dismiss} />
       )}
     </div>
   )
@@ -331,16 +338,21 @@ function AuditionModal({ data, onClose, dispatch, state }) {
 
   const unsigned = candidates.filter(a => !signedIds.includes(a.id) && !state.actors.find(sa => sa.id === a.id && sa.signed))
 
+  // Sign cost penalty: +40% for 8 weeks after a Studio Reputation Crisis
+  const signCostMult = (state.flags?.signCostPenaltyUntilWeek ?? 0) > state.week ? 1.4 : 1.0
+  const effCost = (base) => Math.round(base * signCostMult)
+
   function signOne(actor) {
     SFX.confirm()
-    if (state.money < actor.signCost) {
+    const cost = effCost(actor.signCost)
+    if (state.money < cost) {
       dispatch({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
         title: '💸 INSUFFICIENT FUNDS',
-        message: `You need ₩${actor.signCost.toLocaleString()} to sign ${actor.name}.`,
+        message: `You need ₩${cost.toLocaleString()} to sign ${actor.name}.`,
       } } })
       return
     }
-    dispatch({ type: A.SIGN_ACTOR, id: actor.id, cost: actor.signCost })
+    dispatch({ type: A.SIGN_ACTOR, id: actor.id, cost })
     setSignedIds(prev => [...prev, actor.id])
   }
 
@@ -348,7 +360,7 @@ function AuditionModal({ data, onClose, dispatch, state }) {
     SFX.success()
     const eligible = unsigned
     if (!eligible.length) return
-    const total = Math.round(eligible.reduce((s, a) => s + a.signCost, 0) * 0.7)
+    const total = Math.round(eligible.reduce((s, a) => s + effCost(a.signCost), 0) * 0.7)
     if (state.money < total) {
       dispatch({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
         title: '💸 INSUFFICIENT FUNDS',
@@ -356,11 +368,11 @@ function AuditionModal({ data, onClose, dispatch, state }) {
       } } })
       return
     }
-    dispatch({ type: A.BULK_SIGN, pairs: eligible.map(a => ({ id: a.id, cost: a.signCost })) })
+    dispatch({ type: A.BULK_SIGN, pairs: eligible.map(a => ({ id: a.id, cost: effCost(a.signCost) })) })
     setSignedIds(prev => [...prev, ...eligible.map(a => a.id)])
   }
 
-  const bulkTotal = Math.round(unsigned.reduce((s, a) => s + a.signCost, 0) * 0.7)
+  const bulkTotal = Math.round(unsigned.reduce((s, a) => s + effCost(a.signCost), 0) * 0.7)
 
   return (
     <div className="modal-box" style={{ maxHeight: '92dvh', overflowY: 'auto', padding: 0 }}>
@@ -380,7 +392,7 @@ function AuditionModal({ data, onClose, dispatch, state }) {
           {candidates.map(actor => {
             const alreadySigned = signedIds.includes(actor.id) ||
               state.actors.find(a => a.id === actor.id && a.signed)
-            const canAfford     = state.money >= actor.signCost
+            const canAfford     = state.money >= effCost(actor.signCost)
             return (
               <div key={actor.id} style={{
                 ...auStyles.card,
@@ -398,7 +410,8 @@ function AuditionModal({ data, onClose, dispatch, state }) {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 8, color: 'var(--gold)' }}>
-                      ₩{actor.signCost.toLocaleString()}
+                      ₩{effCost(actor.signCost).toLocaleString()}
+                      {signCostMult > 1 && <span style={{ fontSize: 6, color: 'var(--red)', marginLeft: 4 }}>+40% crisis</span>}
                     </div>
                   </div>
                 </div>
@@ -428,7 +441,7 @@ function AuditionModal({ data, onClose, dispatch, state }) {
                       opacity: canAfford ? 1 : 0.45,
                     }}
                   >
-                    {canAfford ? `✍️ SIGN (₩${actor.signCost.toLocaleString()})` : '💸 INSUFFICIENT FUNDS'}
+                    {canAfford ? `✍️ SIGN (₩${effCost(actor.signCost).toLocaleString()})` : '💸 INSUFFICIENT FUNDS'}
                   </button>
                 )}
               </div>
@@ -452,6 +465,70 @@ function AuditionModal({ data, onClose, dispatch, state }) {
           PASS THIS WEEK
         </button>
       </div>
+    </div>
+  )
+}
+
+// ── Actor Quit Notice ─────────────────────────────────────────────────────────
+function ActorQuitNoticeModal({ data, onClose }) {
+  const { state } = useGame()
+  const actor = state.actors.find(a => a.id === data.actorId)
+
+  return (
+    <div className="modal-box" style={{ textAlign: 'center' }}>
+      <div className="modal-title" style={{ color: 'var(--red)' }}>💥 ACTOR QUIT</div>
+      <button className="modal-close" onClick={onClose}>✕</button>
+
+      {actor && (
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '14px 0 8px' }}>
+          <ActorPortrait actor={actor} size={80} style={{ border: '3px solid var(--red)' }} />
+        </div>
+      )}
+
+      <div style={{ fontSize: 13, color: 'var(--red)', marginBottom: 6 }}>
+        {data.actorName}
+      </div>
+      <div style={{ fontSize: 8, color: 'var(--white)', lineHeight: 2, marginBottom: 8 }}>
+        has <strong>QUIT</strong> the studio after {data.idleWeeks} week{data.idleWeeks !== 1 ? 's' : ''} benched.
+        <br />(Loyalty: 0)
+      </div>
+      <div style={{ fontSize: 7, color: 'var(--lav)', marginBottom: 20, lineHeight: 1.9 }}>
+        They will return to the Free Agents Pool at <strong>Week {data.returnWeek}</strong>.
+        <br />Re-sign cost will be 3× the original.
+      </div>
+
+      <button className="btn-primary" style={styles.closeBtn} onClick={onClose}>
+        CONFIRM
+      </button>
+    </div>
+  )
+}
+
+// ── Actor Burn Letter ─────────────────────────────────────────────────────────
+function ActorBurnLetterModal({ data, onClose }) {
+  return (
+    <div className="modal-box">
+      <div className="modal-title">🧳 {data.actorName} — FAREWELL</div>
+      <button className="modal-close" onClick={onClose}>✕</button>
+
+      <div style={{
+        fontSize: 8,
+        color: 'var(--white)',
+        lineHeight: 2.2,
+        marginBottom: 20,
+        fontStyle: 'italic',
+        background: 'var(--bg-inset)',
+        padding: '14px',
+        border: '1px solid var(--shadow)',
+        borderLeft: '3px solid var(--red)',
+        whiteSpace: 'pre-line',
+      }}>
+        {data.letterText}
+      </div>
+
+      <button className="btn-primary" style={styles.closeBtn} onClick={onClose}>
+        NOTED
+      </button>
     </div>
   )
 }

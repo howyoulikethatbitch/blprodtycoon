@@ -4,7 +4,7 @@
  */
 import React, { useState } from 'react'
 import { useGame } from '../game/state.jsx'
-import { SKILL_LABELS, SKILL_KEYS, STATUS_LABEL, STATUS_COLOR, TIER_COLOR, moodEmoji, portraitUrl, PORTRAIT_COLORS } from '../game/actors.js'
+import { SKILL_LABELS, SKILL_KEYS, STATUS_LABEL, STATUS_COLOR, TIER_COLOR, moodEmoji, portraitUrl, PORTRAIT_COLORS, actorDisplayName } from '../game/actors.js'
 import { getChem, chemTier } from '../game/chemistry.js'
 import { SFX } from '../game/audio.js'
 
@@ -24,7 +24,7 @@ export default function ActorRoster({ openProfile }) {
   const locked = state.actors.filter(a => !a.signed)
 
   const filtered = state.actors.filter(a => {
-    const matchSearch = !search || a.name.toLowerCase().includes(search.toLowerCase())
+    const matchSearch = !search || actorDisplayName(a).toLowerCase().includes(search.toLowerCase())
     if (!matchSearch) return false
     if (filter === 'AVAILABLE') return a.signed && a.status === 'available'
     if (filter === 'FILMING')   return a.signed && a.status === 'filming'
@@ -123,7 +123,7 @@ function ActorCard({ actor, allActors, onClick }) {
         {/* Name row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
           <span style={{ fontSize: 9, color: 'var(--white)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {isLocked ? '???' : actor.name}
+            {isLocked ? '???' : actorDisplayName(actor)}
           </span>
           {!isLocked && <span style={{ fontSize: 14 }}>{mood}</span>}
         </div>
@@ -156,7 +156,7 @@ function ActorCard({ actor, allActors, onClick }) {
               const tier = chemTier(bestChem.val)
               return (
                 <div style={{ fontSize: 6, color: tier.color, marginTop: 5 }}>
-                  {tier.emoji} {bestChem.actor.name} {bestChem.val}
+                  {tier.emoji} {actorDisplayName(bestChem.actor)} {bestChem.val}
                 </div>
               )
             })()}

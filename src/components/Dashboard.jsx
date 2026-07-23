@@ -3,12 +3,96 @@
  * Prompt 4: lead actor portraits on active cards, phase badges, star ratings,
  *           combo indicator, Event Log panel (color-coded, newest-first).
  */
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect, useState } from 'react'
 import { useGame } from '../game/state.jsx'
 import { fmtMoney, fmtPop, calcRank, rankProgress } from '../game/ranking.js'
 import { PROD_TYPES, SCHEDULES, PLATFORMS, scoreToStars } from '../game/productions.js'
 import { ActorPortrait } from './ActorRoster.jsx'
+import { actorDisplayName } from '../game/actors.js'
 import { SFX } from '../game/audio.js'
+
+// ── Roster alert helpers ──────────────────────────────────────────────────────
+function loyaltyLabel(loyalty) {
+  if (loyalty > 75) return 'High'
+  if (loyalty > 50) return 'Moderate'
+  if (loyalty > 25) return 'Low'
+  if (loyalty > 10) return 'Critical'
+  return 'LEAVING!'
+}
+
+function buildRosterAlerts(actors) {
+  const alerts = []
+  for (const a of actors) {
+    if (!a.signed || a.status !== 'available') continue
+    const h    = a.happiness ?? 70
+    const l    = a.loyalty   ?? 60
+    const idle = a.idleWeeks ?? 0
+    const name = actorDisplayName(a)
+    const loyLvl = loyaltyLabel(l)
+    let severity = 0, message = '', color = 'var(--gold)'
+
+    if (l <= 10) {
+      severity = 4
+      message  = `‼️ FINAL WARNING‼️: ${name} is walking out! 🤬 (Loyalty: ${loyLvl}) ⚠️`
+      color    = 'var(--red)'
+    } else if (h >= 10 && h <= 24 && idle >= 14) {
+      severity = 3
+      message  = `❗ROSTER IDLE❗ ${idle} weeks with no work. 😡 Keep ${name} acting before they quit! (Loyalty: ${loyLvl}) 📢`
+      color    = '#FF5470'
+    } else if (h >= 25 && h <= 49 && idle >= 10) {
+      severity = 2
+      message  = `Roster Idle: ${name} feels forgotten after ${idle} weeks! 😢 Keep them acting! (Loyalty: ${loyLvl}) 📉`
+      color    = '#FF9F68'
+    } else if (h >= 50 && h <= 74 && idle >= 6) {
+      severity = 1
+      message  = `Roster idle: Keep ${name} acting! 😐 It has been ${idle} weeks. (Loyalty: ${loyLvl}) ⏳`
+      color    = 'var(--gold)'
+    }
+
+    if (severity > 0) alerts.push({ actor: a, severity, message, color })
+  }
+  return alerts.sort((x, y) => y.severity - x.severity)
+}
+
+function RosterAlertsPanel({ alerts }) {
+  const [expanded, setExpanded] = useState(false)
+  const visible = expanded ? alerts : alerts.slice(0, 3)
+  const hidden  = alerts.length - 3
+
+  return (
+    <div className="panel" style={{ border: '2px solid var(--red)', padding: '10px 12px' }}>
+      <div className="panel-title" style={{ color: 'var(--red)', marginBottom: 8 }}>⚠️ ROSTER ALERTS</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {visible.map(({ actor, message, color }) => (
+          <div key={actor.id} style={{
+            fontSize: 7, color, lineHeight: 1.8,
+            padding: '5px 8px',
+            background: 'rgba(0,0,0,0.25)',
+            borderLeft: `3px solid ${color}`,
+          }}>
+            {message}
+          </div>
+        ))}
+      </div>
+      {!expanded && hidden > 0 && (
+        <button
+          style={{ fontSize: 7, marginTop: 8, padding: '4px 10px', color: 'var(--lav)' }}
+          onClick={() => setExpanded(true)}
+        >
+          ▼ Show {hidden} more
+        </button>
+      )}
+      {expanded && alerts.length > 3 && (
+        <button
+          style={{ fontSize: 7, marginTop: 8, padding: '4px 10px', color: 'var(--lav)' }}
+          onClick={() => setExpanded(false)}
+        >
+          ▲ Show less
+        </button>
+      )}
+    </div>
+  )
+}
 
 const PHASE_LABEL = {
   filming:   { text: 'FILMING',   color: 'var(--blue)'  },
@@ -29,7 +113,8 @@ export default function Dashboard({ setScreen }) {
   const { state } = useGame()
   const rank        = calcRank(state.reputation, state.popularity)
   const progress    = rankProgress(state.reputation, state.popularity)
-  const active      = state.productions.filter(p => p.status === 'active')
+  const active       = state.productions.filter(p => p.status === 'active')
+  const rosterAlerts = buildRosterAlerts(state.actors)
   const recent      = [...state.history].reverse().slice(0, 6)
   const weekInYear  = ((state.week - 1) % 52) + 1
   const currentYear = Math.ceil(state.week / 52)
@@ -78,6 +163,11 @@ export default function Dashboard({ setScreen }) {
           </div>
         </div>
       </div>
+
+      {/* ── Roster alerts ── */}
+      {rosterAlerts.length > 0 && (
+        <RosterAlertsPanel alerts={rosterAlerts} />
+      )}
 
       {/* ── Active productions ── */}
       <div className="panel">
@@ -178,7 +268,7 @@ function ActiveProdCard({ prod, actors }) {
           {leads.map(a => (
             <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <ActorPortrait actor={a} size={36} />
-              <span style={{ fontSize: 7, color: 'var(--lav)' }}>{a.name.split(' ')[0]}</span>
+              <span style={{ fontSize: 7, color: 'var(--lav)' }}>{actorDisplayName(a).split(' ')[0]}</span>
             </div>
           ))}
           {prod.comboResult && (

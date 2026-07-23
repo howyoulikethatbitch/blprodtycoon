@@ -2,9 +2,9 @@
  * ActorProfile.jsx — Detailed actor page with full stats, chemistry map, filmography
  * Updated for Prompt 2: 8 skills, characteristics, chemistry_map, mood emoji.
  */
-import React, { useMemo } from 'react'
-import { useGame } from '../game/state.jsx'
-import { SKILL_KEYS, SKILL_LABELS, STATUS_LABEL, STATUS_COLOR, TIER_COLOR, moodEmoji } from '../game/actors.js'
+import React, { useMemo, useState, useCallback } from 'react'
+import { useGame, A } from '../game/state.jsx'
+import { SKILL_KEYS, SKILL_LABELS, STATUS_LABEL, STATUS_COLOR, TIER_COLOR, moodEmoji, actorDisplayName } from '../game/actors.js'
 import { getChem, chemTier } from '../game/chemistry.js'
 import { SFX } from '../game/audio.js'
 import { ActorPortrait } from './ActorRoster.jsx'
@@ -12,8 +12,34 @@ import { ActorPortrait } from './ActorRoster.jsx'
 const BASE = import.meta.env.BASE_URL
 
 export default function ActorProfile({ actorId, onBack }) {
-  const { state } = useGame()
+  const { state, dispatch } = useGame()
   const actor = state.actors.find(a => a.id === actorId)
+
+  // ── Inline name editor state ──────────────────────────────────────────────
+  const [editingName, setEditingName] = useState(false)
+  const [draftName,   setDraftName]   = useState('')
+
+  const openEdit = useCallback(() => {
+    setDraftName(actorDisplayName(actor))
+    setEditingName(true)
+  }, [actor])
+
+  const saveName = useCallback(() => {
+    const trimmed = draftName.trim()
+    if (trimmed && trimmed !== actor.name) {
+      dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch: { customName: trimmed } })
+    } else if (!trimmed) {
+      dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch: { customName: null } })
+    }
+    setEditingName(false)
+  }, [draftName, actor, dispatch])
+
+  const cancelEdit = useCallback(() => setEditingName(false), [])
+
+  const resetName = useCallback(() => {
+    dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch: { customName: null } })
+    setEditingName(false)
+  }, [actor, dispatch])
 
   if (!actor) {
     return (
@@ -79,13 +105,46 @@ export default function ActorProfile({ actorId, onBack }) {
           </div>
 
           <div style={styles.identityInfo}>
-            {/* Name + mood */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <span style={{ fontSize: 13, color: isLocked ? 'var(--gray)' : 'var(--pink)' }}>
-                {isLocked ? '???' : actor.name}
-              </span>
-              {!isLocked && <span style={{ fontSize: 20 }}>{mood}</span>}
-            </div>
+            {/* Name + mood + inline editor */}
+            {editingName && !isLocked ? (
+              <div style={{ marginBottom: 8 }}>
+                <input
+                  autoFocus
+                  type="text"
+                  value={draftName}
+                  maxLength={24}
+                  onChange={e => setDraftName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') cancelEdit() }}
+                  style={{ fontSize: 11, padding: '5px 8px', width: '100%', marginBottom: 4, color: 'var(--pink)', background: 'var(--bg-inset)', border: '2px solid var(--pink)', outline: 'none' }}
+                />
+                {actor.customName && (
+                  <div style={{ fontSize: 6, color: 'var(--gray)', marginBottom: 4 }}>
+                    Original name: {actor.name}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button style={{ fontSize: 7, padding: '4px 10px', background: 'var(--pink)', color: '#000' }} onClick={saveName}>✓ SAVE</button>
+                  <button style={{ fontSize: 7, padding: '4px 10px' }} onClick={cancelEdit}>✕ CANCEL</button>
+                  {actor.customName && (
+                    <button style={{ fontSize: 7, padding: '4px 10px', color: 'var(--gray)' }} onClick={resetName}>↺ RESET</button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 13, color: isLocked ? 'var(--gray)' : 'var(--pink)' }}>
+                  {isLocked ? '???' : actorDisplayName(actor)}
+                </span>
+                {!isLocked && <span style={{ fontSize: 20 }}>{mood}</span>}
+                {!isLocked && (
+                  <button
+                    onClick={openEdit}
+                    title="Edit name"
+                    style={{ fontSize: 10, padding: '2px 6px', marginLeft: 2, background: 'transparent', border: '1px solid var(--shadow)', color: 'var(--lav)', cursor: 'pointer' }}
+                  >✏️</button>
+                )}
+              </div>
+            )}
 
             {/* Tier badge */}
             <div style={{ fontSize: 8, color: tierColor, marginBottom: 6 }}>
@@ -161,7 +220,7 @@ export default function ActorProfile({ actorId, onBack }) {
                   <ActorPortrait actor={partner} size={32} isLocked={!partner.signed} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 7, color: 'var(--white)', marginBottom: 3 }}>
-                      {partner.name} (CP Partner)
+                      {actorDisplayName(partner)} (CP Partner)
                     </div>
                     <div style={styles.chemTrack}>
                       <div style={{ ...styles.chemFill, width: `${val}%`, background: tier.color }} />
