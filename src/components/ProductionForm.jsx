@@ -8,7 +8,7 @@ import { useGame, A, pushToast } from '../game/state.jsx'
 import {
   PROD_TYPES, SCHEDULES, PLATFORMS, RATINGS, GENRES, GENRE_EMOJI, STORY_TYPES,
   BUDGET_TIERS, TITLE_POOL, calcCost, createProduction,
-  genCpName, getComboResult, DEFAULT_GENRES,
+  getComboResult, DEFAULT_GENRES,
 } from '../game/productions.js'
 import {
   THEMES, THEME_CATEGORIES, THEME_EMOJI, THEME_UNLOCK_BY_GRADE, DEFAULT_THEMES,
@@ -16,7 +16,7 @@ import {
 } from '../game/themes.js'
 import { getGameTierByRank } from '../game/tiers.js'
 import { calcChemistryBonus, chemTier, getChem, bondKey } from '../game/chemistry.js'
-import { canAssign, moodEmoji } from '../game/actors.js'
+import { canAssign, moodEmoji, actorDisplayName } from '../game/actors.js'
 import { fmtMoney } from '../game/ranking.js'
 import { SFX } from '../game/audio.js'
 import { ActorPortrait } from './ActorRoster.jsx'
@@ -103,7 +103,7 @@ export default function ProductionForm({ setScreen }) {
       setCpName(storedCPName)
       setCpEdited(false)
     } else if (!cpEdited) {
-      setCpName(genCpName(lead1?.name ?? '', lead2?.name ?? ''))
+      setCpName('')
     }
   }, [lead1Id, lead2Id, cpEdited, cpNameLocked, storedCPName])
 
@@ -631,7 +631,7 @@ export default function ProductionForm({ setScreen }) {
                 {/* Unhappy warnings */}
                 {[lead1, lead2].map(a => (a.happiness ?? 70) < 40 && (
                   <div key={a.id} style={{ fontSize: 7, color: 'var(--red)', marginBottom: 4 }}>
-                    ⚠️ {a.name} is unhappy — chemistry may suffer
+                    ⚠️ {actorDisplayName(a)} is unhappy — chemistry may suffer
                   </div>
                 ))}
               </div>
@@ -652,7 +652,7 @@ export default function ProductionForm({ setScreen }) {
             value={cpName}
             maxLength={20}
             onChange={e => { if (!cpNameLocked) { setCpName(e.target.value); setCpEdited(true) } }}
-            placeholder="Auto-generated from lead names"
+            placeholder="Enter a CP name…"
             readOnly={cpNameLocked}
             style={{ opacity: cpNameLocked ? 0.7 : 1, cursor: cpNameLocked ? 'not-allowed' : 'text' }}
           />
@@ -1050,7 +1050,7 @@ function LeadDropdown({ label, value, onChange, actors, excludeId, locked }) {
         <option value="">— Select —</option>
         {filtered.map(a => (
           <option key={a.id} value={a.id}>
-            {a.name} ({a.tier}) {(a.happiness ?? 70) < 40 ? '⚠️' : ''}
+            {actorDisplayName(a)} ({a.tier}) {(a.happiness ?? 70) < 40 ? '⚠️' : ''}
           </option>
         ))}
       </select>
@@ -1069,7 +1069,7 @@ function LeadMini({ actor }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <ActorPortrait actor={actor} size={44} />
       <div>
-        <div style={{ fontSize: 8, color: 'var(--white)' }}>{actor.name}</div>
+        <div style={{ fontSize: 8, color: 'var(--white)' }}>{actorDisplayName(actor)}</div>
         <div style={{ fontSize: 7, color: 'var(--lav)' }}>{actor.tier}</div>
         <div style={{ fontSize: 12 }}>{moodEmoji(actor.happiness ?? 70)}</div>
       </div>
