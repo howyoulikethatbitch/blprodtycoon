@@ -15,7 +15,7 @@ import {
 import { SFX } from '../game/audio.js'
 import { triggerConfetti } from './Confetti.jsx'
 import { ActorPortrait } from './ActorRoster.jsx'
-import { PORTRAIT_COLORS, NEW_TALENT_POOL } from '../game/actors.js'
+import { PORTRAIT_COLORS, NEW_TALENT_POOL, actorDisplayName } from '../game/actors.js'
 
 const BASE = import.meta.env.BASE_URL
 
@@ -598,7 +598,7 @@ function AwardWinnerDisplay({ result, award, isPlayer, actors, freeAgents }) {
 
   if (award.kind === 'actor') {
     const portraitActor = isPlayer
-      ? actors.find(a => a.name === winner.actorName || a.name === winner.name)
+      ? actors.find(a => a.id === winner.actorId || a.name === winner.actorName || a.name === winner.name)
       : null
 
     return (
@@ -629,6 +629,60 @@ function AwardWinnerDisplay({ result, award, isPlayer, actors, freeAgents }) {
           </div>
           <div style={{ fontSize: 7, color: 'var(--lav)' }}>{winner.company}</div>
         </div>
+      </div>
+    )
+  }
+
+  if (award.kind === 'chemistry') {
+    const actor1 = isPlayer
+      ? actors.find(a => a.id === winner.actor1Id)
+      : null
+    const actor2 = isPlayer
+      ? actors.find(a => a.id === winner.actor2Id)
+      : null
+    const chemScore = winner.chemScore ?? 0
+
+    return (
+      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+        {isPlayer && (
+          <div style={{
+            fontSize: 8, color: 'var(--bg-deep)',
+            background: 'var(--gold)', padding: '4px 12px',
+            letterSpacing: 1, textAlign: 'center', width: '100%', boxSizing: 'border-box',
+          }}>
+            ★ WINNER ★
+          </div>
+        )}
+        {/* Two actors side by side */}
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            {actor1 ? (
+              <ActorPortrait actor={actor1} size={72} />
+            ) : (
+              <RivalPortrait actorName={winner.actor1Name ?? '?'} size={72} />
+            )}
+            <div style={{ fontSize: 8, color: nameColor, maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {actor1 ? actorDisplayName(actor1) : (winner.actor1Name ?? '?')}
+            </div>
+          </div>
+          <div style={{ fontSize: 20, color: 'var(--pink)' }}>💕</div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            {actor2 ? (
+              <ActorPortrait actor={actor2} size={72} />
+            ) : (
+              <RivalPortrait actorName={winner.actor2Name ?? '?'} size={72} />
+            )}
+            <div style={{ fontSize: 8, color: nameColor, maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {actor2 ? actorDisplayName(actor2) : (winner.actor2Name ?? '?')}
+            </div>
+          </div>
+        </div>
+        {/* Chemistry level */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+          <span style={{ fontSize: 9, color: 'var(--gold)', fontWeight: 'bold' }}>💕 {chemScore}</span>
+          <span style={{ fontSize: 7, color: 'var(--lav)' }}>Chemistry Level</span>
+        </div>
+        <div style={{ fontSize: 7, color: 'var(--lav)' }}>{winner.company}</div>
       </div>
     )
   }
@@ -677,7 +731,9 @@ function SummaryRow({ award, result, isPlayer }) {
             }}>
               {award.kind === 'actor'
                 ? (winner.actorName ?? winner.name)
-                : (winner.title ?? winner.name)}
+                : award.kind === 'chemistry'
+                  ? `${winner.actor1Name ?? '?'} & ${winner.actor2Name ?? '?'}`
+                  : (winner.title ?? winner.name)}
             </div>
             <div style={{ fontSize: 7, color: 'var(--lav)' }}>
               {winner.company}
