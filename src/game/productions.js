@@ -13,9 +13,9 @@ export const PROD_TYPES = {
 
 // ─── Schedules (production duration & quality multiplier) ─────────────────────
 export const SCHEDULES = [
-  { id: '3m',  label: '3 Months',  weeks: 12, qMult: 0.8 },
-  { id: '6m',  label: '6 Months',  weeks: 24, qMult: 1.0 },
-  { id: '12m', label: '12 Months', weeks: 48, qMult: 1.3 },
+  { id: '3m',  label: '3 Months',  weeks: 12, qMult: 0.85 },  // was 0.80
+  { id: '6m',  label: '6 Months',  weeks: 24, qMult: 1.10 },  // was 1.00
+  { id: '12m', label: '12 Months', weeks: 48, qMult: 1.55 },  // was 1.30 — rewards risk of long injury cooldown
 ]
 
 // ─── Platforms ────────────────────────────────────────────────────────────────
@@ -222,11 +222,11 @@ export function calcRevenue(score, budgetMult, type, reputation, platform, combo
 // Represents the studio learning its workflow: first few productions execute
 // at reduced quality regardless of actor skill, improving with experience.
 function studioQualityMult(productionsCompleted) {
-  if (productionsCompleted <  3) return 0.65   // greenhorn — still figuring it out
-  if (productionsCompleted <  6) return 0.78   // finding the rhythm
-  if (productionsCompleted < 10) return 0.88   // getting confident
-  if (productionsCompleted < 15) return 0.95   // near-professional
-  return 1.0                                   // fully experienced
+  if (productionsCompleted <  2) return 0.75   // greenhorn — floor raised from 0.65 so early C/B grades are achievable
+  if (productionsCompleted <  4) return 0.83   // finding the rhythm
+  if (productionsCompleted <  7) return 0.90   // getting confident
+  if (productionsCompleted < 10) return 0.96   // near-professional
+  return 1.0                                   // fully experienced (reached at prod 10, was prod 15)
 }
 
 // ─── Score formula ────────────────────────────────────────────────────────────

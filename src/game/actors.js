@@ -317,7 +317,10 @@ export function weeklyActorTick(actor, tier) {
   } else if (actor.status === 'injured') {
     const weeks = Math.max(0, (actor.injuredWeeks ?? 1) - 1)
     patch.injuredWeeks = weeks
-    if (weeks === 0) patch.status = 'available'
+    if (weeks === 0) {
+      patch.status   = 'available'
+      patch.idleWeeks = -8  // 8-week grace buffer — actor just recovered, don't immediately drain loyalty
+    }
   }
 
   return patch

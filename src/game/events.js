@@ -869,7 +869,8 @@ function makeActorEvent(type, actor, state) {
 }
 
 const ACTOR_EVENT_TYPES = [
-  'poached', 'scandal', 'romance', 'solo_ambitions', 'injury',
+  // 'injury' removed — now triggers deterministically at every 3rd production completion
+  'poached', 'scandal', 'romance', 'solo_ambitions',
   'fan_meeting', 'raise', 'viral_chemistry', 'language_barrier', 'singing_debut',
 ]
 

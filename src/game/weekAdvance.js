@@ -63,6 +63,18 @@ export function useWeekAdvance() {
       if (prod.status !== 'active') continue
       // Prompt 1 (Year Lineup): skip productions not yet at their scheduled start week
       if (prod.weekScheduled && week < prod.weekScheduled) continue
+
+      // ── Filming-start happiness boost (+8) on the very first tick ─────────
+      if (prod.weeksLeft === prod.weeksTotal && (prod.castIds ?? []).length > 0) {
+        for (const actorId of prod.castIds) {
+          const a = state.actors.find(x => x.id === actorId)
+          if (a?.signed) {
+            dispatch({ type: A.UPDATE_ACTOR, id: a.id,
+              patch: { happiness: clamp((a.happiness ?? 70) + 8, 0, 100) } })
+          }
+        }
+      }
+
       const patch = tickProduction(prod)
       dispatch({ type: A.UPDATE_PRODUCTION, id: prod.id, patch })
 
@@ -187,6 +199,119 @@ export function useWeekAdvance() {
             completedProds: (actor.completedProds ?? 0) + 1,
           },
         })
+
+        // ── Injury / fatigue: fires at every 3rd completed production ─────────
+        const newCompleted = (actor.completedProds ?? 0) + 1
+        if (newCompleted % 3 === 0) {
+          const schedMap      = { '3m': 12, '6m': 24, '12m': 48 }
+          const recoveryWeeks = schedMap[prod.schedule] ?? 12
+          const weekInYear    = ((week - 1) % 52) + 1
+          const overflowWeeks = Math.max(0, weekInYear + recoveryWeeks - 52)
+          const isWorsened    = actor.worsened ?? false
+
+          const overflowMsg = overflowWeeks > 0
+            ? `\n\n⚠️ Rest extends ${overflowWeeks} week(s) past year-end — unable to film that period. `
+              + `−${Math.min(overflowWeeks * 5, Math.max(0, (actor.loyalty ?? 30) - 10))} loyalty · −15 happiness deducted.`
+            : ''
+
+          const restEffect = (s, d) => {
+            const loyLoss = overflowWeeks > 0
+              ? Math.min(overflowWeeks * 5, Math.max(0, (actor.loyalty ?? 30) - 10)) : 0
+            const hapLoss = overflowWeeks > 0 ? 15 : 0
+            d({ type: A.UPDATE_ACTOR, id: actor.id, patch: {
+              status:       'injured',
+              injuredWeeks: recoveryWeeks,
+              assignedTo:   null,
+              worsened:     false,
+              idleWeeks:    -8,
+              loyalty:      clamp((actor.loyalty  ?? 30) - loyLoss, 10, 100),
+              happiness:    clamp((actor.happiness ?? 70) - hapLoss,  0, 100),
+            } })
+          }
+
+          const ordinal = n => n === 3 ? '3rd' : `${n}th`
+
+          dispatch({
+            type: A.PUSH_MODAL,
+            modal: {
+              type: 'event',
+              data: {
+                label: isWorsened
+                  ? `🚨 SERIOUS INJURY — ${actor.name.toUpperCase()}`
+                  : `🤕 FATIGUE WARNING — ${actor.name.toUpperCase()}`,
+                message: isWorsened
+                  ? `${actor.name} is carrying a worsened injury and has just finished another production without resting.\n\n`
+                    + `They MUST rest for ${recoveryWeeks} weeks. Forcing them to continue risks permanent departure.${overflowMsg}`
+                  : `${actor.name} has completed their ${ordinal(newCompleted)} production. `
+                    + `The physical and mental toll of repeated filming schedules is beginning to show.\n\n`
+                    + `Recommended recovery: ${recoveryWeeks} weeks.${overflowMsg}`,
+                choices: isWorsened
+                  ? [
+                      { label: `🏥 Mandatory rest — ${recoveryWeeks}-week recovery`,
+                        effect: restEffect },
+                      { label: `😤 Force continue — HIGH risk of permanent departure`,
+                        effect: (s, d) => {
+                          const boostedSkills = {}
+                          for (const [k, v] of Object.entries(actor.skills ?? {}))
+                            boostedSkills[k] = Math.min(100, Math.round(v * 1.5))
+                          d({ type: A.PUSH_MODAL, modal: { type: 'event', data: {
+                            label: `💔 ACTOR WALKOUT — ${actor.name.toUpperCase()}`,
+                            message:
+                              `${actor.name} refuses to go on. After being forced through injury twice, `
+                              + `they are leaving the studio.\n\nThey will enter the Free Agents Pool after a 12-week cooldown.`,
+                            choices: [
+                              { label: `👋 Accept their departure`,
+                                effect: (s2, d2) => {
+                                  d2({ type: A.UPDATE_ACTOR, id: actor.id,
+                                    patch: { signed: false, status: 'locked', loyalty: 0, worsened: false } })
+                                  d2({ type: A.ADD_FREE_AGENT, entry: {
+                                    poolId:          `ex_${actor.id}_${week}_inj`,
+                                    type:            'ex_actor',
+                                    originalActorId: actor.id,
+                                    name:            actor.name,
+                                    tier:            actor.tier,
+                                    skills:          boostedSkills,
+                                    signCost:        Math.round((actor.signCost ?? 200) * 3 * (tier.resignCostMult ?? 1.0)),
+                                    happiness:       20,
+                                    loyalty:         0,
+                                    weeksInPool:     0,
+                                    availableWeek:   week + 12,
+                                    permanentlyGone: false,
+                                    idleReturnCount: 0,
+                                  } })
+                                  pushEventLog(d2,
+                                    `💔 ${actor.name} walked out — forced through injury twice → Free Agents Pool`,
+                                    'red', week)
+                                } },
+                            ],
+                          } } })
+                        } },
+                    ]
+                  : [
+                      { label: `🏥 Rest — ${recoveryWeeks}-week recovery (recommended)`,
+                        effect: restEffect },
+                      { label: `🎬 Push through — continue filming (fatigue will worsen)`,
+                        effect: (s, d) => {
+                          d({ type: A.UPDATE_ACTOR, id: actor.id, patch: {
+                            worsened:  true,
+                            happiness: clamp((actor.happiness ?? 70) - 10, 0, 100),
+                            loyalty:   clamp((actor.loyalty   ?? 60) -  8, 0, 100),
+                          } })
+                          d({ type: A.PUSH_MODAL, modal: { type: 'generic', data: {
+                            title:   `⚠️ ${actor.name} — FATIGUE WORSENED`,
+                            message: `${actor.name} is pushing through the fatigue. `
+                                     + `If they complete another production without resting first, `
+                                     + `the consequences will be severe — they may leave the studio permanently.`,
+                          } } })
+                        } },
+                    ],
+              },
+            },
+          })
+          pushEventLog(dispatch,
+            `🤕 ${actor.name} fatigue warning after ${ordinal(newCompleted)} production — rest advised.`,
+            'red', week)
+        }
       }
 
       // Record completion (chemScore stored for BL Awards chemistry check)
