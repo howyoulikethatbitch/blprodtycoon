@@ -2,6 +2,7 @@
  * awards.js — BL Awards: pure logic for the annual ceremony
  * Runs once per in-game year at week 52.
  */
+import { actorDisplayName } from './actors.js'
 
 // ─── Award Definitions (minor first → major last) ─────────────────────────────
 export const AWARD_DEFS = [
@@ -10,7 +11,7 @@ export const AWARD_DEFS = [
   { id: 'rising_actor',       label: 'Rising Star Actor Award',    category: 'minor', icon: '⭐', kind: 'actor'      },
   { id: 'popular_actor',      label: 'Popular Actor Award',        category: 'minor', icon: '💫', kind: 'actor'      },
   { id: 'worldwide_actor',    label: 'Worldwide Actor Award',      category: 'minor', icon: '🌍', kind: 'actor'      },
-  { id: 'best_chemistry',     label: 'Best in Chemistry',          category: 'minor', icon: '💕', kind: 'production' },
+  { id: 'best_chemistry',     label: 'Best in Chemistry',          category: 'minor', icon: '💕', kind: 'chemistry'  },
   { id: 'best_quality',       label: 'Best in Production Quality', category: 'minor', icon: '💎', kind: 'production' },
   { id: 'best_originality',   label: 'Best in Originality',        category: 'minor', icon: '✍️', kind: 'production' },
   { id: 'best_adaptation',    label: 'Best in Adaptation',         category: 'minor', icon: '🎭', kind: 'production' },
@@ -277,7 +278,7 @@ export function computeAllAwards(state, week, extraHistory = []) {
     })
 
     if (bestUser && userScore >= bestRivalScore) {
-      playerWin(awardId, { name: bestUser.name, company: companyName, actorName: bestUser.name })
+      playerWin(awardId, { name: actorDisplayName(bestUser), company: companyName, actorName: actorDisplayName(bestUser), actorId: bestUser.id })
     } else if (topRivals.length > 0) {
       const rival     = topRivals[bestRivalIdx] ?? topRivals[0]
       const actorName = pickRivalActorName(usedActorNames)
@@ -292,9 +293,30 @@ export function computeAllAwards(state, week, extraHistory = []) {
     const chemProds = yearHistory.filter(h => (h.chemScore ?? 0) >= 90)
     if (chemProds.length >= 2) {
       const best = chemProds.reduce((a, b) => (b.chemScore ?? 0) > (a.chemScore ?? 0) ? b : a)
-      playerWin('best_chemistry', { name: companyName, company: companyName, title: best.title, extra: `Chemistry: ${Math.round(best.chemScore)}` })
-    } else rivalWin('best_chemistry', false)
-  } else rivalWin('best_chemistry', false)
+      const leadIds = best.leadIds ?? best.castIds ?? []
+      const actor1 = (state.actors ?? []).find(a => a.id === leadIds[0])
+      const actor2 = (state.actors ?? []).find(a => a.id === leadIds[1])
+      playerWin('best_chemistry', {
+        name: companyName, company: companyName,
+        actor1Id: actor1?.id, actor2Id: actor2?.id,
+        actor1Name: actor1 ? actorDisplayName(actor1) : 'Unknown',
+        actor2Name: actor2 ? actorDisplayName(actor2) : 'Unknown',
+        chemScore: Math.round(best.chemScore ?? 0),
+        title: best.title,
+        extra: `Chemistry: ${Math.round(best.chemScore ?? 0)}`,
+      })
+    } else {
+      const rival = pickRivalCompany(rivals, false)
+      const a1Name = pickRivalActorName(usedActorNames)
+      const a2Name = pickRivalActorName(usedActorNames)
+      results.push({ awardId: 'best_chemistry', winner: { isPlayer: false, name: rival.name, company: rival.name, actor1Name: a1Name, actor2Name: a2Name, chemScore: Math.round(85 + Math.random() * 20) } })
+    }
+  } else {
+    const rival = pickRivalCompany(rivals, false)
+    const a1Name = pickRivalActorName(usedActorNames)
+    const a2Name = pickRivalActorName(usedActorNames)
+    results.push({ awardId: 'best_chemistry', winner: { isPlayer: false, name: rival.name, company: rival.name, actor1Name: a1Name, actor2Name: a2Name, chemScore: Math.round(85 + Math.random() * 20) } })
+  }
 
   // ── Best in Production Quality (≥2 productions with finalScore ≥ 90) ───────
   if (companyEligible) {
@@ -356,7 +378,7 @@ export function computeAllAwards(state, week, extraHistory = []) {
   })
 
   if (bestLead && userLeadScore >= bestRivalLeadScore) {
-    playerWin('best_lead_actor', { name: bestLead.name, company: companyName, actorName: bestLead.name })
+    playerWin('best_lead_actor', { name: actorDisplayName(bestLead), company: companyName, actorName: actorDisplayName(bestLead), actorId: bestLead.id })
   } else if (top5Rivals.length > 0) {
     const rival     = top5Rivals[bestRivalLeadIdx] ?? top5Rivals[0]
     const actorName = pickRivalActorName(usedActorNames)
@@ -424,7 +446,7 @@ export function computeAllAwards(state, week, extraHistory = []) {
   })
 
   if (bestAoY && userAoYScore >= bestRivalAoY) {
-    playerWin('actor_of_year', { name: bestAoY.name, company: companyName, actorName: bestAoY.name })
+    playerWin('actor_of_year', { name: actorDisplayName(bestAoY), company: companyName, actorName: actorDisplayName(bestAoY), actorId: bestAoY.id })
   } else if (top3Rivals.length > 0) {
     const rival     = top3Rivals[bestRivalAoYIdx] ?? top3Rivals[0]
     const actorName = pickRivalActorName(usedActorNames)
