@@ -474,11 +474,16 @@ export function calcScore(production, castActors, chemistryBonus = 0, production
   const diffPenaltyMult = 1.0 - (difficulty - 1) * 0.04
   const riskVariance = (difficulty - 1) * 0.02 * (Math.random() - 0.5)
 
-  // Introduce a user-selected focus factor (0.0 to 1.0, where 1.0 is full focus)
-  const userFocusFactor = production.focusAllocation ?? 0.0;
+  // Mitigate high RNG difficulty risks based on existing strategic factors (Con 3):
+  // 1. Studio experience (productionsCompleted): up to 50% risk reduction at 10+ productions.
+  const experienceBonus = Math.min(0.50, productionsCompleted * 0.05);
+  // 2. Production quality (baseRaw): up to 35% risk reduction above 40 quality.
+  const qualityDampBonus = Math.min(0.35, Math.max(0, baseRaw - 40) / 100);
 
-  // Dampen the random risk variance based on strategic investment:
-  const dampenedRiskVariance = riskVariance * (1.0 - userFocusFactor * 0.85);
+  const strategicDampeningFactor = experienceBonus + qualityDampBonus; // total up to 85% dampening
+
+  // Dampen the random risk variance:
+  const dampenedRiskVariance = riskVariance * (1.0 - strategicDampeningFactor);
 
   // Apply difficulty and risk modifiers
   const modifiedRaw = baseRaw * (diffPenaltyMult + dampenedRiskVariance)
@@ -528,7 +533,6 @@ export function createProduction({
   type, title, genre, theme, budget, schedule,
   platform, rating, story, castIds, leadIds,
   cpName, weekStarted, weekScheduled, genreMultiplier,
-  focusAllocation,
 }) {
   const s = SCHEDULES.find(sc => sc.id === schedule) ?? SCHEDULES[1]
   const t = PROD_TYPES[type]
@@ -561,7 +565,6 @@ export function createProduction({
     weekStarted:      weekStarted    ?? null,
     weekScheduled:    weekScheduled  ?? null,  // global week when filming actually begins
     genreMultiplier:  genreMultiplier ?? 1,    // 2 if 2× slot bonus was applied
-    focusAllocation:  focusAllocation ?? 0.0,
   }
 }
 

@@ -177,12 +177,6 @@ export default function ProductionForm({ setScreen }) {
   // Prompt 2 — Year Lineup: start week within the current year (1–52)
   const [startWeekInYear, setStartWeekInYear] = useState(weekInYear)
 
-  // Strategic Focus Areas State (Con 3)
-  const [focusAreas, setFocusAreas] = useState({ direction: false, screenplay: false, postProduction: false })
-  const focusCount = Object.values(focusAreas).filter(Boolean).length
-  const focusAllocation = focusCount / 3.0
-  const focusCost = focusCount * 1500
-
   // 5.1: Randomized title suggestions (fresh on mount, never change during session)
   const [titleSuggestions] = useState(pickRandomTitles)
 
@@ -381,7 +375,7 @@ export default function ProductionForm({ setScreen }) {
     ([x, y]) => (x === lead1.id && y === lead2.id) || (x === lead2.id && y === lead1.id)
   )
   const isEffectivelyFixed = alreadyFixedCP || (cpFixed && fixedCpAllowed)
-  const totalCost     = cost + focusCost + (cpFixed && fixedCpAllowed && !alreadyFixedCP ? fixedCpPrice : 0)
+  const totalCost     = cost + (cpFixed && fixedCpAllowed && !alreadyFixedCP ? fixedCpPrice : 0)
   const canAffordTotal = state.money >= totalCost
 
   function handleSubmit(e) {
@@ -422,7 +416,6 @@ export default function ProductionForm({ setScreen }) {
       weekScheduled:   weekScheduled,
       theme:           theme,
       genreMultiplier: genreMultiplier,
-      focusAllocation: focusAllocation,
       // Already-fixed pairs get fixedCP:true automatically (no extra fee charged).
       // New fixed CP contracts require the toggle + chemistry ≥ 20.
       fixedCP:   alreadyFixedCP || (cpFixed && fixedCpAllowed),
@@ -473,7 +466,6 @@ export default function ProductionForm({ setScreen }) {
     setBonusSpins(0)
     setGenreMultiplier(1)
     setStartWeekInYear(((state.week - 1) % 52) + 1)
-    setFocusAreas({ direction: false, screenplay: false, postProduction: false })
 
     setScreen('dashboard')
   }
@@ -1063,42 +1055,6 @@ export default function ProductionForm({ setScreen }) {
             })}
           </div>
         </div>
-      </div>
-
-      {/* ── Focus Areas (Con 3) ── */}
-      <div className="panel">
-        <div className="panel-title">🎯 STRATEGIC FOCUS AREAS</div>
-        <div style={{ fontSize: 7, color: 'var(--lav)', marginBottom: 8, lineHeight: 1.4 }}>
-          Allocate focus to mitigate random risks in high-difficulty genres. Each checked area costs ₩1,500.
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {[
-            { id: 'direction', label: '🎬 Direction', desc: 'Ensures robust artistic vision on set.' },
-            { id: 'screenplay', label: '✍️ Screenplay', desc: 'Ensures high quality script beats and dialogue.' },
-            { id: 'postProduction', label: '✂️ Post-Production', desc: 'Ensures pristine sound and visual editing.' },
-          ].map(area => (
-            <label key={area.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 8, color: 'var(--white)', background: 'var(--bg-inset)', padding: '6px 8px', cursor: 'pointer', border: focusAreas[area.id] ? '1px solid var(--pink)' : '1px solid var(--shadow)' }}>
-              <input
-                type="checkbox"
-                checked={focusAreas[area.id]}
-                onChange={() => {
-                  SFX.click();
-                  setFocusAreas(prev => ({ ...prev, [area.id]: !prev[area.id] }))
-                }}
-              />
-              <div style={{ flex: 1 }}>
-                <span style={{ fontWeight: 'bold' }}>{area.label}</span>
-                <span style={{ fontSize: 6.5, color: 'var(--lav)', marginLeft: 8 }}>— {area.desc}</span>
-              </div>
-              <span style={{ fontSize: 7, color: 'var(--gold)' }}>+₩1,500</span>
-            </label>
-          ))}
-        </div>
-        {focusCount > 0 && (
-          <div style={{ fontSize: 7, color: 'var(--gold)', marginTop: 8, fontWeight: 'bold', letterSpacing: 0.5 }}>
-            ⚡ Focus Allocation: {(focusAllocation * 100).toFixed(0)}% · Reduces RNG risk variance by -{(focusAllocation * 85).toFixed(0)}%!
-          </div>
-        )}
       </div>
 
       {/* ── Budget ────────────────────────────────────────────────────────── */}
