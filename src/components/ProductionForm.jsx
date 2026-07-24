@@ -39,8 +39,108 @@ function fixedCpCost(lead1, lead2) {
   return Math.round(((lead1.signCost ?? 200) + (lead2.signCost ?? 200)) * 0.3)
 }
 
+// ─── Refined Unlock Requirements Utility (Category A & B) ───────────────────
+export function getUnlockRequirements(id, gradeCounts, gameTier) {
+  const getCount = (g) => gradeCounts?.[g] ?? 0
+  const isRising  = ['rising', 'popular', 'worldwide'].includes(gameTier.id)
+  const isPopular = ['popular', 'worldwide'].includes(gameTier.id)
+
+  switch (id) {
+    // --- Category A: Creative Growth (Ratings-only) ---
+    case 'select_genre':
+      return [
+        { text: `Earn 3 C-Rated Productions (${getCount('C')}/3)`, met: getCount('C') >= 3 },
+        { text: `Earn 3 B-Rated Productions (${getCount('B')}/3)`, met: getCount('B') >= 3 },
+        { text: `Earn 2 A-Rated Productions (${getCount('A')}/2)`, met: getCount('A') >= 2 },
+      ]
+    case 'adaptation':
+      return [
+        { text: `Earn 3 C-Rated Productions (${getCount('C')}/3)`, met: getCount('C') >= 3 },
+        { text: `Earn 3 B-Rated Productions (${getCount('B')}/3)`, met: getCount('B') >= 3 },
+        { text: `Earn 2 A-Rated Productions (${getCount('A')}/2)`, met: getCount('A') >= 2 },
+      ]
+    case '6m':
+      return [
+        { text: `Earn 2 C-Rated Productions (${getCount('C')}/2)`, met: getCount('C') >= 2 },
+        { text: `Earn 2 B-Rated Productions (${getCount('B')}/2)`, met: getCount('B') >= 2 },
+      ]
+    case 'max_budget':
+      return [
+        { text: `Earn 2 C-Rated Productions (${getCount('C')}/2)`, met: getCount('C') >= 2 },
+        { text: `Earn 2 B-Rated Productions (${getCount('B')}/2)`, met: getCount('B') >= 2 },
+        { text: `Earn 1 A-Rated Production (${getCount('A')}/1)`, met: getCount('A') >= 1 },
+      ]
+
+    // --- Category B: Studio Growth (Company Tier AND Ratings) ---
+    case 'series':
+      return [
+        { text: 'Reach Rising Star Studio Tier', met: isRising },
+        { text: `Earn 2 C-Rated Productions (${getCount('C')}/2)`, met: getCount('C') >= 2 },
+        { text: `Earn 1 B-Rated Production (${getCount('B')}/1)`, met: getCount('B') >= 1 },
+      ]
+    case 'movie':
+      return [
+        { text: 'Reach Popular Studio Tier', met: isPopular },
+        { text: `Earn 2 A-Rated Productions (${getCount('A')}/2)`, met: getCount('A') >= 2 },
+        { text: `Earn 1 S-Rated Production (${getCount('S')}/1)`, met: getCount('S') >= 1 },
+        { text: `Earn 1 S+-Rated Production (${getCount('S+')}/1)`, met: getCount('S+') >= 1 },
+      ]
+    case 'streaming':
+      return [
+        { text: 'Reach Rising Star Studio Tier', met: isRising },
+        { text: `Earn 2 C-Rated Productions (${getCount('C')}/2)`, met: getCount('C') >= 2 },
+        { text: `Earn 2 B-Rated Productions (${getCount('B')}/2)`, met: getCount('B') >= 2 },
+        { text: `Earn 1 A-Rated Production (${getCount('A')}/1)`, met: getCount('A') >= 1 },
+      ]
+    case '12m':
+      return [
+        { text: 'Reach Popular Studio Tier', met: isPopular },
+        { text: `Earn 3 C-Rated Productions (${getCount('C')}/3)`, met: getCount('C') >= 3 },
+        { text: `Earn 2 B-Rated Productions (${getCount('B')}/2)`, met: getCount('B') >= 2 },
+        { text: `Earn 2 A-Rated Productions (${getCount('A')}/2)`, met: getCount('A') >= 2 },
+      ]
+    case 'custom_budget':
+      return [
+        { text: 'Reach Popular Studio Tier', met: isPopular },
+        { text: `Earn 3 C-Rated Productions (${getCount('C')}/3)`, met: getCount('C') >= 3 },
+        { text: `Earn 3 B-Rated Productions (${getCount('B')}/3)`, met: getCount('B') >= 3 },
+        { text: `Earn 2 A-Rated Productions (${getCount('A')}/2)`, met: getCount('A') >= 2 },
+        { text: `Earn 2 S-Rated Productions (${getCount('S')}/2)`, met: getCount('S') >= 2 },
+      ]
+    default:
+      return []
+  }
+}
+
+// ─── UX Checklist Component for Locked Features ──────────────────────────────
+export function UnlockRequirementsList({ label, icon, requirements }) {
+  const allMet = requirements.every(r => r.met)
+  if (allMet) return null
+
+  return (
+    <div style={styles.reqBlock}>
+      <div style={styles.reqHeader}>
+        <span>{icon} {label} Requirements</span>
+      </div>
+      <div style={styles.reqList}>
+        {requirements.map((r, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '7.5px', color: r.met ? 'var(--green)' : 'var(--lav)' }}>
+            <span style={{ fontSize: '9px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center' }}>{r.met ? '✓' : '□'}</span>
+            <span style={{ textDecoration: r.met ? 'line-through' : 'none', opacity: r.met ? 0.6 : 1 }}>
+              {r.text}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function ProductionForm({ setScreen }) {
   const { state, dispatch } = useGame()
+
+  // Prompt 1: tier now rank-based
+  const gameTier = getGameTierByRank(state.numericRank ?? 50)
 
   // ── Year / week calculations (Prompt 1 — Start Year System) ─────────────────
   const startYear        = state.startYear ?? 2024
@@ -117,48 +217,28 @@ export default function ProductionForm({ setScreen }) {
 
   const isTypeUnlocked = (id) => {
     if (id === 'mini_series') return true
-    if (id === 'series') {
-      return getGradeCount('C') >= 2 && getGradeCount('B') >= 1
-    }
-    if (id === 'movie') {
-      return getGradeCount('A') >= 2 && getGradeCount('S') >= 1 && getGradeCount('S+') >= 1
-    }
-    return true
+    return getUnlockRequirements(id, state.gradeCounts, gameTier).every(r => r.met)
   }
 
-  const isSelectGenreUnlocked = getGradeCount('C') >= 3 && getGradeCount('B') >= 3 && getGradeCount('A') >= 2
+  const isSelectGenreUnlocked = getUnlockRequirements('select_genre', state.gradeCounts, gameTier).every(r => r.met)
 
   const isStoryUnlocked = (id) => {
     if (id === 'original') return true
-    if (id === 'adaptation') {
-      return getGradeCount('C') >= 3 && getGradeCount('B') >= 3 && getGradeCount('A') >= 2
-    }
-    return true
+    return getUnlockRequirements(id, state.gradeCounts, gameTier).every(r => r.met)
   }
 
   const isScheduleUnlocked = (id) => {
     if (id === '3m') return true
-    if (id === '6m') {
-      return getGradeCount('C') >= 2 && getGradeCount('B') >= 2
-    }
-    if (id === '12m') {
-      const hasGrades = getGradeCount('C') >= 3 && getGradeCount('B') >= 2 && getGradeCount('A') >= 2
-      const hasTier = gameTier.id === 'popular' || gameTier.id === 'worldwide'
-      return hasGrades && hasTier
-    }
-    return true
+    return getUnlockRequirements(id, state.gradeCounts, gameTier).every(r => r.met)
   }
 
   const isPlatformUnlocked = (id) => {
     if (id === 'tv') return true
-    if (id === 'streaming') {
-      return getGradeCount('C') >= 2 && getGradeCount('B') >= 2 && getGradeCount('A') >= 1
-    }
-    return true
+    return getUnlockRequirements(id, state.gradeCounts, gameTier).every(r => r.met)
   }
 
-  const isMaxBudgetUnlocked = getGradeCount('C') >= 2 && getGradeCount('B') >= 2 && getGradeCount('A') >= 1
-  const isCustomBudgetUnlocked = getGradeCount('C') >= 3 && getGradeCount('B') >= 3 && getGradeCount('A') >= 2 && getGradeCount('S') >= 2
+  const isMaxBudgetUnlocked = getUnlockRequirements('max_budget', state.gradeCounts, gameTier).every(r => r.met)
+  const isCustomBudgetUnlocked = getUnlockRequirements('custom_budget', state.gradeCounts, gameTier).every(r => r.met)
 
   const isBudgetPickUnlocked = (v) => {
     if (v <= 1.0) return true
@@ -251,9 +331,6 @@ export default function ProductionForm({ setScreen }) {
 
   // Combo preview — genre×type only (theme combo revealed after filming)
   const combo = getComboResult(prodType, genre)
-
-  // Prompt 1: tier now rank-based
-  const gameTier = getGameTierByRank(state.numericRank ?? 50)
 
   // Genre trends: cap to current tier's count so display & slot machine stay in sync
   const TREND_COUNTS_BY_TIER = { rookie: 3, rising: 4, popular: 5, worldwide: 6 }
@@ -480,6 +557,20 @@ export default function ProductionForm({ setScreen }) {
           <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 4 }}>
             {typeInfo?.episodes} episode{typeInfo?.episodes !== 1 ? 's' : ''}
           </div>
+          {!isTypeUnlocked('series') && (
+            <UnlockRequirementsList
+              label="Series"
+              icon="🎭"
+              requirements={getUnlockRequirements('series', state.gradeCounts, gameTier)}
+            />
+          )}
+          {!isTypeUnlocked('movie') && (
+            <UnlockRequirementsList
+              label="Movie"
+              icon="🎬"
+              requirements={getUnlockRequirements('movie', state.gradeCounts, gameTier)}
+            />
+          )}
         </div>
 
         {/* Genre */}
@@ -551,6 +642,13 @@ export default function ProductionForm({ setScreen }) {
               )
             })()}
           </div>
+          {!isSelectGenreUnlocked && (
+            <UnlockRequirementsList
+              label="Select Genre"
+              icon="🎭"
+              requirements={getUnlockRequirements('select_genre', state.gradeCounts, gameTier)}
+            />
+          )}
           {/* 2× multiplier active badge */}
           {genreMultiplier === 2 && (
             <div style={{ fontSize: 8, color: 'var(--gold)', letterSpacing: 1, fontWeight: 'bold', marginTop: 4 }}>
@@ -820,6 +918,13 @@ export default function ProductionForm({ setScreen }) {
               );
             })}
           </div>
+          {!isStoryUnlocked('adaptation') && (
+            <UnlockRequirementsList
+              label="Adaptation Story"
+              icon="📚"
+              requirements={getUnlockRequirements('adaptation', state.gradeCounts, gameTier)}
+            />
+          )}
         </div>
 
         {/* Schedule */}
@@ -843,6 +948,20 @@ export default function ProductionForm({ setScreen }) {
           <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 4 }}>
             {schedInfo?.weeks} filming weeks · quality ×{schedInfo?.qMult}
           </div>
+          {!isScheduleUnlocked('6m') && (
+            <UnlockRequirementsList
+              label="6 Months Schedule"
+              icon="⏳"
+              requirements={getUnlockRequirements('6m', state.gradeCounts, gameTier)}
+            />
+          )}
+          {!isScheduleUnlocked('12m') && (
+            <UnlockRequirementsList
+              label="12 Months Schedule"
+              icon="⏳"
+              requirements={getUnlockRequirements('12m', state.gradeCounts, gameTier)}
+            />
+          )}
         </div>
 
         {/* Prompt 2: Start week selector */}
@@ -906,6 +1025,13 @@ export default function ProductionForm({ setScreen }) {
               ? 'Wide reach (×1.3 pop) · lower revenue · R rating blocked'
               : 'Niche reach · higher revenue (×1.3) · all ratings allowed'}
           </div>
+          {!isPlatformUnlocked('streaming') && (
+            <UnlockRequirementsList
+              label="Streaming Platform"
+              icon="📱"
+              requirements={getUnlockRequirements('streaming', state.gradeCounts, gameTier)}
+            />
+          )}
         </div>
 
         {/* Rating */}
@@ -970,6 +1096,20 @@ export default function ProductionForm({ setScreen }) {
             <span>×0.5 (min)</span><span>×3.0 (blockbuster)</span>
           </div>
         </div>
+        {!isMaxBudgetUnlocked && (
+          <UnlockRequirementsList
+            label="Max Budget"
+            icon="💰"
+            requirements={getUnlockRequirements('max_budget', state.gradeCounts, gameTier)}
+          />
+        )}
+        {!isCustomBudgetUnlocked && (
+          <UnlockRequirementsList
+            label="Custom Budget"
+            icon="🎚️"
+            requirements={getUnlockRequirements('custom_budget', state.gradeCounts, gameTier)}
+          />
+        )}
       </div>
 
       {/* ── Cost preview ──────────────────────────────────────────────────── */}
@@ -1826,5 +1966,25 @@ const styles = {
     padding:     '4px 10px',
     minWidth:    60,
     textAlign:   'center',
+  },
+  reqBlock: {
+    marginTop: 6,
+    padding: '6px 8px',
+    background: 'rgba(255,107,157,0.05)',
+    border: '1px dashed var(--pink-dim)',
+    borderRadius: 2,
+  },
+  reqHeader: {
+    fontSize: '7.5px',
+    fontWeight: 'bold',
+    color: 'var(--pink)',
+    marginBottom: 4,
+    letterSpacing: '0.5px',
+    textTransform: 'uppercase',
+  },
+  reqList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 3,
   },
 }
