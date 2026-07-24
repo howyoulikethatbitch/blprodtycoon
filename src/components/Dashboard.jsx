@@ -263,7 +263,7 @@ function ActiveProdCard({ prod, actors }) {
           ))}
           {prod.comboResult && (
             <div style={{ marginLeft: 6, fontSize: 7, color: prod.comboResult.color }}>
-              {prod.comboResult.emoji} {prod.comboResult.label}
+              {prod.comboResult.emoji} {prod.comboResult.fitLabel || prod.comboResult.label}
             </div>
           )}
         </div>
@@ -291,7 +291,7 @@ function ActiveProdCard({ prod, actors }) {
       )}
       {prod.phase === 'wrap' && prod.comboResult && (
         <div style={{ fontSize: 8, color: prod.comboResult.color }}>
-          {prod.comboResult.emoji} {prod.genre} × {prod.theme || '—'}: {prod.comboResult.label}
+          {prod.comboResult.emoji} {prod.genre} × {prod.theme || '—'}: {prod.comboResult.fitLabel || prod.comboResult.label}
         </div>
       )}
       {sched && (

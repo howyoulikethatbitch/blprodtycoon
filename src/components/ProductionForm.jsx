@@ -526,8 +526,9 @@ export default function ProductionForm({ setScreen }) {
               }}
               onClick={() => { if (isSelectGenreUnlocked) { SFX.click(); setShowGenrePick(true) } }}
               disabled={!isSelectGenreUnlocked}
+              title={!isSelectGenreUnlocked ? `Unlock Select Genre by completing: 3 C-Rated (${getGradeCount('C')}/3), 3 B-Rated (${getGradeCount('B')}/3), and 2 A-Rated (${getGradeCount('A')}/2) productions` : ""}
             >
-              🎭 Select Genre
+              🎭 Select Genre {!isSelectGenreUnlocked && '🔒'}
             </button>
             {(() => {
               const baseLimitByTier = { rookie: 2, rising: 3, popular: 5, worldwide: Infinity }
@@ -608,9 +609,28 @@ export default function ProductionForm({ setScreen }) {
             : Math.max(0, baseLimit + bonusSpins - slotSpinsUsed)
           return (
             <SlotMachineModal
-              onSelect={g => { setGenre(g); setShowSlotMachine(false); SFX.confirm() }}
+              onSelect={(g, isDiscovery) => {
+                if (isDiscovery) {
+                  dispatch({ type: A.DISCOVER_GENRE, genre: g })
+                  pushEventLog(dispatch, `🎉 New Genre Discovered: ${g}!`, 'gold', state.week)
+                  dispatch({
+                    type: A.PUSH_MODAL,
+                    modal: {
+                      type: 'generic',
+                      data: {
+                        title: '🎉 NEW GENRE DISCOVERED!',
+                        message: `Congratulations! You have discovered the genre "${g}" during your slot spin! It has been permanently added to your Genre Collection.`,
+                      }
+                    }
+                  })
+                }
+                setGenre(g);
+                setShowSlotMachine(false);
+                SFX.confirm()
+              }}
               onClose={() => setShowSlotMachine(false)}
               unlockedGenres={state.unlockedGenres ?? DEFAULT_GENRES}
+              unlockedMilestones={state.unlockedMilestones ?? ['Romance', 'School', 'Office']}
               spinsLeft={effectiveSpinsLeft}
               onSpinUsed={() => setSlotSpinsUsed(c => c + 1)}
               onSpinAgain={() => setBonusSpins(c => c + 1)}
@@ -1279,41 +1299,61 @@ function ThemePickModal({ current, onSelect, onClose, unlockedThemes }) {
 }
 
 // ─── Slot Machine Modal ───────────────────────────────────────────────────────
-// Outcome-based spin: 5 result types (Genre Trend / Other Trend / Available /
+// Outcome-based spin: 5 result types (Genre Trend / Genre Discovery / Available /
 // Spin Again / 2× Multiplier) with tier-based probability weights.
 // spinsLeft is managed by parent so the count persists across cancel/reopen.
 function SlotMachineModal({
-  onSelect, onClose, unlockedGenres, spinsLeft, onSpinUsed, onSpinAgain,
+  onSelect, onClose, unlockedGenres, unlockedMilestones, spinsLeft, onSpinUsed, onSpinAgain,
   onMultiplierAccepted, currentGenre, gameTierId, genreTrends,
 }) {
   const unlocked   = (unlockedGenres ?? DEFAULT_GENRES).filter(g => GENRES.includes(g))
-  const locked     = GENRES.filter(g => !unlocked.includes(g))
   const trendPool  = (genreTrends ?? []).filter(g => GENRES.includes(g))        // all trending genres
-  const otherPool  = locked.filter(g => !trendPool.includes(g))                  // locked non-trending
   const availPool  = unlocked.length > 0 ? unlocked : DEFAULT_GENRES             // unlocked genres
+  const discoveryPool = (unlockedMilestones ?? []).filter(g => !unlocked.includes(g))
 
   // Tier-based outcome weights (must sum to 100 per tier)
   // Worldwide has no Spin Again — already unlimited; its weights sum without it.
   const WEIGHTS = {
-    rookie:    { genreTrend: 8,  otherTrend: 20, available: 35, spinAgain: 25, multiplier: 12 },
-    rising:    { genreTrend: 10, otherTrend: 16, available: 38, spinAgain: 22, multiplier: 14 },
-    popular:   { genreTrend: 14, otherTrend: 12, available: 40, spinAgain: 18, multiplier: 16 },
-    worldwide: { genreTrend: 20, otherTrend: 18, available: 45, spinAgain: 0,  multiplier: 17 },
+    rookie:    { genreTrend: 8,  genreDiscovery: 20, available: 35, spinAgain: 25, multiplier: 12 },
+    rising:    { genreTrend: 10, genreDiscovery: 16, available: 38, spinAgain: 22, multiplier: 14 },
+    popular:   { genreTrend: 14, genreDiscovery: 12, available: 40, spinAgain: 18, multiplier: 16 },
+    worldwide: { genreTrend: 20, genreDiscovery: 18, available: 45, spinAgain: 0,  multiplier: 17 },
   }
   const w = WEIGHTS[gameTierId] ?? WEIGHTS.rookie
 
+  function rollDiscovery() {
+    if (discoveryPool.length === 0) return null
+    const tierWeights = {
+      Starter: 100,
+      C: 100,
+      B: 60,
+      A: 30,
+      S: 10,
+      'S+': 3,
+    }
+    const bucket = []
+    for (const g of discoveryPool) {
+      const gTier = GENRE_DETAILS[g]?.tier ?? 'C'
+      const w = tierWeights[gTier] ?? 10
+      for (let i = 0; i < w; i++) bucket.push(g)
+    }
+    if (bucket.length === 0) return discoveryPool[0]
+    return bucket[Math.floor(Math.random() * bucket.length)]
+  }
+
   function rollOutcome() {
     // If a sub-pool is empty, redistribute its weight to available
+    const hasDiscovery = discoveryPool.length > 0
     const effectiveTrend  = trendPool.length > 0 ? w.genreTrend : 0
-    const effectiveOther  = otherPool.length > 0 ? w.otherTrend : 0
+    const effectiveDisc   = hasDiscovery ? w.genreDiscovery : 0
     const effectiveAvail  = w.available
       + (trendPool.length === 0 ? w.genreTrend : 0)
-      + (otherPool.length  === 0 ? w.otherTrend  : 0)
+      + (!hasDiscovery ? w.genreDiscovery  : 0)
 
     // Build weighted bucket
     const bucket = []
     for (let i = 0; i < effectiveTrend;       i++) bucket.push('genreTrend')
-    for (let i = 0; i < effectiveOther;        i++) bucket.push('otherTrend')
+    for (let i = 0; i < effectiveDisc;        i++) bucket.push('genreDiscovery')
     for (let i = 0; i < effectiveAvail;        i++) bucket.push('available')
     for (let i = 0; i < w.spinAgain;           i++) bucket.push('spinAgain')
     for (let i = 0; i < w.multiplier;          i++) bucket.push('multiplier')
@@ -1324,8 +1364,9 @@ function SlotMachineModal({
     if (type === 'genreTrend') {
       return { type, genre: trendPool[Math.floor(Math.random() * trendPool.length)] }
     }
-    if (type === 'otherTrend') {
-      return { type, genre: otherPool[Math.floor(Math.random() * otherPool.length)] }
+    if (type === 'genreDiscovery') {
+      const dGenre = rollDiscovery()
+      if (dGenre) return { type, genre: dGenre }
     }
     if (type === 'spinAgain')  return { type }
     if (type === 'multiplier') return { type }
@@ -1420,11 +1461,11 @@ function SlotMachineModal({
           </div>
         </div>
       )
-      case 'otherTrend': return (
+      case 'genreDiscovery': return (
         <div>
-          <div style={{ ...tagStyles, color: 'var(--pink)' }}>🔓 LUCKY UNLOCK!</div>
+          <div style={{ ...tagStyles, color: 'var(--pink)' }}>🎉 NEW GENRE DISCOVERED!</div>
           <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 2 }}>
-            {outcome.genre} is normally locked — the slot machine unlocked it for this production!
+            You discovered {outcome.genre}! This genre is permanently added to your collection!
           </div>
         </div>
       )
@@ -1465,8 +1506,15 @@ function SlotMachineModal({
             ✅ ACCEPT 2× BONUS
           </button>
         )
+      case 'genreDiscovery':
+        return (
+          <button type="button" style={modalStyles.acceptBtn}
+            onClick={() => onSelect(outcome.genre, true)}
+          >
+            🎉 DISCOVER & USE {(outcome.genre ?? '').toUpperCase()}
+          </button>
+        )
       case 'genreTrend':
-      case 'otherTrend':
       case 'available':
         return (
           <button type="button" style={modalStyles.acceptBtn}

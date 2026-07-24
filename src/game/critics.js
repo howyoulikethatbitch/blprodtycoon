@@ -4,6 +4,7 @@
  * Each scores 1–5 stars. Final score = average × 20.
  */
 import { getChem } from './chemistry.js'
+import { GENRE_DETAILS } from './productions.js'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function pick(arr) {
@@ -188,7 +189,9 @@ function scoreMedia(prod, castActors, chemValue, baseScore) {
   const chem    = chemValue / 100
   const base    = baseScore / 100
   const fixed   = prod.fixedCP ? 0.5 : 0
-  const stars   = roundStars(1 + base * 1.5 + chem * 2.0 + fixed)
+  const expectations = GENRE_DETAILS[prod.genre]?.criticExpectations ?? 1
+  const expectationPenalty = (expectations - 1) * 0.1
+  const stars   = roundStars(1 + base * 1.5 + chem * 2.0 + fixed - expectationPenalty)
   const quoteRaw = pick(stars >= 4 ? QUOTES.media.high : stars >= 3 ? QUOTES.media.mid : QUOTES.media.low)
   return {
     id: 'media', name: 'Media Critic', icon: '📰',
@@ -208,7 +211,9 @@ function scoreIndustry(prod, castActors, chemValue, baseScore) {
   // an inexperienced studio to a high grade — skill must do the heavy lifting.
   const bonus   = Math.min(0.8, cbBonus + adapt + sched)
   const base    = baseScore / 100
-  const stars   = roundStars(1.5 + base * 1.8 + bonus)
+  const expectations = GENRE_DETAILS[prod.genre]?.criticExpectations ?? 1
+  const expectationPenalty = (expectations - 1) * 0.1
+  const stars   = roundStars(1.5 + base * 1.8 + bonus - expectationPenalty)
   const quoteRaw = pick(stars >= 4 ? QUOTES.industry.high : stars >= 3 ? QUOTES.industry.mid : QUOTES.industry.low)
   return {
     id: 'industry', name: 'Industry Critic', icon: '🏭',
@@ -225,7 +230,9 @@ function scoreBLFan(prod, castActors, chemValue, baseScore) {
     ? castActors.reduce((s, a) => s + (a.skills?.visual ?? 40), 0) / castActors.length / 100
     : 0.5
   const rBonus  = prod.rating === 'r' ? 0.5 : prod.rating === 'pg' ? -0.2 : 0
-  const stars   = roundStars(1 + chem * 2.5 + visualAvg * 1.5 + rBonus)
+  const expectations = GENRE_DETAILS[prod.genre]?.criticExpectations ?? 1
+  const expectationPenalty = (expectations - 1) * 0.1
+  const stars   = roundStars(1 + chem * 2.5 + visualAvg * 1.5 + rBonus - expectationPenalty)
   const quoteRaw = pick(stars >= 4 ? QUOTES.bl_fan.high : stars >= 3 ? QUOTES.bl_fan.mid : QUOTES.bl_fan.low)
   return {
     id: 'bl_fan', name: 'BL Fan Critic', icon: '💕',
@@ -240,8 +247,10 @@ function scoreSocial(prod, castActors, chemValue, baseScore) {
   const rMod      = prod.rating === 'pg' ? 0.8 : prod.rating === 'r' ? -0.5 : 0
   const srPenalty = (prod.genre === 'School' && prod.rating === 'r') ? -1.5 : 0
   const base      = baseScore / 100
+  const expectations = GENRE_DETAILS[prod.genre]?.criticExpectations ?? 1
+  const expectationPenalty = (expectations - 1) * 0.1
   // Floor lowered 2.5 → 1.8: weak productions no longer get a free near-3 from Social.
-  const stars     = roundStars(1.8 + base * 1.2 + rMod + srPenalty)
+  const stars     = roundStars(1.8 + base * 1.2 + rMod + srPenalty - expectationPenalty)
   const quoteRaw  = pick(stars >= 4 ? QUOTES.social.high : stars >= 3 ? QUOTES.social.mid : QUOTES.social.low)
   return {
     id: 'social', name: 'Social Critic', icon: '🌈',
@@ -261,7 +270,7 @@ function scoreSocial(prod, castActors, chemValue, baseScore) {
  * @param {object} [tier]     game tier config from getGameTier() — for rep cap & distribution
  * @returns {object}
  */
-export function runAllCritics(production, castActors, chemValue, baseScore, tier) {
+export function runAllCritics(production, castActors, chemValue, baseScore, tier, genreTrends = []) {
   const critics = [
     scoreMedia   (production, castActors, chemValue, baseScore),
     scoreIndustry(production, castActors, chemValue, baseScore),
@@ -272,7 +281,9 @@ export function runAllCritics(production, castActors, chemValue, baseScore, tier
   // Prompt 8: apply tier star bonus to shift distribution toward positive at lower tiers
   const starBonus = tier?.reviewStarBonus ?? 0
   const rawAvg = critics.reduce((s, c) => s + c.stars, 0) / critics.length
-  const avgStars = Math.min(5, rawAvg + starBonus)
+  // Add a small awards visibility / review bonus (+0.1 stars) if trending
+  const trendBonus = (genreTrends ?? []).includes(production.genre) ? 0.1 : 0
+  const avgStars = Math.min(5, rawAvg + starBonus + trendBonus)
   const finalScore = Math.round((avgStars / 5) * 100)
 
   // Rep delta per spec: (avg - 3) × 8 × rating modifier

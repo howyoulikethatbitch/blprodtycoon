@@ -142,11 +142,14 @@ export function useWeekAdvance() {
           'red', week)
       }
 
-      const revenue    = calcRevenue(
+      const isTrending = (state.genreTrends ?? []).includes(prod.genre)
+
+      const baseRevenue = calcRevenue(
         adjBase, prod.budget ?? 1.0, prod.type,
         state.reputation, prod.platform ?? 'tv', comboMult,
         tier.revenueMod,     // Prompt 8: tier revenue modifier
       )
+      const revenue = isTrending ? Math.round(baseRevenue * 1.10) : baseRevenue
 
       // Four-critics evaluation
       const evalResult = evaluateProduction({
@@ -157,19 +160,19 @@ export function useWeekAdvance() {
         castActors,
         chemValue,
         tier,                // Prompt 8: pass tier for rep cap & distribution
+        genreTrends: state.genreTrends ?? [],
       })
 
       const finalScore = evalResult.score
 
       // Apply stat deltas — genre trend gives +20% pop bonus
-      const isTrending = (state.genreTrends ?? []).includes(prod.genre)
       const trendedPop = isTrending ? Math.round(evalResult.popDelta * 1.20) : evalResult.popDelta
       dispatch({ type: A.ADD_MONEY,      amount: revenue })
       dispatch({ type: A.ADD_REPUTATION, amount: evalResult.repDelta })
       dispatch({ type: A.SET_POPULARITY, value: state.popularity + trendedPop })
       if (isTrending) {
         pushEventLog(dispatch,
-          `📈 "${prod.genre}" is trending! +20% pop bonus for "${prod.title}"`, 'gold', week)
+          `📈 "${prod.genre}" is trending! +10% revenue & +20% pop bonus for "${prod.title}"`, 'gold', week)
       }
 
       // Chemistry + XP for cast
