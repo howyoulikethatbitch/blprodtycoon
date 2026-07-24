@@ -144,18 +144,10 @@ export function useWeekAdvance() {
 
       const isTrending = (state.genreTrends ?? []).includes(prod.genre)
 
-      const baseRevenue = calcRevenue(
-        adjBase, prod.budget ?? 1.0, prod.type,
-        state.reputation, prod.platform ?? 'tv', comboMult,
-        tier.revenueMod,     // Prompt 8: tier revenue modifier
-      )
-      const revenue = isTrending ? Math.round(baseRevenue * 1.10) : baseRevenue
-
-      // Four-critics evaluation
+      // Four-critics evaluation (reconstructed into a clean sequential pipeline inside evaluators.js)
       const evalResult = evaluateProduction({
         production: prod,
         score:      adjBase,
-        revenue,
         reputation: state.reputation,
         castActors,
         chemValue,
@@ -164,15 +156,15 @@ export function useWeekAdvance() {
       })
 
       const finalScore = evalResult.score
+      const revenue = evalResult.revenue
 
-      // Apply stat deltas — genre trend gives +20% pop bonus
-      const trendedPop = isTrending ? Math.round(evalResult.popDelta * 1.20) : evalResult.popDelta
+      // Apply stat deltas — popDelta returned from evaluateProduction is already fully trended and calculated
       dispatch({ type: A.ADD_MONEY,      amount: revenue })
       dispatch({ type: A.ADD_REPUTATION, amount: evalResult.repDelta })
-      dispatch({ type: A.SET_POPULARITY, value: state.popularity + trendedPop })
+      dispatch({ type: A.SET_POPULARITY, value: state.popularity + evalResult.popDelta })
       if (isTrending) {
         pushEventLog(dispatch,
-          `📈 "${prod.genre}" is trending! +10% revenue & +20% pop bonus for "${prod.title}"`, 'gold', week)
+          `📈 "${prod.genre}" is trending! +20% pop bonus for "${prod.title}"`, 'gold', week)
       }
 
       // Chemistry + XP for cast
@@ -192,7 +184,7 @@ export function useWeekAdvance() {
         })
       }
 
-      // Record completion (chemScore stored for BL Awards chemistry check)
+      // Record completion (chemScore, productionScore, criticScore, audienceScore stored for BL Awards)
       const historyRecord = {
         ...prod,
         score:         finalScore,
@@ -200,6 +192,9 @@ export function useWeekAdvance() {
         grade:         evalResult.grade,
         weekCompleted: week,
         chemScore:     chemValue,
+        productionScore: adjBase,
+        criticScore:   evalResult.criticScore,
+        audienceScore: evalResult.audienceScore,
       }
       dispatch({ type: A.COMPLETE_PRODUCTION, id: prod.id, record: historyRecord })
       extraHistoryRecords.push(historyRecord)
@@ -318,7 +313,7 @@ export function useWeekAdvance() {
 
       // Event log + main result modal
       pushEventLog(dispatch,
-        `"${prod.title}" critique: ${evalResult.grade} (${evalResult.avgStars}★). Revenue ₩${revenue.toLocaleString()}`,
+        `🎬 "${prod.title}" released! Critics: ${evalResult.criticScore}/100, Audience: ${evalResult.audienceScore}/100 (${evalResult.grade})`,
         evalResult.grade === 'F' || evalResult.grade === 'D' ? 'red'
           : evalResult.grade === 'S+' || evalResult.grade === 'S' ? 'gold'
           : 'green',

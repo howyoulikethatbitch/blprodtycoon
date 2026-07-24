@@ -3,27 +3,30 @@
  * Prompt 5: integrates the four critics into the final evaluation.
  */
 import { runAllCritics } from './critics.js'
+import { calcRevenue } from './productions.js'
 
 // ─── Score → grade (F/D/C/B/A/S/S+ scale) ────────────────────────────────────
 export function scoreGrade(score) {
-  if (score >= 96) return { grade: 'S+', label: 'LEGENDARY', color: '#FF85E1' }
-  if (score >= 88) return { grade: 'S',  label: 'PERFECT',   color: '#FFD700' }
-  if (score >= 72) return { grade: 'A',  label: 'GREAT',     color: '#5CE1A0' }
-  if (score >= 55) return { grade: 'B',  label: 'GOOD',      color: '#6BC5FF' }
-  if (score >= 40) return { grade: 'C',  label: 'NEUTRAL',   color: '#9B86C4' }
-  if (score >= 25) return { grade: 'D',  label: 'BAD',       color: '#FF8C42' }
+  if (score >= 98) return { grade: 'S+', label: 'LEGENDARY', color: '#FF85E1' }
+  if (score >= 90) return { grade: 'S',  label: 'PERFECT',   color: '#FFD700' }
+  if (score >= 75) return { grade: 'A',  label: 'GREAT',     color: '#5CE1A0' }
+  if (score >= 60) return { grade: 'B',  label: 'GOOD',      color: '#6BC5FF' }
+  if (score >= 50) return { grade: 'C',  label: 'NEUTRAL',   color: '#9B86C4' }
+  if (score >= 40) return { grade: 'D',  label: 'BAD',       color: '#FF8C42' }
   return                  { grade: 'F',  label: 'TERRIBLE',  color: '#FF5470' }
 }
 
 // ─── Popularity impact ────────────────────────────────────────────────────────
-export function popularityDelta(score, budget, type) {
-  const budgetMult = typeof budget === 'number' ? budget : 1.0
+export function popularityDelta(audienceScore, revenue, prodPerformance, type) {
   const typePop = {
     mini_series: 0.9, series: 1.2, movie: 1.5,
     // legacy
     drama: 1.2, variety: 0.8, cf: 0.6, web: 0.9, concert: 1.3,
   }
-  return Math.round((score / 100) * 500 * budgetMult * (typePop[type] ?? 1))
+  const basePop = (audienceScore * 0.4 + prodPerformance * 0.6) * 5
+  const revBonus = Math.min(2.0, 1.0 + revenue / 100000)
+  const typeMult = typePop[type] ?? 1.0
+  return Math.round(basePop * revBonus * typeMult)
 }
 
 // ─── Actor XP awards ─────────────────────────────────────────────────────────
@@ -52,34 +55,50 @@ export function criticQuote(grade) {
  * Run all four critics and produce the complete evaluation report.
  * @param {object} args
  * @param {object} args.production
- * @param {number} args.score        — base score from calcScore (0-100)
- * @param {number} args.revenue
+ * @param {number} args.score        — hidden Production Score (0-100)
+ * @param {number} [args.revenue]    — optional pre-calculated revenue
  * @param {number} args.reputation
  * @param {Array}  args.castActors   — actor objects
  * @param {number} args.chemValue    — lead pair chemistry 0-100
  */
 export function evaluateProduction({ production, score, revenue, reputation, castActors = [], chemValue = 0, tier, genreTrends = [] }) {
-  // Run the four critics — they derive their stars from baseScore
-  // Prompt 8: pass tier for rep cap & distribution bonus
-  const critiqueResult = runAllCritics(production, castActors, chemValue, score, tier, genreTrends)
+  const productionScore = score
 
-  // The critic average is the authoritative final score
-  const finalScore = critiqueResult.finalScore
-  const { grade, label, color } = scoreGrade(finalScore)
+  // 1. Critic Reviews (Phase 6)
+  const critiqueResult = runAllCritics(production, castActors, chemValue, productionScore, tier, genreTrends)
+  const criticScore = critiqueResult.finalScore
+
+  // 2. Audience Reception (Phase 6)
+  const isTrending = (genreTrends ?? []).includes(production.genre)
+  const trendBonus = isTrending ? 8 : 0
+  const audienceScore = Math.min(100, Math.max(0, Math.round(productionScore * 0.4 + criticScore * 0.55 + trendBonus)))
+
+  // 3. Revenue (Phase 6)
+  const budgetMult = typeof production.budget === 'number' ? production.budget : 1.0
+  const calculatedRevenue = calcRevenue(audienceScore, budgetMult, production.type, production.platform ?? 'tv', tier?.revenueMod ?? 1.0)
+  const finalRevenue = revenue !== undefined ? revenue : calculatedRevenue
+
+  // 4. Studio Popularity (Phase 6)
+  const popDelta = popularityDelta(audienceScore, finalRevenue, productionScore, production.type)
+
+  const { grade, label, color } = scoreGrade(criticScore)
 
   return {
     grade,
     label,
     color,
-    score:         finalScore,      // override with critic-averaged score
-    baseScore:     score,           // original skill-based score for reference
-    revenue,
+    score:         criticScore,     // authoritative final critic-averaged score
+    baseScore:     productionScore, // hidden skill-based score
+    productionScore,                // hidden skill-based score
+    criticScore,                    // critic reviews score
+    audienceScore,                  // audience reception score
+    revenue:       finalRevenue,    // revenue
     criticQuote:   criticQuote(grade),
 
     // Critic-derived deltas
     repDelta:      critiqueResult.repDelta,
-    popDelta:      popularityDelta(finalScore, production.budget, production.type),
-    xpPerActor:    castXpAward(finalScore, production.weeksTotal),
+    popDelta,
+    xpPerActor:    castXpAward(criticScore, production.weeksTotal),
 
     // Four critics detail
     critics:       critiqueResult.critics,

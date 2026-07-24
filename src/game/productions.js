@@ -409,15 +409,21 @@ export function calcCost(type, budgetMult, scheduleId, castSize, costMod = 1.0, 
 
 // ─── Revenue formula ──────────────────────────────────────────────────────────
 // revenueMod: tier-based revenue modifier (default 1.0 = no change)
-export function calcRevenue(score, budgetMult, type, reputation, platform, comboMult = 1.0, revenueMod = 1.0) {
+export function calcRevenue(audienceScore, budgetMult, type, platform, revenueMod = 1.0) {
+  let realPlatform = platform
+  let realMod = revenueMod
+  if (arguments.length >= 6) {
+    // legacy call support: calcRevenue(score, budgetMult, type, reputation, platform, comboMult, revenueMod)
+    realPlatform = arguments[4]
+    realMod = arguments[6] ?? 1.0
+  }
   const t  = PROD_TYPES[type]
-  const pf = PLATFORMS.find(p => p.id === platform)
+  const pf = PLATFORMS.find(p => p.id === realPlatform)
   if (!t) return 0
   const baseRevenue = t.baseCost * budgetMult * 3.5
-  const scoreMult   = Math.pow(score / 100, 1.3)
-  const repBonus    = 1 + reputation / 200
+  const scoreMult   = Math.pow(audienceScore / 100, 1.3)
   const platMult    = pf?.revMult ?? 1.0
-  return Math.round(baseRevenue * scoreMult * repBonus * platMult * comboMult * revenueMod)
+  return Math.round(baseRevenue * scoreMult * platMult * realMod)
 }
 
 // ─── Studio quality multiplier (production experience curve) ─────────────────
