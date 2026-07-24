@@ -347,11 +347,32 @@ export function useWeekAdvance() {
     }
 
     // ── 5. Weekly actor tick ──────────────────────────────────────────────────
+    let currentMoney = state.money;
     for (const actor of state.actors) {
       if (!actor.signed) continue
       if (completedThisWeek.find(p => p.castIds.includes(actor.id))) continue
+
+      let activeSubActivity = actor.subActivity
+      if (actor.status === 'available' && activeSubActivity) {
+        const cost = activeSubActivity === 'training' ? 150 : 250
+        if (currentMoney < cost) {
+          activeSubActivity = null
+          dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch: { subActivity: null } })
+          pushEventLog(dispatch, `⚠️ ${actorDisplayName(actor)}'s sub-activity cancelled due to low funds.`, 'red', week)
+        } else {
+          currentMoney -= cost
+          dispatch({ type: A.ADD_MONEY, amount: -cost })
+          const actLabel = activeSubActivity === 'training' ? 'Acting Masterclass' : 'Fan Meeting'
+          pushEventLog(dispatch, `🏃 ${actorDisplayName(actor)} participated in ${actLabel} (−₩${cost})`, '', week)
+        }
+      }
+
+      const actorWithResolvedActivity = activeSubActivity !== actor.subActivity
+        ? { ...actor, subActivity: activeSubActivity }
+        : actor
+
       // Prompt 8: pass tier to weeklyActorTick for threshold scaling
-      const patch = weeklyActorRecovery(actor, tier, week)
+      const patch = weeklyActorRecovery(actorWithResolvedActivity, tier, week)
       dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch })
 
       // ── Prompt 8: Emergency save event at loyalty ≤ 10 (one-time) ────────

@@ -349,23 +349,35 @@ export function weeklyActorTick(actor, tier, currentWeek) {
     let h = actor.happiness ?? 70
     let l = actor.loyalty ?? 60
 
-    if (honeymoon) {
-      // Contract Honeymoon: happiness cannot decrease from being idle,
-      // and loyalty cannot decrease from happiness.
-      patch.happiness = Math.round(h)
+    if (actor.subActivity === 'training') {
+      patch.happiness = Math.min(100, h + 2)
+      const actSkill = actor.skills?.act ?? 0
+      patch.skills = {
+        ...(actor.skills ?? {}),
+        act: Number(Math.min(95, actSkill + 0.2).toFixed(1))
+      }
+    } else if (actor.subActivity === 'fan_meeting') {
+      patch.happiness = Math.min(100, h + 4)
+      patch.loyalty = Math.min(100, l + 1)
     } else {
-      // ── Idle happiness decay — scales by actor's own tier ──────────────
-      const decay = IDLE_HAPPINESS_DECAY_BY_TIER[actor.tier] ?? 3
-      h = clamp(h - decay, 0, 100)
-      patch.happiness = Math.round(h)
+      if (honeymoon) {
+        // Contract Honeymoon: happiness cannot decrease from being idle,
+        // and loyalty cannot decrease from happiness.
+        patch.happiness = Math.round(h)
+      } else {
+        // ── Idle happiness decay — scales by actor's own tier ──────────────
+        const decay = IDLE_HAPPINESS_DECAY_BY_TIER[actor.tier] ?? 3
+        h = clamp(h - decay, 0, 100)
+        patch.happiness = Math.round(h)
 
-      // ── Loyalty decline driven by happiness state ──────────────────────
-      // Sad (25–49): loyalty begins to decline.
-      // Angry (0–24): loyalty declines much faster.
-      if (h < NEUTRAL_MIN) {
-        const loyaltyDrop = h < SAD_MIN ? 8 : 4   // Angry: 8, Sad: 4
-        l = clamp(l - loyaltyDrop, 0, 100)
-        patch.loyalty = Math.round(l)
+        // ── Loyalty decline driven by happiness state ──────────────────────
+        // Sad (25–49): loyalty begins to decline.
+        // Angry (0–24): loyalty declines much faster.
+        if (h < NEUTRAL_MIN) {
+          const loyaltyDrop = h < SAD_MIN ? 8 : 4   // Angry: 8, Sad: 4
+          l = clamp(l - loyaltyDrop, 0, 100)
+          patch.loyalty = Math.round(l)
+        }
       }
     }
   } else if (actor.status === 'injured') {
