@@ -219,6 +219,13 @@ function rivalActorScore(tier, rivalScore, year = 1) {
  *   year:     number
  */
 export function computeAllAwards(state, week, extraHistory = []) {
+  function getExcellenceScore(h) {
+    const prodScore   = h.productionScore ?? h.baseScore ?? h.score ?? 0
+    const critic      = h.criticScore ?? h.score ?? 0
+    const audience    = h.audienceScore ?? h.score ?? 0
+    return Math.round(prodScore * 0.4 + critic * 0.4 + audience * 0.2)
+  }
+
   const yearHistory     = [...getYearHistory(state.history, week), ...extraHistory]
   const year            = getYearFromWeek(week)
   const companyEligible = isCompanyProductionEligible(yearHistory)
@@ -318,12 +325,12 @@ export function computeAllAwards(state, week, extraHistory = []) {
     results.push({ awardId: 'best_chemistry', winner: { isPlayer: false, name: rival.name, company: rival.name, actor1Name: a1Name, actor2Name: a2Name, chemScore: Math.round(85 + Math.random() * 20) } })
   }
 
-  // ── Best in Production Quality (≥2 productions with finalScore ≥ 90) ───────
+  // ── Best in Production Quality (≥2 productions with excellenceScore ≥ 90) ───────
   if (companyEligible) {
-    const qualProds = yearHistory.filter(h => (h.score ?? 0) >= 90)
+    const qualProds = yearHistory.filter(h => getExcellenceScore(h) >= 90)
     if (qualProds.length >= 2) {
-      const best = qualProds.reduce((a, b) => (b.score ?? 0) > (a.score ?? 0) ? b : a)
-      playerWin('best_quality', { name: companyName, company: companyName, title: best.title, extra: `Score: ${Math.round(best.score)}/100` })
+      const best = qualProds.reduce((a, b) => getExcellenceScore(b) > getExcellenceScore(a) ? b : a)
+      playerWin('best_quality', { name: companyName, company: companyName, title: best.title, extra: `Excellence: ${getExcellenceScore(best)}/100` })
     } else rivalWin('best_quality', false)
   } else rivalWin('best_quality', false)
 
@@ -400,8 +407,8 @@ export function computeAllAwards(state, week, extraHistory = []) {
   if (companyEligible) {
     const splusSeries = yearHistory.filter(h => h.type === 'series' && h.grade === 'S+')
     if (splusSeries.length >= 1) {
-      const best = splusSeries.reduce((a, b) => (b.score ?? 0) > (a.score ?? 0) ? b : a)
-      playerWin('series_of_year', { name: companyName, company: companyName, title: best.title, extra: `Score: ${Math.round(best.score)}/100` })
+      const best = splusSeries.reduce((a, b) => getExcellenceScore(b) > getExcellenceScore(a) ? b : a)
+      playerWin('series_of_year', { name: companyName, company: companyName, title: best.title, extra: `Excellence: ${getExcellenceScore(best)}/100` })
     } else rivalWin('series_of_year', true)
   } else rivalWin('series_of_year', true)
 
@@ -409,8 +416,8 @@ export function computeAllAwards(state, week, extraHistory = []) {
   if (companyEligible) {
     const splusMovies = yearHistory.filter(h => h.type === 'movie' && h.grade === 'S+')
     if (splusMovies.length >= 1) {
-      const best = splusMovies.reduce((a, b) => (b.score ?? 0) > (a.score ?? 0) ? b : a)
-      playerWin('movie_of_year', { name: companyName, company: companyName, title: best.title, extra: `Score: ${Math.round(best.score)}/100` })
+      const best = splusMovies.reduce((a, b) => getExcellenceScore(b) > getExcellenceScore(a) ? b : a)
+      playerWin('movie_of_year', { name: companyName, company: companyName, title: best.title, extra: `Excellence: ${getExcellenceScore(best)}/100` })
     } else rivalWin('movie_of_year', true)
   } else rivalWin('movie_of_year', true)
 
@@ -459,8 +466,8 @@ export function computeAllAwards(state, week, extraHistory = []) {
   if (companyEligible) {
     const splusSM = yearHistory.filter(h => (h.type === 'series' || h.type === 'movie') && h.grade === 'S+')
     if (splusSM.length >= 1) {
-      const best = splusSM.reduce((a, b) => (b.score ?? 0) > (a.score ?? 0) ? b : a)
-      playerWin('production_of_year', { name: companyName, company: companyName, title: best.title, extra: `${best.type === 'series' ? 'Series' : 'Movie'} · ${best.grade}` })
+      const best = splusSM.reduce((a, b) => getExcellenceScore(b) > getExcellenceScore(a) ? b : a)
+      playerWin('production_of_year', { name: companyName, company: companyName, title: best.title, extra: `Excellence: ${getExcellenceScore(best)}/100` })
     } else rivalWin('production_of_year', true)
   } else rivalWin('production_of_year', true)
 
@@ -468,8 +475,8 @@ export function computeAllAwards(state, week, extraHistory = []) {
   if (companyEligible) {
     const splusAll = yearHistory.filter(h => h.grade === 'S+')
     if (splusAll.length >= 1) {
-      const best = splusAll.reduce((a, b) => (b.score ?? 0) > (a.score ?? 0) ? b : a)
-      playerWin('bl_of_year', { name: companyName, company: companyName, title: best.title, extra: `Score: ${Math.round(best.score)}/100` })
+      const best = splusAll.reduce((a, b) => getExcellenceScore(b) > getExcellenceScore(a) ? b : a)
+      playerWin('bl_of_year', { name: companyName, company: companyName, title: best.title, extra: `Excellence: ${getExcellenceScore(best)}/100` })
     } else rivalWin('bl_of_year', true)
   } else rivalWin('bl_of_year', true)
 
