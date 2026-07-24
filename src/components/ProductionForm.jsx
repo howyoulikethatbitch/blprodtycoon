@@ -347,9 +347,10 @@ export default function ProductionForm({ setScreen }) {
   // Clamp startWeekInYear to valid range whenever schedule changes
   const clampedStart     = Math.max(weekInYear, Math.min(startWeekInYear, 52))
   const lineupEndWeek    = clampedStart + schedWeeks - 1   // last week used in year
-  const canFitInYear     = lineupEndWeek <= 52
+  const actualFitsInYear = lineupEndWeek <= 52
+  const canFitInYear     = true; // Always allow starting!
   const minScheduleWeeks = 12  // 3M is shortest
-  const anySlotLeft      = weekInYear + minScheduleWeeks - 1 <= 52
+  const anySlotLeft      = true; // Always allow scheduling!
 
   // Global week when filming actually begins (converts year-relative → global)
   const weekScheduled = yearStartGlobal + clampedStart - 1
@@ -990,13 +991,13 @@ export default function ProductionForm({ setScreen }) {
               />
             </div>
             {/* Year boundary validation */}
-            {canFitInYear ? (
+            {actualFitsInYear ? (
               <div style={{ fontSize: 7, color: 'var(--green)', marginTop: 4 }}>
                 ✓ Wk {clampedStart} → Wk {lineupEndWeek} · {schedWeeks} weeks · fits this year
               </div>
             ) : (
-              <div style={{ fontSize: 7, color: 'var(--red)', marginTop: 4 }}>
-                ✕ Not enough weeks left this year. Choose an earlier start week or shorter schedule.
+              <div style={{ fontSize: 7, color: 'var(--pink)', marginTop: 4 }}>
+                ✨ Wk {clampedStart} → Wk {lineupEndWeek} (Year rollover) · {schedWeeks} weeks · spills over to next year!
               </div>
             )}
           </div>

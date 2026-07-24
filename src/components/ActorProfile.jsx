@@ -5,7 +5,7 @@
 import React, { useMemo, useState, useCallback } from 'react'
 import { useGame, A } from '../game/state.jsx'
 import { SKILL_KEYS, SKILL_LABELS, STATUS_LABEL, STATUS_COLOR, TIER_COLOR, moodEmoji, actorDisplayName } from '../game/actors.js'
-import { getChem, chemTier } from '../game/chemistry.js'
+import { getChem, chemTier, bondKey } from '../game/chemistry.js'
 import { SFX } from '../game/audio.js'
 import { ActorPortrait } from './ActorRoster.jsx'
 
@@ -14,6 +14,34 @@ const BASE = import.meta.env.BASE_URL
 export default function ActorProfile({ actorId, onBack }) {
   const { state, dispatch } = useGame()
   const actor = state.actors.find(a => a.id === actorId)
+
+  // ── Fixed CP Contract data ──
+  const fixedCP = useMemo(() => {
+    if (!actor) return null
+    return (state.fixedCPs ?? []).find(([a, b]) => a === actor.id || b === actor.id)
+  }, [state.fixedCPs, actor])
+
+  const fixedCPPartner = useMemo(() => {
+    if (!fixedCP || !actor) return null
+    const partnerId = fixedCP[0] === actor.id ? fixedCP[1] : fixedCP[0]
+    return state.actors.find(a => a.id === partnerId)
+  }, [fixedCP, state.actors, actor])
+
+  const fixedCPName = useMemo(() => {
+    if (!fixedCP) return ''
+    const key = bondKey(fixedCP[0], fixedCP[1])
+    return (state.fixedCPNames ?? {})[key] ?? ''
+  }, [fixedCP, state.fixedCPNames])
+
+  const successfulCPProductionsCount = useMemo(() => {
+    if (!fixedCPPartner || !actor) return 0
+    return state.history.filter(h => {
+      const hasActor = (h.castIds ?? []).includes(actor.id)
+      const hasPartner = (h.castIds ?? []).includes(fixedCPPartner.id)
+      const isHighRated = ['B', 'A', 'S', 'S+'].includes(h.grade)
+      return hasActor && hasPartner && isHighRated
+    }).length
+  }, [fixedCPPartner, state.history, actor])
 
   // ── Inline name editor state ──────────────────────────────────────────────
   const [editingName, setEditingName] = useState(false)
@@ -248,6 +276,116 @@ export default function ActorProfile({ actorId, onBack }) {
           <div className="panel-title">💕 CHEMISTRY</div>
           <div style={{ fontSize: 7, color: 'var(--gray)', padding: '6px 0' }}>
             Chemistry details are only visible while this actor is in an active production.
+          </div>
+        </div>
+      )}
+
+      {/* ── Fixed CP Contract Panel ── */}
+      {!isLocked && fixedCPPartner && (
+        <div className="panel" style={{ border: '2px solid var(--pink)', background: 'rgba(255,107,157,0.03)' }}>
+          <div className="panel-title" style={{ color: 'var(--pink)' }}>💞 COUPLE PAIRING (FIXED CP) STATUS</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <ActorPortrait actor={fixedCPPartner} size={48} isLocked={!fixedCPPartner.signed} />
+            <div style={{ flex: 1, minWidth: 150 }}>
+              <div style={{ fontSize: 9, color: 'var(--white)', fontWeight: 'bold' }}>
+                CP Partner: {actorDisplayName(fixedCPPartner)}
+              </div>
+              {fixedCPName && (
+                <div style={{ fontSize: 8, color: 'var(--pink)', marginTop: 2 }}>
+                  CP Name: &quot;{fixedCPName}&quot;
+                </div>
+              )}
+              <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 4 }}>
+                Successful high-rated productions completed together:
+                <span style={{ color: 'var(--gold)', marginLeft: 4, fontWeight: 'bold' }}>
+                  {successfulCPProductionsCount} / 3
+                </span>
+              </div>
+              <div style={{ fontSize: 6.5, color: 'var(--gray)', marginTop: 4, lineHeight: 1.4 }}>
+                *Requires 3 productions with grade B or higher to negotiate an amicable graduation contract (resetting to Unfixed with zero penalties).
+              </div>
+            </div>
+
+            {/* Action button */}
+            <div style={{ flexShrink: 0, marginTop: 4 }}>
+              <button
+                type="button"
+                disabled={successfulCPProductionsCount < 3}
+                onClick={() => {
+                  SFX.confirm()
+                  dispatch({ type: A.GRADUATE_FIXED_CP, pair: [actor.id, fixedCPPartner.id] })
+                  dispatch({
+                    type: A.PUSH_MODAL,
+                    modal: {
+                      type: 'generic',
+                      data: {
+                        title: '🎉 AMICABLE GRADUATION!',
+                        message: `The beloved couple "${fixedCPName || `${actor.name} & ${fixedCPPartner.name}`}" has amicably graduated! Fans celebrate their past work while being extremely excited for their individual paths. They are now free to pair with other actors with ZERO loyalty or reputation penalty!`,
+                      }
+                    }
+                  })
+                }}
+                className={successfulCPProductionsCount >= 3 ? 'btn-primary' : ''}
+                style={{
+                  fontSize: 8,
+                  padding: '8px 12px',
+                  cursor: successfulCPProductionsCount >= 3 ? 'pointer' : 'not-allowed',
+                  opacity: successfulCPProductionsCount >= 3 ? 1 : 0.5,
+                }}
+              >
+                🎉 Coordinate Graduation Contract
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Downtime Activity Panel (Con 4) ── */}
+      {!isLocked && actor.status !== 'filming' && (
+        <div className="panel" style={{ border: '2px solid var(--blue)', background: 'rgba(107,197,255,0.03)' }}>
+          <div className="panel-title" style={{ color: 'var(--blue)' }}>🏃 DOWNTIME ACTIVITY</div>
+          <div style={{ fontSize: 7, color: 'var(--lav)', marginBottom: 8, lineHeight: 1.4 }}>
+            Assign idle actors to downtime activities to maintain morale or grow skills.
+          </div>
+          <div className="seg" style={{ gap: 6, display: 'flex', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className={!actor.subActivity ? 'sel' : ''}
+              onClick={() => {
+                SFX.click();
+                dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch: { subActivity: null } })
+              }}
+              style={{ fontSize: 7.5, padding: '6px 10px', flex: '1 1 auto' }}
+            >
+              Default (Idle Decay)
+            </button>
+            <button
+              type="button"
+              className={actor.subActivity === 'training' ? 'sel' : ''}
+              onClick={() => {
+                SFX.click();
+                dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch: { subActivity: 'training' } })
+              }}
+              style={{ fontSize: 7.5, padding: '6px 10px', flex: '1 1 auto' }}
+            >
+              🏫 Acting Masterclass (−₩150/wk)
+            </button>
+            <button
+              type="button"
+              className={actor.subActivity === 'fan_meeting' ? 'sel' : ''}
+              onClick={() => {
+                SFX.click();
+                dispatch({ type: A.UPDATE_ACTOR, id: actor.id, patch: { subActivity: 'fan_meeting' } })
+              }}
+              style={{ fontSize: 7.5, padding: '6px 10px', flex: '1 1 auto' }}
+            >
+              🤝 Fan Meeting (−₩250/wk)
+            </button>
+          </div>
+          <div style={{ fontSize: 6.5, color: 'var(--gray)', marginTop: 6, lineHeight: 1.4 }}>
+            {actor.subActivity === 'training' && "★ Training active: Morale +2/wk · ACT Skill +0.2/wk · Deducts ₩150 each week."}
+            {actor.subActivity === 'fan_meeting' && "★ Fan Meeting active: Morale +4/wk · Loyalty +1/wk · Deducts ₩250 each week."}
+            {!actor.subActivity && "★ Idle active: Happiness decay based on tier · Loyalty decline if happiness is Sad or Angry."}
           </div>
         </div>
       )}

@@ -474,8 +474,19 @@ export function calcScore(production, castActors, chemistryBonus = 0, production
   const diffPenaltyMult = 1.0 - (difficulty - 1) * 0.04
   const riskVariance = (difficulty - 1) * 0.02 * (Math.random() - 0.5)
 
+  // Mitigate high RNG difficulty risks based on existing strategic factors (Con 3):
+  // 1. Studio experience (productionsCompleted): up to 50% risk reduction at 10+ productions.
+  const experienceBonus = Math.min(0.50, productionsCompleted * 0.05);
+  // 2. Production quality (baseRaw): up to 35% risk reduction above 40 quality.
+  const qualityDampBonus = Math.min(0.35, Math.max(0, baseRaw - 40) / 100);
+
+  const strategicDampeningFactor = experienceBonus + qualityDampBonus; // total up to 85% dampening
+
+  // Dampen the random risk variance:
+  const dampenedRiskVariance = riskVariance * (1.0 - strategicDampeningFactor);
+
   // Apply difficulty and risk modifiers
-  const modifiedRaw = baseRaw * (diffPenaltyMult + riskVariance)
+  const modifiedRaw = baseRaw * (diffPenaltyMult + dampenedRiskVariance)
 
   // Apply Quality Bonus
   const qualityBonus = genreDetails.qualityBonus ?? 0

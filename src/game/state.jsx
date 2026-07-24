@@ -53,7 +53,7 @@ export const A = {
   COMPLETE_PRODUCTION: 'COMPLETE_PRODUCTION', PUSH_MODAL: 'PUSH_MODAL', POP_MODAL: 'POP_MODAL',
   PUSH_TOAST: 'PUSH_TOAST', DISMISS_TOAST: 'DISMISS_TOAST', PUSH_EVENT: 'PUSH_EVENT',
   RESOLVE_EVENT: 'RESOLVE_EVENT', PUSH_EVENT_LOG: 'PUSH_EVENT_LOG', ADD_FIXED_CP: 'ADD_FIXED_CP',
-  REMOVE_FIXED_CP: 'REMOVE_FIXED_CP', UPDATE_RIVALS: 'UPDATE_RIVALS', BULK_SIGN: 'BULK_SIGN',
+  REMOVE_FIXED_CP: 'REMOVE_FIXED_CP', GRADUATE_FIXED_CP: 'GRADUATE_FIXED_CP', UPDATE_RIVALS: 'UPDATE_RIVALS', BULK_SIGN: 'BULK_SIGN',
   SET_COMPANY_NAME: 'SET_COMPANY_NAME', SET_SETTINGS: 'SET_SETTINGS', SET_FLAG: 'SET_FLAG',
   LOAD_SAVE: 'LOAD_SAVE', MARK_SAVED: 'MARK_SAVED', ADD_FREE_AGENT: 'ADD_FREE_AGENT',
   REMOVE_FREE_AGENT: 'REMOVE_FREE_AGENT', UPDATE_FREE_AGENT: 'UPDATE_FREE_AGENT',
@@ -95,6 +95,14 @@ function gameReducer(state, action) {
     case A.PUSH_EVENT_LOG: return { ...state, eventLog: [action.entry, ...(state.eventLog ?? [])].slice(0, 80) }
     case A.ADD_FIXED_CP: { const [x, y] = action.pair; const without = (state.fixedCPs ?? []).filter(([a, b]) => a !== x && b !== x && a !== y && b !== y); if (without.some(([a, b]) => (a === x && b === y) || (a === y && b === x))) return state; return { ...state, fixedCPs: [...without, [x, y]] } }
     case A.REMOVE_FIXED_CP: { const [x, y] = action.pair; return { ...state, fixedCPs: (state.fixedCPs ?? []).filter(([a, b]) => !((a === x && b === y) || (a === y && b === x))) } }
+    case A.GRADUATE_FIXED_CP: {
+      const [x, y] = action.pair;
+      return {
+        ...state,
+        fixedCPs: (state.fixedCPs ?? []).filter(([a, b]) => !((a === x && b === y) || (a === y && b === x))),
+        eventLog: [{ id: Date.now(), message: "🎉 The beloved couple has graduated! Fans celebrate their past work while excited for individual careers.", variant: 'gold' }, ...state.eventLog]
+      };
+    }
     case A.UPDATE_RIVALS: return { ...state, rivals: (state.rivals ?? []).map(r => r.id === action.id ? { ...r, score: Math.max(0, r.score + action.scoreDelta) } : r) }
     case A.BULK_SIGN: { const discounted = Math.round(action.pairs.reduce((s, p) => s + p.cost, 0) * 0.7); return { ...state, money: state.money - discounted, actors: state.actors.map(a => { const m = action.pairs.find(p => p.id === a.id); return m ? { ...a, signed: true, status: 'available', ...startHoneymoon(a, state.week, HONEYMOON_NEW_RECRUIT_WEEKS) } : a }) } }
     case A.SET_COMPANY_NAME: return { ...state, companyName: action.name }
