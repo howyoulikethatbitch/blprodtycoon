@@ -12,10 +12,11 @@ export const PROD_TYPES = {
 }
 
 // ─── Schedules (production duration & quality multiplier) ─────────────────────
+// Rebalanced to enforce strategic tradeoffs and reduce 12m dominance.
 export const SCHEDULES = [
-  { id: '3m',  label: '3 Months',  weeks: 12, qMult: 0.85 },  // was 0.80
-  { id: '6m',  label: '6 Months',  weeks: 24, qMult: 1.10 },  // was 1.00
-  { id: '12m', label: '12 Months', weeks: 48, qMult: 1.55 },  // was 1.30 — rewards risk of long injury cooldown
+  { id: '3m',  label: '3 Months',  weeks: 12, qMult: 0.90 },
+  { id: '6m',  label: '6 Months',  weeks: 24, qMult: 1.02 },
+  { id: '12m', label: '12 Months', weeks: 48, qMult: 1.18 },
 ]
 
 // ─── Platforms ────────────────────────────────────────────────────────────────
@@ -285,9 +286,10 @@ export const GENRE_EMOJI = {
 }
 
 // ─── Story origin ─────────────────────────────────────────────────────────────
+// Rebalanced: Original has higher creative potential (+5), Adaptation has +2.
 export const STORY_TYPES = [
-  { id: 'original',    label: 'Original',    scoreMod: +3 },
-  { id: 'adaptation',  label: 'Adaptation',  scoreMod: +5 },   // known IP bonus
+  { id: 'original',    label: 'Original',    scoreMod: +5 },
+  { id: 'adaptation',  label: 'Adaptation',  scoreMod: +2 },
 ]
 
 // ─── Title suggestion pool ────────────────────────────────────────────────────
@@ -458,9 +460,13 @@ export function calcScore(production, castActors, chemistryBonus = 0, production
   }
   statScore = statScore / castActors.length
 
-  const budgetMod  = 0.5 + budgetMult * 0.2
+  // Diminishing returns curve for budget to avoid dominant blockbuster strategies
+  const budgetMod  = 0.80 + Math.sqrt(Math.max(0, budgetMult - 0.5)) * 0.22
   const sqMult     = studioQualityMult(productionsCompleted)
-  const baseRaw = (statScore * budgetMod * qMult + chemistryBonus * 5 + storyMod) * sqMult
+  // Chemistry modifier as a multiplicative factor (0.85 - 1.05) and a small flat contribution (+0 to +10)
+  // This prevents chemistry from single-handedly carrying a low-skill production
+  const chemMod    = 0.85 + (chemistryBonus / 10) * 0.20
+  const baseRaw    = (statScore * budgetMod * qMult * chemMod + chemistryBonus * 1.0 + storyMod) * sqMult
 
   // Genre-based Redesign metrics (Difficulty execution penalty & Risk variance)
   const genreDetails = GENRE_DETAILS[genre] ?? {}

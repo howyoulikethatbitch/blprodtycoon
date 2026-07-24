@@ -191,7 +191,9 @@ function scoreMedia(prod, castActors, chemValue, baseScore) {
   const fixed   = prod.fixedCP ? 0.5 : 0
   const expectations = GENRE_DETAILS[prod.genre]?.criticExpectations ?? 1
   const expectationPenalty = (expectations - 1) * 0.1
-  const stars   = roundStars(1 + base * 1.5 + chem * 2.0 + fixed - expectationPenalty)
+  const storyPenalty = prod.story === 'adaptation' ? 0.15 : 0
+  // Recalibrated: base has higher impact, chemistry slightly reduced, adaptation penalty applied
+  const stars   = roundStars(1.2 + base * 1.8 + chem * 1.1 + fixed - expectationPenalty - storyPenalty)
   const quoteRaw = pick(stars >= 4 ? QUOTES.media.high : stars >= 3 ? QUOTES.media.mid : QUOTES.media.low)
   return {
     id: 'media', name: 'Media Critic', icon: '📰',
@@ -205,15 +207,15 @@ function scoreMedia(prod, castActors, chemValue, baseScore) {
 function scoreIndustry(prod, castActors, chemValue, baseScore) {
   const combo   = prod.comboResult?.mult ?? 1.0
   const cbBonus = combo >= 1.5 ? 0.8 : combo <= 0.6 ? -0.6 : 0.2
-  const adapt   = prod.story === 'adaptation' ? 0.4 : 0
   const sched   = prod.schedule === '12m' ? 0.5 : prod.schedule === '6m' ? 0.2 : 0
-  // Cap the stacked positive bonuses so that menu choices alone can't inflate
-  // an inexperienced studio to a high grade — skill must do the heavy lifting.
-  const bonus   = Math.min(0.8, cbBonus + adapt + sched)
+  const bonus   = Math.min(0.8, cbBonus + sched)
   const base    = baseScore / 100
   const expectations = GENRE_DETAILS[prod.genre]?.criticExpectations ?? 1
   const expectationPenalty = (expectations - 1) * 0.1
-  const stars   = roundStars(1.5 + base * 1.8 + bonus - expectationPenalty)
+  // Higher expectations penalty for adaptations on professional reviews
+  const storyPenalty = prod.story === 'adaptation' ? 0.25 : 0
+  // Recalibrated: base has higher impact, skill dominates execution
+  const stars   = roundStars(1.4 + base * 2.2 + bonus - expectationPenalty - storyPenalty)
   const quoteRaw = pick(stars >= 4 ? QUOTES.industry.high : stars >= 3 ? QUOTES.industry.mid : QUOTES.industry.low)
   return {
     id: 'industry', name: 'Industry Critic', icon: '🏭',
@@ -229,10 +231,12 @@ function scoreBLFan(prod, castActors, chemValue, baseScore) {
   const visualAvg = castActors.length
     ? castActors.reduce((s, a) => s + (a.skills?.visual ?? 40), 0) / castActors.length / 100
     : 0.5
+  const base      = baseScore / 100
   const rBonus  = prod.rating === 'r' ? 0.5 : prod.rating === 'pg' ? -0.2 : 0
   const expectations = GENRE_DETAILS[prod.genre]?.criticExpectations ?? 1
   const expectationPenalty = (expectations - 1) * 0.1
-  const stars   = roundStars(1 + chem * 2.5 + visualAvg * 1.5 + rBonus - expectationPenalty)
+  // Recalibrated: base quality + visual appeal + chemistry balanced nicely
+  const stars   = roundStars(1.0 + base * 0.6 + chem * 1.6 + visualAvg * 1.4 + rBonus - expectationPenalty)
   const quoteRaw = pick(stars >= 4 ? QUOTES.bl_fan.high : stars >= 3 ? QUOTES.bl_fan.mid : QUOTES.bl_fan.low)
   return {
     id: 'bl_fan', name: 'BL Fan Critic', icon: '💕',
@@ -249,8 +253,8 @@ function scoreSocial(prod, castActors, chemValue, baseScore) {
   const base      = baseScore / 100
   const expectations = GENRE_DETAILS[prod.genre]?.criticExpectations ?? 1
   const expectationPenalty = (expectations - 1) * 0.1
-  // Floor lowered 2.5 → 1.8: weak productions no longer get a free near-3 from Social.
-  const stars     = roundStars(1.8 + base * 1.2 + rMod + srPenalty - expectationPenalty)
+  // Recalibrated: base has higher impact, floor set correctly
+  const stars     = roundStars(1.5 + base * 1.8 + rMod + srPenalty - expectationPenalty)
   const quoteRaw  = pick(stars >= 4 ? QUOTES.social.high : stars >= 3 ? QUOTES.social.mid : QUOTES.social.low)
   return {
     id: 'social', name: 'Social Critic', icon: '🌈',
