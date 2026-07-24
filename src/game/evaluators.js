@@ -3,7 +3,7 @@
  * Prompt 5: integrates the four critics into the final evaluation.
  */
 import { runAllCritics } from './critics.js'
-import { calcRevenue } from './productions.js'
+import { calcRevenue, getRatingFit, PLATFORMS, PROD_TYPES, RATINGS } from './productions.js'
 
 // ─── Score → grade (F/D/C/B/A/S/S+ scale) ────────────────────────────────────
 export function scoreGrade(score) {
@@ -17,21 +17,26 @@ export function scoreGrade(score) {
 }
 
 // ─── Popularity impact ────────────────────────────────────────────────────────
-export function popularityDelta(audienceScore, revenue, prodPerformance, type) {
+export function popularityDelta(audienceScore, revenue, prodPerformance, type, platform, rating, genre) {
   const typePop = {
     mini_series: 0.9, series: 1.2, movie: 1.5,
     // legacy
     drama: 1.2, variety: 0.8, cf: 0.6, web: 0.9, concert: 1.3,
   }
+  const platformInfo = PLATFORMS.find(p => p.id === platform)
+  const ratingInfo = RATINGS.find(r => r.id === rating)
+  const ratingFit = getRatingFit(genre, rating)
   const basePop = (audienceScore * 0.4 + prodPerformance * 0.6) * 5
   const revBonus = Math.min(2.0, 1.0 + revenue / 100000)
   const typeMult = typePop[type] ?? 1.0
-  return Math.round(basePop * revBonus * typeMult)
+  const matureStreamingMult = platform === 'streaming' && ratingFit.isMatureFit ? 1.20 : 1.0
+  return Math.round(basePop * revBonus * typeMult * (platformInfo?.popMult ?? 1.0) * (ratingInfo?.popMult ?? 1.0) * matureStreamingMult)
 }
 
 // ─── Actor XP awards ─────────────────────────────────────────────────────────
-export function castXpAward(score, weeksTotal) {
-  return Math.round((score / 100) * 40 + (weeksTotal ?? 1) * 3)
+export function castXpAward(score, weeksTotal, type) {
+  const xpMult = PROD_TYPES[type]?.xpMult ?? 1
+  return Math.round(((score / 100) * 40 + (weeksTotal ?? 1) * 3) * xpMult)
 }
 
 // ─── Legacy critic quote (kept for backward compat / generic modal fallback) ──
@@ -71,17 +76,19 @@ export function evaluateProduction({ production, score, revenue, reputation, cas
   // 2. Audience Reception (Phase 6)
   const isTrending = (genreTrends ?? []).includes(production.genre)
   const trendBonus = isTrending ? 8 : 0
-  // Adaptations reward stable audience reception with a +5 bonus, offset by professional critic penalties
-  const adaptationAudienceBonus = production.story === 'adaptation' ? 5 : 0
-  const audienceScore = Math.min(100, Math.max(0, Math.round(productionScore * 0.4 + criticScore * 0.55 + trendBonus + adaptationAudienceBonus)))
+  // Adaptations reward stable audience reception, offset by professional critic penalties
+  const adaptationAudienceBonus = production.story === 'adaptation' ? 6 : 0
+  const ratingFit = getRatingFit(production.genre, production.rating)
+  const audienceScore = Math.min(100, Math.max(0, Math.round(productionScore * 0.4 + criticScore * 0.55 + trendBonus + adaptationAudienceBonus + ratingFit.audienceBonus)))
 
   // 3. Revenue (Phase 6)
   const budgetMult = typeof production.budget === 'number' ? production.budget : 1.0
-  const calculatedRevenue = calcRevenue(audienceScore, budgetMult, production.type, production.platform ?? 'tv', tier?.revenueMod ?? 1.0)
+  const calculatedRevenue = calcRevenue(audienceScore, budgetMult, production.type, production.platform ?? 'tv', tier?.revenueMod ?? 1.0, production.story)
   const finalRevenue = revenue !== undefined ? revenue : calculatedRevenue
 
   // 4. Studio Popularity (Phase 6)
-  const popDelta = popularityDelta(audienceScore, finalRevenue, productionScore, production.type)
+  const popDelta = popularityDelta(audienceScore, finalRevenue, productionScore, production.type, production.platform, production.rating, production.genre)
+  const platformRepMult = PLATFORMS.find(p => p.id === production.platform)?.repMult ?? 1
 
   const { grade, label, color } = scoreGrade(criticScore)
 
@@ -98,9 +105,9 @@ export function evaluateProduction({ production, score, revenue, reputation, cas
     criticQuote:   criticQuote(grade),
 
     // Critic-derived deltas
-    repDelta:      critiqueResult.repDelta,
+    repDelta:      Math.round(critiqueResult.repDelta * platformRepMult),
     popDelta,
-    xpPerActor:    castXpAward(criticScore, production.weeksTotal),
+    xpPerActor:    castXpAward(criticScore, production.weeksTotal, production.type),
 
     // Four critics detail
     critics:       critiqueResult.critics,

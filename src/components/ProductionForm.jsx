@@ -337,7 +337,7 @@ export default function ProductionForm({ setScreen }) {
   const displayedGenreTrends = (state.genreTrends ?? []).slice(0, TREND_COUNTS_BY_TIER[gameTier.id] ?? 3)
 
   // Cost & affordability
-  const cost     = calcCost(prodType, budgetMult, schedule, castIds.length, gameTier.productionCostMod)
+  const cost     = calcCost(prodType, budgetMult, schedule, castIds.length, gameTier.productionCostMod, genre, platform)
   const schedInfo  = SCHEDULES.find(s => s.id === schedule)
   const platInfo   = PLATFORMS.find(p => p.id === platform)
   const typeInfo   = PROD_TYPES[prodType]
@@ -556,7 +556,7 @@ export default function ProductionForm({ setScreen }) {
             })}
           </div>
           <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 4 }}>
-            {typeInfo?.episodes} episode{typeInfo?.episodes !== 1 ? 's' : ''}
+            {typeInfo?.episodes} episode{typeInfo?.episodes !== 1 ? 's' : ''} · {prodType === 'mini_series' ? 'fast XP & chemistry growth' : prodType === 'series' ? 'balanced reviews and returns' : 'high investment, prestige, and reward'}
           </div>
           {!isTypeUnlocked('series') && (
             <UnlockRequirementsList
@@ -1023,8 +1023,8 @@ export default function ProductionForm({ setScreen }) {
           </div>
           <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 4 }}>
             {platInfo?.label === 'TV'
-              ? 'Wide reach (×1.3 pop) · lower revenue · R rating blocked'
-              : 'Niche reach · higher revenue (×1.3) · all ratings allowed'}
+              ? 'Lower cost · steadier returns · stronger reputation · R rating blocked'
+              : 'Higher cost · higher revenue ceiling · mature R content gains more popularity'}
           </div>
           {!isPlatformUnlocked('streaming') && (
             <UnlockRequirementsList

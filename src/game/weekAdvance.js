@@ -6,7 +6,7 @@
  */
 import { useState } from 'react'
 import { useGame, A, pushToast, pushEventLog } from './state.jsx'
-import { tickProduction, calcRevenue, calcScore, popularityDeltaByPlatform } from './productions.js'
+import { tickProduction, calcRevenue, calcScore, popularityDeltaByPlatform, PROD_TYPES } from './productions.js'
 import { weeklyActorRecovery, grantExp, NEW_TALENT_POOL, checkTierPromotion, applyTierPromotion, actorDisplayName, startHoneymoon, HONEYMOON_NEW_RECRUIT_WEEKS } from './actors.js'
 import { calcChemistryBonus, calcBondGrowth, applyBondDeltas, getChem } from './chemistry.js'
 import { evaluateProduction } from './evaluators.js'
@@ -180,7 +180,8 @@ export function useWeekAdvance() {
       }
 
       // Chemistry + XP for cast
-      const chemDeltas = calcBondGrowth(castActors, finalScore)
+      const chemGrowthMult = PROD_TYPES[prod.type]?.chemistryMult ?? 1
+      const chemDeltas = calcBondGrowth(castActors, finalScore, chemGrowthMult)
       for (const actor of castActors) {
         const expPatch   = grantExp(actor, evalResult.xpPerActor)
         const newChemMap = applyBondDeltas(actor, chemDeltas)
