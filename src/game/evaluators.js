@@ -71,7 +71,9 @@ export function evaluateProduction({ production, score, revenue, reputation, cas
   // 2. Audience Reception (Phase 6)
   const isTrending = (genreTrends ?? []).includes(production.genre)
   const trendBonus = isTrending ? 8 : 0
-  const audienceScore = Math.min(100, Math.max(0, Math.round(productionScore * 0.4 + criticScore * 0.55 + trendBonus)))
+  // Adaptations reward stable audience reception with a +5 bonus, offset by professional critic penalties
+  const adaptationAudienceBonus = production.story === 'adaptation' ? 5 : 0
+  const audienceScore = Math.min(100, Math.max(0, Math.round(productionScore * 0.4 + criticScore * 0.55 + trendBonus + adaptationAudienceBonus)))
 
   // 3. Revenue (Phase 6)
   const budgetMult = typeof production.budget === 'number' ? production.budget : 1.0
