@@ -11,6 +11,7 @@ import { weeklyActorRecovery, grantExp, NEW_TALENT_POOL, checkTierPromotion, app
 import { calcChemistryBonus, calcBondGrowth, applyBondDeltas, getChem } from './chemistry.js'
 import { evaluateProduction } from './evaluators.js'
 import { rollWeeklyEvents, rollActorEvent, runChemPulse, rollCpEvents } from './events.js'
+import { generateAtmosphereMessage } from './atmosphere.js'
 import { calcRank, computeNumericRank, playerScore } from './ranking.js'
 import { SFX, resumeAudio } from './audio.js'
 import { getGameTierByRank } from './tiers.js'
@@ -72,6 +73,17 @@ export function useWeekAdvance() {
         wrappedThisWeek.push({ ...prod, ...patch })
       } else if (patch.phase === 'releasing') {
         releasingThisWeek.push({ ...prod, ...patch })
+      } else if (prod.phase === 'filming' && patch.phase !== 'wrap') {
+        // Active filming week: roll for 40% chance of a contextual atmosphere message (Polish Version 1.1)
+        if (Math.random() < 0.40) {
+          const { text, usedIds } = generateAtmosphereMessage(prod, state.actors)
+          dispatch({
+            type: A.UPDATE_PRODUCTION,
+            id: prod.id,
+            patch: { usedAtmosphereIds: usedIds }
+          })
+          pushEventLog(dispatch, `🎥 [On Set: ${prod.title}] ${text}`, '', week)
+        }
       }
     }
 
