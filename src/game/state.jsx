@@ -19,8 +19,8 @@ export const INITIAL_STATE = {
   numericRank:   101,
   awards:        0,
   unlockedTiers: ['Rookie'],
-  unlockedGenres: ['Romance', 'School', 'Office'],
-  unlockedMilestones: ['Romance', 'School', 'Office'],
+  unlockedGenres: ['Romance', 'School', 'Office', 'Comedy'],
+  unlockedMilestones: ['Romance', 'School', 'Office', 'Comedy'],
   unlockedThemes: ['Slow Burn', 'Friends-to-Lovers', 'Enemies-to-Lovers', 'Soulmates', 'Forbidden Love'],
   actors:        initChemistry(ACTOR_DATA.map(initActor)),
   productions:   [],
@@ -112,7 +112,14 @@ function gameReducer(state, action) {
     case A.REMOVE_FREE_AGENT: return { ...state, freeAgentsPool: (state.freeAgentsPool ?? []).filter(e => e.poolId !== action.poolId) }
     case A.UPDATE_FREE_AGENT: return { ...state, freeAgentsPool: (state.freeAgentsPool ?? []).map(e => e.poolId === action.poolId ? { ...e, ...action.patch } : e) }
     case A.INIT_FREE_AGENTS: return { ...state, freeAgentsPool: action.pool }
-    case A.LOAD_SAVE: return { ...action.saveData, started: action.saveData.started !== undefined ? action.saveData.started : true, startYear: action.saveData.startYear ?? 2024, eventLog: action.saveData.eventLog ?? [], fixedCPs: action.saveData.fixedCPs ?? [], freeAgentsPool: action.saveData.freeAgentsPool ?? [], rivals: action.saveData.rivals?.length ? action.saveData.rivals : generateRivals(), productionsCompleted: action.saveData.productionsCompleted ?? 0, gradeCounts: action.saveData.gradeCounts ?? {}, fixedCPNames: action.saveData.fixedCPNames ?? {}, genreTrends: action.saveData.genreTrends ?? [], unlockedMilestones: action.saveData.unlockedMilestones ?? action.saveData.unlockedGenres ?? ['Romance', 'School', 'Office'], unlockedThemes: action.saveData.unlockedThemes ?? ['Slow Burn', 'Friends-to-Lovers', 'Enemies-to-Lovers', 'Soulmates', 'Forbidden Love'], awardsPhase: null, awardsData: null }
+    case A.LOAD_SAVE: {
+      // Migration: ensure Comedy is in unlocked genres for old saves that started with only 3
+      const _savedMilestones = action.saveData.unlockedMilestones ?? action.saveData.unlockedGenres ?? ['Romance', 'School', 'Office']
+      const _savedGenres = action.saveData.unlockedGenres ?? ['Romance', 'School', 'Office']
+      const _migratedMilestones = _savedMilestones.includes('Comedy') ? _savedMilestones : [..._savedMilestones, 'Comedy']
+      const _migratedGenres = _savedGenres.includes('Comedy') ? _savedGenres : [..._savedGenres, 'Comedy']
+      return { ...action.saveData, started: action.saveData.started !== undefined ? action.saveData.started : true, startYear: action.saveData.startYear ?? 2024, eventLog: action.saveData.eventLog ?? [], fixedCPs: action.saveData.fixedCPs ?? [], freeAgentsPool: action.saveData.freeAgentsPool ?? [], rivals: action.saveData.rivals?.length ? action.saveData.rivals : generateRivals(), productionsCompleted: action.saveData.productionsCompleted ?? 0, gradeCounts: action.saveData.gradeCounts ?? {}, fixedCPNames: action.saveData.fixedCPNames ?? {}, genreTrends: action.saveData.genreTrends ?? [], unlockedGenres: _migratedGenres, unlockedMilestones: _migratedMilestones, unlockedThemes: action.saveData.unlockedThemes ?? ['Slow Burn', 'Friends-to-Lovers', 'Enemies-to-Lovers', 'Soulmates', 'Forbidden Love'], awardsPhase: null, awardsData: null }
+    }
     case A.MARK_SAVED: return { ...state, lastSaved: action.ts }
     case A.INCREMENT_GRADE_COUNT: return { ...state, gradeCounts: { ...(state.gradeCounts ?? {}), [action.grade]: ((state.gradeCounts ?? {})[action.grade] ?? 0) + 1 } }
     case A.SET_FIXED_CP_NAME: return { ...state, fixedCPNames: { ...(state.fixedCPNames ?? {}), [action.key]: action.name } }

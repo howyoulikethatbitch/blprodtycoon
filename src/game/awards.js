@@ -7,17 +7,19 @@ import { actorDisplayName } from './actors.js'
 // ─── Award Definitions (minor first → major last) ─────────────────────────────
 export const AWARD_DEFS = [
   // Minor
-  { id: 'rookie_actor',       label: 'Best Rookie Actor',          category: 'minor', icon: '🌱', kind: 'actor'      },
-  { id: 'rising_actor',       label: 'Rising Star Actor Award',    category: 'minor', icon: '⭐', kind: 'actor'      },
-  { id: 'popular_actor',      label: 'Popular Actor Award',        category: 'minor', icon: '💫', kind: 'actor'      },
-  { id: 'worldwide_actor',    label: 'Worldwide Actor Award',      category: 'minor', icon: '🌍', kind: 'actor'      },
-  { id: 'best_chemistry',     label: 'Best in Chemistry',          category: 'minor', icon: '💕', kind: 'chemistry'  },
-  { id: 'best_quality',       label: 'Best in Production Quality', category: 'minor', icon: '💎', kind: 'production' },
-  { id: 'best_originality',   label: 'Best in Originality',        category: 'minor', icon: '✍️', kind: 'production' },
-  { id: 'best_adaptation',    label: 'Best in Adaptation',         category: 'minor', icon: '🎭', kind: 'production' },
-  { id: 'best_storyline',     label: 'Best in Storyline',          category: 'minor', icon: '📖', kind: 'production' },
-  { id: 'best_lead_actor',    label: 'Best Lead Actor',            category: 'minor', icon: '🎬', kind: 'actor'      },
-  { id: 'best_mini_series',   label: 'Best Mini Series Award',     category: 'minor', icon: '📺', kind: 'production' },
+  { id: 'rookie_actor',         label: 'Best Rookie Actor',          category: 'minor', icon: '🌱', kind: 'actor'      },
+  { id: 'rising_actor',         label: 'Rising Star Actor Award',    category: 'minor', icon: '⭐', kind: 'actor'      },
+  { id: 'popular_actor',        label: 'Popular Actor Award',        category: 'minor', icon: '💫', kind: 'actor'      },
+  { id: 'worldwide_actor',      label: 'Worldwide Actor Award',      category: 'minor', icon: '🌍', kind: 'actor'      },
+  { id: 'best_chemistry',       label: 'Best in Chemistry',          category: 'minor', icon: '💕', kind: 'chemistry'  },
+  { id: 'best_quality',         label: 'Best in Production Quality', category: 'minor', icon: '💎', kind: 'production' },
+  { id: 'best_originality',     label: 'Best in Originality',        category: 'minor', icon: '✍️', kind: 'production' },
+  { id: 'best_adaptation',      label: 'Best in Adaptation',         category: 'minor', icon: '🎭', kind: 'production' },
+  { id: 'best_storyline',       label: 'Best in Storyline',          category: 'minor', icon: '📖', kind: 'production' },
+  { id: 'best_lead_actor',      label: 'Best Lead Actor',            category: 'minor', icon: '🎬', kind: 'actor'      },
+  { id: 'best_mini_series',     label: 'Best Mini Series Award',     category: 'minor', icon: '📺', kind: 'production' },
+  { id: 'best_cinematography',  label: 'Best Cinematography',        category: 'minor', icon: '🎥', kind: 'production' },
+  { id: 'fan_favorite_ship',    label: 'Fan Favorite Ship',          category: 'minor', icon: '⚓', kind: 'chemistry'  },
   // Major
   { id: 'series_of_year',     label: 'Series Of The Year',         category: 'major', icon: '🏆', kind: 'production' },
   { id: 'movie_of_year',      label: 'Movie Of The Year',          category: 'major', icon: '🎞️', kind: 'production' },
@@ -403,6 +405,55 @@ export function computeAllAwards(state, week, extraHistory = []) {
     } else rivalWin('best_mini_series', false)
   } else rivalWin('best_mini_series', false)
 
+  // ── Best Cinematography (best high-budget production grade ≥ A) ─────────────
+  // Rewards studios that invest in high-budget Movie or Series productions.
+  if (companyEligible) {
+    const cinemaProds = yearHistory.filter(h =>
+      (h.type === 'movie' || h.type === 'series') &&
+      typeof h.budget === 'number' && h.budget >= 1.5 &&
+      isGradeAtLeast(h.grade, 'A')
+    )
+    if (cinemaProds.length >= 1) {
+      const best = cinemaProds.reduce((a, b) => getExcellenceScore(b) > getExcellenceScore(a) ? b : a)
+      playerWin('best_cinematography', {
+        name: companyName, company: companyName,
+        title: best.title,
+        extra: `Grade: ${best.grade} · Budget: ${best.budget}× · Excellence: ${getExcellenceScore(best)}/100`,
+      })
+    } else rivalWin('best_cinematography', false)
+  } else rivalWin('best_cinematography', false)
+
+  // ── Fan Favorite Ship (production with highest audience chemistry ≥ 70) ─────
+  // Rewards chemistry-focused gameplay over pure stat optimisation.
+  if (companyEligible) {
+    const shipProds = yearHistory.filter(h => (h.chemScore ?? 0) >= 70)
+    if (shipProds.length >= 1) {
+      const best = shipProds.reduce((a, b) => (b.chemScore ?? 0) > (a.chemScore ?? 0) ? b : a)
+      const leadIds = best.leadIds ?? best.castIds ?? []
+      const actor1  = (state.actors ?? []).find(a => a.id === leadIds[0])
+      const actor2  = (state.actors ?? []).find(a => a.id === leadIds[1])
+      playerWin('fan_favorite_ship', {
+        name: companyName, company: companyName,
+        actor1Id:   actor1?.id, actor2Id: actor2?.id,
+        actor1Name: actor1 ? actorDisplayName(actor1) : 'Unknown',
+        actor2Name: actor2 ? actorDisplayName(actor2) : 'Unknown',
+        chemScore:  Math.round(best.chemScore ?? 0),
+        title:      best.title,
+        extra:      `Ship Chemistry: ${Math.round(best.chemScore ?? 0)}`,
+      })
+    } else {
+      const rival  = pickRivalCompany(rivals, false)
+      const a1Name = pickRivalActorName(usedActorNames)
+      const a2Name = pickRivalActorName(usedActorNames)
+      results.push({ awardId: 'fan_favorite_ship', winner: { isPlayer: false, name: rival.name, company: rival.name, actor1Name: a1Name, actor2Name: a2Name, chemScore: Math.round(72 + Math.random() * 20) } })
+    }
+  } else {
+    const rival  = pickRivalCompany(rivals, false)
+    const a1Name = pickRivalActorName(usedActorNames)
+    const a2Name = pickRivalActorName(usedActorNames)
+    results.push({ awardId: 'fan_favorite_ship', winner: { isPlayer: false, name: rival.name, company: rival.name, actor1Name: a1Name, actor2Name: a2Name, chemScore: Math.round(72 + Math.random() * 20) } })
+  }
+
   // ── Series Of The Year (best series with grade S+) ─────────────────────────
   if (companyEligible) {
     const splusSeries = yearHistory.filter(h => h.type === 'series' && h.grade === 'S+')
@@ -437,7 +488,8 @@ export function computeAllAwards(state, week, extraHistory = []) {
 
   function aotYScore(actor) {
     const base = actorNormalizedScore(actor, yearHistory, 5)
-    return lastAotYWinner && actor.name === lastAotYWinner ? base * 0.8 : base
+    // Consecutive-win penalty softened from −20% to −10% to preserve legendary eras
+    return lastAotYWinner && actor.name === lastAotYWinner ? base * 0.9 : base
   }
 
   const bestAoY      = yearAotYActors.length > 0

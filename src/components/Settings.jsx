@@ -6,6 +6,27 @@ import React, { useRef, useState } from 'react'
 import { useGame, A, pushToast, INITIAL_STATE } from '../game/state.jsx'
 import { SFX } from '../game/audio.js'
 
+// ─── Studio cosmetics catalogue ─────────────────────────────────────────────
+// Cosmetic-only items stored as flags. No gameplay effects.
+const STUDIO_COSMETICS = [
+  { id: 'neon_sign',      icon: '✨', label: 'Neon Studio Sign',    cost: 8000,  desc: 'A glowing neon sign for your studio entrance.' },
+  { id: 'trophy_case',    icon: '🏆', label: 'Gold Trophy Case',    cost: 12000, desc: 'A prestigious trophy case to display your victories.' },
+  { id: 'sakura_garden',  icon: '🌸', label: 'Sakura Garden View',  cost: 15000, desc: 'A tranquil sakura-themed office backdrop.' },
+  { id: 'retro_arcade',   icon: '🕹️', label: 'Retro Arcade Lounge', cost: 20000, desc: 'A retro arcade room for actor downtime.' },
+]
+
+function purchaseCosmetic(item, state, dispatch) {
+  SFX.click()
+  if (state.money < item.cost) {
+    pushToast(dispatch, `Insufficient funds — need ₩${item.cost.toLocaleString()}.`, 'red')
+    return
+  }
+  SFX.confirm()
+  dispatch({ type: A.ADD_MONEY, amount: -item.cost })
+  dispatch({ type: A.SET_FLAG, key: `cosmetic_${item.id}`, value: true })
+  pushToast(dispatch, `${item.icon} ${item.label} purchased for the studio!`, 'green')
+}
+
 export default function Settings() {
   const { state, dispatch }  = useGame()
   const { settings }         = state
@@ -247,6 +268,36 @@ export default function Settings() {
             onChange={handleFileChange}
           />
         </div>
+      </div>
+
+      {/* ── Studio Customization ── */}
+      <div className="panel">
+        <div className="panel-title">🎨 STUDIO CUSTOMIZATION</div>
+        <div style={{ fontSize: 7, color: 'var(--lav)', marginBottom: 12 }}>
+          Cosmetic upgrades for your studio — prestige without gameplay effects.
+        </div>
+        {STUDIO_COSMETICS.map(item => {
+          const owned = !!(state.flags?.[`cosmetic_${item.id}`])
+          return (
+            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '8px 10px', background: 'var(--bg-inset)', borderRadius: 6, border: owned ? '2px solid var(--gold)' : '2px solid var(--shadow)' }}>
+              <span style={{ fontSize: 20, flexShrink: 0 }}>{item.icon}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 8, color: owned ? 'var(--gold)' : 'var(--text)', fontWeight: 'bold' }}>
+                  {item.label}{owned ? '  ★ OWNED' : ''}
+                </div>
+                <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 2 }}>{item.desc}</div>
+              </div>
+              {!owned && (
+                <button
+                  style={{ fontSize: 7, padding: '6px 10px', flexShrink: 0 }}
+                  onClick={() => purchaseCosmetic(item, state, dispatch)}
+                >
+                  ₩{item.cost.toLocaleString()}
+                </button>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       {/* ── Danger zone ── */}

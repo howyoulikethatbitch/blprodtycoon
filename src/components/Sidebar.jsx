@@ -4,7 +4,7 @@
  *   Desktop: left sidebar with dominant NEXT WEEK (pink, pulsing) at top
  *   Mobile: bottom tab bar + floating NEXT WEEK FAB above it
  */
-import React from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useGame } from '../game/state.jsx'
 import { useWeekAdvance } from '../game/weekAdvance.js'
 import { SFX } from '../game/audio.js'
@@ -19,8 +19,31 @@ const NAV_ITEMS = [
 ]
 
 export default function Sidebar({ currentScreen, setScreen }) {
-  const { state }                = useGame()
+  const { state }                  = useGame()
   const { advanceWeek, advancing } = useWeekAdvance()
+  const [autoAdvance, setAutoAdvance] = useState(false)
+  const autoTimerRef = useRef(null)
+
+  // Auto-advance: keep ticking weeks until a modal appears or the player stops it.
+  // Stops immediately when anything needs player input (modal queue, advancing lock).
+  useEffect(() => {
+    clearTimeout(autoTimerRef.current)
+    if (!autoAdvance || advancing) return
+    // Stop if modals are waiting
+    if ((state.modalQueue ?? []).length > 0) {
+      setAutoAdvance(false)
+      return
+    }
+    autoTimerRef.current = setTimeout(() => {
+      advanceWeek()
+    }, 400)
+    return () => clearTimeout(autoTimerRef.current)
+  }, [autoAdvance, advancing, state.modalQueue?.length, state.week])
+
+  function toggleAutoAdvance() {
+    SFX.click()
+    setAutoAdvance(prev => !prev)
+  }
 
   function navigate(id) {
     SFX.click()
@@ -46,6 +69,27 @@ export default function Sidebar({ currentScreen, setScreen }) {
           aria-label="Advance one week"
         >
           {advancing ? '⏳ WAIT...' : '▶ NEXT WEEK'}
+        </button>
+
+        {/* Auto-advance toggle */}
+        <button
+          type="button"
+          onClick={toggleAutoAdvance}
+          style={{
+            width: '100%',
+            fontSize: 7,
+            padding: '8px 10px',
+            textAlign: 'center',
+            background: autoAdvance ? 'var(--green)' : 'var(--bg-inset)',
+            color: autoAdvance ? 'var(--bg-deep)' : 'var(--lav)',
+            border: `2px solid ${autoAdvance ? 'var(--green)' : 'var(--shadow)'}`,
+            boxShadow: 'none',
+            letterSpacing: 1,
+          }}
+          aria-pressed={autoAdvance}
+          title="Skip forward automatically until a decision is needed"
+        >
+          {autoAdvance ? '⏩ AUTO: ON — tap to stop' : '⏩ AUTO-ADVANCE'}
         </button>
 
         {/* Nav items */}

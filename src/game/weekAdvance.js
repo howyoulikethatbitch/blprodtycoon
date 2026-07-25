@@ -71,6 +71,7 @@ export function useWeekAdvance() {
         completedThisWeek.push({ ...prod, ...patch })
       } else if (patch.phase === 'wrap' && prod.phase === 'filming') {
         wrappedThisWeek.push({ ...prod, ...patch })
+        // Note: comboResult is set by tickProduction at wrap time
       } else if (patch.phase === 'releasing') {
         releasingThisWeek.push({ ...prod, ...patch })
       } else if (prod.phase === 'filming' && patch.phase !== 'wrap') {
@@ -88,6 +89,8 @@ export function useWeekAdvance() {
     }
 
     // ── 2. Wrap events ────────────────────────────────────────────────────────
+    // Modal consolidation: only pop up a modal for notable combos (PERFECT / BAD FIT).
+    // GOOD combos (mult = 1.0) go to the event log only — reduces modal fatigue.
     for (const prod of wrappedThisWeek) {
       const combo = prod.comboResult
       if (combo) {
@@ -95,16 +98,19 @@ export function useWeekAdvance() {
           `"${prod.title}" filming wrapped! Combo: ${combo.emoji} ${combo.label} ×${combo.mult}`,
           combo.mult >= 1.5 ? 'gold' : combo.mult < 1.0 ? 'red' : 'green', week,
         )
-        dispatch({
-          type: A.PUSH_MODAL,
-          modal: {
-            type: 'generic',
-            data: {
-              title: `🎬 ${prod.title} — WRAP!`,
-              message: `Genre×Type Combo: ${combo.emoji} ${combo.label}\n\nScore multiplier: ×${combo.mult}\nEpisodes now releasing weekly.`,
+        // Only push modal for PERFECT (×1.5) or BAD FIT (×0.6) — GOOD is event-log-only
+        if (combo.mult >= 1.5 || combo.mult <= 0.6) {
+          dispatch({
+            type: A.PUSH_MODAL,
+            modal: {
+              type: 'generic',
+              data: {
+                title: `🎬 ${prod.title} — WRAP!`,
+                message: `Genre×Type Combo: ${combo.emoji} ${combo.label}\n\nScore multiplier: ×${combo.mult}\nEpisodes now releasing weekly.`,
+              },
             },
-          },
-        })
+          })
+        }
       }
     }
 
@@ -138,6 +144,9 @@ export function useWeekAdvance() {
       // Apply Creative Differences quality bonus before genre reuse check
       let adjBase      = Math.round(Math.min(100, baseScore * comboMult))
       if (prod.qualityBonus) adjBase = Math.min(100, adjBase + prod.qualityBonus)
+      // Movie Critic Buffer: +10 score bonus to offset single-episode RNG variance,
+      // reflecting the higher production values and prestige of cinematic releases.
+      if (prod.type === 'movie') adjBase = Math.min(100, adjBase + 10)
 
       // ── Genre reuse penalty — 13-week cooldown from each production's wrap ──
       // Uses weekCompleted so the clock starts when filming ends, not when episodes finish airing.
@@ -472,13 +481,17 @@ export function useWeekAdvance() {
                       }
 
                       // ── Co-star loyalty/happiness penalty ───────────────────
+                      // Dampened by 50% if the co-star is currently mid-shoot —
+                      // they're too focused on filming to feel the full impact yet.
                       if (recentCoActorObj?.signed) {
+                        const coIsFilming   = recentCoActorObj.status === 'filming'
+                        const penaltyPoints = coIsFilming ? 5 : 10
                         d({ type: A.UPDATE_ACTOR, id: recentCoActorObj.id, patch: {
-                          loyalty:   clamp((recentCoActorObj.loyalty   ?? 60) - 10, 0, 100),
-                          happiness: clamp((recentCoActorObj.happiness ?? 70) - 10, 0, 100),
+                          loyalty:   clamp((recentCoActorObj.loyalty   ?? 60) - penaltyPoints, 0, 100),
+                          happiness: clamp((recentCoActorObj.happiness ?? 70) - penaltyPoints, 0, 100),
                         } })
                         pushEventLog(d,
-                          `😞 ${actorDisplayName(recentCoActorObj)} is affected by ${displayName}'s departure. (−10 loyalty, −10 happiness)`,
+                          `😞 ${actorDisplayName(recentCoActorObj)} is affected by ${displayName}'s departure. (−${penaltyPoints} loyalty, −${penaltyPoints} happiness${coIsFilming ? ' — shooting softens the blow' : ''})`,
                           'red', week)
                       }
 
@@ -641,43 +654,76 @@ export function useWeekAdvance() {
     if (numRank <= 15) autoSignTier('Worldwide',   '🌍', numRank)
 
     // ── 5.6 Rivalry showdown (every 10 weeks) ────────────────────────────────
+    // Player now picks a Focus before the result is resolved, adding agency.
     if (week > 0 && week % 10 === 0 && (state.rivals ?? []).length > 0) {
-      const ps       = playerScore(state)
-      // Find the rival ranked just above the player (lowest score still above player)
-      const rivals   = [...state.rivals].sort((a, b) => a.score - b.score)
-      const rival    = rivals.find(r => r.score > ps)
+      const ps     = playerScore(state)
+      const rivals = [...state.rivals].sort((a, b) => a.score - b.score)
+      const rival  = rivals.find(r => r.score > ps)
       if (rival) {
-        // Win chance proportional to relative scores; small random factor for drama
-        const winChance  = Math.min(0.88, (ps / (ps + rival.score)) * 1.6 + 0.05)
-        const playerWins = Math.random() < winChance
-        if (playerWins) {
-          dispatch({ type: A.ADD_REPUTATION,  amount: 5 })
-          dispatch({ type: A.SET_POPULARITY,  value: state.popularity + 8000 })
-          dispatch({ type: A.UPDATE_RIVALS,   id: rival.id, scoreDelta: -25 })
-          pushEventLog(dispatch,
-            `⚔️ Showdown vs ${rival.name}: WON! +5 rep +8K pop`, 'gold', week)
-          dispatch({ type: A.PUSH_MODAL, modal: { type: 'event', data: {
-            label: '⚔️ RIVALRY SHOWDOWN — VICTORY!',
-            message:
-              `Your studio faced off against ${rival.name} in the weekly rankings!\n\n` +
-              `Your score: ${ps.toLocaleString()}\nRival score: ${rival.score.toLocaleString()}\n\n` +
-              `VICTORY! +5 rep · +8,000 pop · rival weakened.`,
-            choices: [{ label: '🏆 CELEBRATE!', effect: () => {} }],
-          } } })
-        } else {
-          dispatch({ type: A.ADD_REPUTATION, amount: -4 })
-          dispatch({ type: A.UPDATE_RIVALS,  id: rival.id, scoreDelta: 10 })
-          pushEventLog(dispatch,
-            `⚔️ Showdown vs ${rival.name}: lost. −4 rep`, 'red', week)
-          dispatch({ type: A.PUSH_MODAL, modal: { type: 'event', data: {
-            label: '⚔️ RIVALRY SHOWDOWN — DEFEAT',
-            message:
-              `Your studio faced off against ${rival.name} in the weekly rankings.\n\n` +
-              `Your score: ${ps.toLocaleString()}\nRival score: ${rival.score.toLocaleString()}\n\n` +
-              `DEFEAT. −4 rep · rival grows stronger. Improve your score!`,
-            choices: [{ label: '😤 NOTED', effect: () => {} }],
-          } } })
+        const baseWinChance = Math.min(0.88, (ps / (ps + rival.score)) * 1.6 + 0.05)
+
+        // Pre-compute focus bonuses based on current studio strengths
+        const hasStrongActors  = state.actors.some(a => a.signed && (a.tier === 'Worldwide' || a.tier === 'Popular'))
+        const hasHighChemCP    = (state.fixedCPs ?? []).some(([x, y]) => {
+          const actA = state.actors.find(ac => ac.id === x)
+          return actA && getChem(actA, y) >= 70
+        })
+        const mediaBlitzBonus  = state.popularity > rival.score * 10 ? 0.10 : 0.04
+        const talentBonus      = hasStrongActors ? 0.10 : 0.04
+        const fanAppealBonus   = hasHighChemCP   ? 0.10 : 0.04
+
+        // Resolve showdown after player picks a Focus strategy
+        function resolveShowdown(focusBonus, s, d) {
+          const winChance  = Math.min(0.92, baseWinChance + focusBonus)
+          const playerWins = Math.random() < winChance
+          if (playerWins) {
+            d({ type: A.ADD_REPUTATION, amount: 5 })
+            d({ type: A.SET_POPULARITY, value: s.popularity + 8000 })
+            d({ type: A.UPDATE_RIVALS,  id: rival.id, scoreDelta: -25 })
+            pushEventLog(d, `⚔️ Showdown vs ${rival.name}: WON! +5 rep +8K pop`, 'gold', week)
+            d({ type: A.PUSH_MODAL, modal: { type: 'event', data: {
+              label: '⚔️ RIVALRY SHOWDOWN — VICTORY!',
+              message:
+                `Your studio faced off against ${rival.name}!\n\n` +
+                `Your score: ${ps.toLocaleString()}\nRival score: ${rival.score.toLocaleString()}\n\n` +
+                `VICTORY! +5 rep · +8,000 pop · rival weakened.`,
+              choices: [{ label: '🏆 CELEBRATE!', effect: () => {} }],
+            } } })
+          } else {
+            d({ type: A.ADD_REPUTATION, amount: -4 })
+            d({ type: A.UPDATE_RIVALS,  id: rival.id, scoreDelta: 10 })
+            pushEventLog(d, `⚔️ Showdown vs ${rival.name}: lost. −4 rep`, 'red', week)
+            d({ type: A.PUSH_MODAL, modal: { type: 'event', data: {
+              label: '⚔️ RIVALRY SHOWDOWN — DEFEAT',
+              message:
+                `Your studio faced off against ${rival.name}.\n\n` +
+                `Your score: ${ps.toLocaleString()}\nRival score: ${rival.score.toLocaleString()}\n\n` +
+                `DEFEAT. −4 rep · rival grows stronger.`,
+              choices: [{ label: '😤 NOTED', effect: () => {} }],
+            } } })
+          }
         }
+
+        // Focus selection modal — player chooses their battle strategy
+        dispatch({ type: A.PUSH_MODAL, modal: { type: 'event', data: {
+          label: `⚔️ SHOWDOWN vs ${rival.name.toUpperCase()}`,
+          message:
+            `Rankings showdown incoming!\n\n` +
+            `Your score: ${ps.toLocaleString()}  vs  ${rival.name}: ${rival.score.toLocaleString()}\n` +
+            `Base win chance: ${Math.round(baseWinChance * 100)}%\n\n` +
+            `Pick your battle strategy — strong studios earn +10% for their specialty:`,
+          choices: [
+            { label: `📡 Media Blitz — marketing & audience push  (${state.popularity > rival.score * 10 ? '+10%' : '+4%'} win chance)`,
+              effect: (s, d) => resolveShowdown(mediaBlitzBonus, s, d) },
+            { label: `⭐ Talent Showdown — actor quality & prestige  (${hasStrongActors ? '+10%' : '+4%'} win chance)`,
+              effect: (s, d) => resolveShowdown(talentBonus,      s, d) },
+            { label: `💕 Fan Appeal — CP chemistry & shipper fandom  (${hasHighChemCP ? '+10%' : '+4%'} win chance)`,
+              effect: (s, d) => resolveShowdown(fanAppealBonus,   s, d) },
+          ],
+        } } })
+        pushEventLog(dispatch,
+          `⚔️ Showdown vs ${rival.name} this week! Base win: ${Math.round(baseWinChance * 100)}% — choose your strategy.`,
+          'pink', week)
       }
     }
 

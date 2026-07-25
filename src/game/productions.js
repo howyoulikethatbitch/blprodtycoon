@@ -255,7 +255,7 @@ export const GENRE_DETAILS = {
 }
 
 // Default genres + what each grade unlocks (count-based — see GENRE_UNLOCK_COUNTS)
-export const DEFAULT_GENRES   = ['Romance', 'School', 'Office']
+export const DEFAULT_GENRES   = ['Romance', 'School', 'Office', 'Comedy']
 export const GENRE_UNLOCK_BY_GRADE = {
   C:    ['Music', 'Sports'],
   B:    ['Slice of Life', 'Comedy'],
@@ -438,7 +438,11 @@ export function calcRevenue(audienceScore, budgetMult, type, platform, revenueMo
   const pf = PLATFORMS.find(p => p.id === realPlatform)
   if (!t) return 0
   const baseRevenue = t.baseCost * budgetMult * 3.5
-  const scoreMult   = Math.pow(audienceScore / 100, 1.3)
+  // Soft logarithmic damping above audienceScore 85 to prevent infinite late-game cash.
+  // Below 85: standard exponential curve. Above 85: linear growth at a much gentler rate.
+  const cappedAudience = Math.min(audienceScore, 85)
+  const overCap = Math.max(0, audienceScore - 85)
+  const scoreMult = Math.pow(cappedAudience / 100, 1.3) * (1 + overCap * 0.008)
   const storyVariance = STORY_TYPES.find(st => st.id === realStory)?.revenueVariance ?? 0
   const variance = Math.min(0.35, (pf?.revenueVariance ?? 0) + storyVariance)
   const performanceMult = 1 + (Math.random() * 2 - 1) * variance

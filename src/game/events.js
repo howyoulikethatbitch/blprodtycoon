@@ -1181,12 +1181,47 @@ export function runChemPulse(state, week) {
           ([x, y]) => bondKey(x, y) === key
         )
 
-        // Fixed CP + chem below tier threshold → breakup crisis
+        // Fixed CP + chem below tier threshold → grace period, then breakup crisis
         const breakupThreshold = getGameTierByRank(state.numericRank ?? 50).cpBreakupThreshold
         if (isFixed && chem < breakupThreshold) {
+          const warnKey = `cpBreakupWarn_${key}`
           const coolKey = `cpBreakup_${key}`
           const lastWk  = state.flags?.[coolKey] ?? -999
-          if (week - lastWk >= 4) {
+          const isWarned = !!(state.flags?.[warnKey])
+
+          if (!isWarned && week - lastWk >= 4) {
+            // ── First warning: grace period — do NOT break up yet ──────────────
+            actions.push({ type: A.SET_FLAG, key: warnKey, value: week })
+            modals.push({
+              type: 'event',
+              data: {
+                label: '⚠️ CP CHEMISTRY WARNING',
+                message:
+                  `The chemistry between ${a.name} and ${b.name} is dangerously low (${chem}, danger zone: <${breakupThreshold}). `
+                  + `Their Fixed CP contract is at risk.\n\nYou have ONE WEEK to stabilise their bond before the contract breaks.`,
+                choices: [
+                  { label: '💰 Emergency fan meeting now (−₩1,500, +25 chemistry)',
+                    effect: (s, d) => {
+                      d({ type: A.ADD_MONEY, amount: -1500 })
+                      const curA = s.actors.find(x => x.id === a.id)
+                      if (curA) d({ type: A.UPDATE_ACTOR, id: a.id, patch: {
+                        chemistry_map: { ...(curA.chemistry_map ?? {}), [b.id]: clamp(chem + 25, 0, 100) }
+                      } })
+                      const curB = s.actors.find(x => x.id === b.id)
+                      if (curB) d({ type: A.UPDATE_ACTOR, id: b.id, patch: {
+                        chemistry_map: { ...(curB.chemistry_map ?? {}), [a.id]: clamp(chem + 25, 0, 100) }
+                      } })
+                      // Grace period resolved early — clear the warn flag
+                      d({ type: A.SET_FLAG, key: warnKey, value: null })
+                    } },
+                  { label: '📅 I\'ll handle it this week (skip)',
+                    effect: () => {} },
+                ],
+              },
+            })
+          } else if (isWarned && week - lastWk >= 4) {
+            // ── Second strike: warn was set last week and chem is still low — crisis ──
+            actions.push({ type: A.SET_FLAG, key: warnKey, value: null })
             actions.push({ type: A.SET_FLAG, key: coolKey, value: week })
 
             // Check if this is an established long-standing pair (5+ productions together)

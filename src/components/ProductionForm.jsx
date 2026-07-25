@@ -651,9 +651,9 @@ export default function ProductionForm({ setScreen }) {
             />
           )}
           {/* 2× multiplier active badge */}
-          {genreMultiplier === 2 && (
+          {genreMultiplier >= 1.3 && (
             <div style={{ fontSize: 8, color: 'var(--gold)', letterSpacing: 1, fontWeight: 'bold', marginTop: 4 }}>
-              ✨ 2× GENRE MULTIPLIER ACTIVE — combo bonus doubled!
+              ✨ 1.35× GENRE MULTIPLIER ACTIVE — combo bonus boosted!
             </div>
           )}
 
@@ -733,7 +733,7 @@ export default function ProductionForm({ setScreen }) {
               spinsLeft={effectiveSpinsLeft}
               onSpinUsed={() => setSlotSpinsUsed(c => c + 1)}
               onSpinAgain={() => setBonusSpins(c => c + 1)}
-              onMultiplierAccepted={() => { setGenreMultiplier(2); SFX.confirm() }}
+              onMultiplierAccepted={() => { setGenreMultiplier(1.35); SFX.confirm() }}
               currentGenre={genre}
               gameTierId={gameTier.id}
               genreTrends={displayedGenreTrends}
@@ -1584,7 +1584,7 @@ function SlotMachineModal({
                   : (GENRE_EMOJI[displayGenre] ?? '🎬')
   const slotLabel = spinning          ? displayGenre
                   : outcome?.type === 'spinAgain'  ? 'SPIN AGAIN!'
-                  : outcome?.type === 'multiplier' ? '2× MULTIPLIER!'
+                  : outcome?.type === 'multiplier' ? '1.35× MULTIPLIER!'
                   : (outcome?.genre ?? displayGenre)
 
   // Sub-label shown after landing
@@ -1620,7 +1620,7 @@ function SlotMachineModal({
       )
       case 'multiplier': return (
         <div>
-          <div style={{ ...tagStyles, color: 'var(--gold)' }}>✨ 2× COMBO MULTIPLIER!</div>
+          <div style={{ ...tagStyles, color: 'var(--gold)' }}>✨ 1.35× COMBO MULTIPLIER!</div>
           <div style={{ fontSize: 7, color: 'var(--lav)', marginTop: 2 }}>
             Accept to double your genre×type combo bonus.
           </div>
@@ -1644,7 +1644,7 @@ function SlotMachineModal({
           <button type="button" style={modalStyles.acceptBtn}
             onClick={() => { onMultiplierAccepted(); onClose() }}
           >
-            ✅ ACCEPT 2× BONUS
+            ✅ ACCEPT 1.35× BONUS
           </button>
         )
       case 'genreDiscovery':
