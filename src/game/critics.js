@@ -4,7 +4,7 @@
  * Each scores 1–5 stars. Final score = average × 20.
  */
 import { getChem } from './chemistry.js'
-import { GENRE_DETAILS } from './productions.js'
+import { GENRE_DETAILS, getRatingFit } from './productions.js'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function pick(arr) {
@@ -232,7 +232,8 @@ function scoreBLFan(prod, castActors, chemValue, baseScore) {
     ? castActors.reduce((s, a) => s + (a.skills?.visual ?? 40), 0) / castActors.length / 100
     : 0.5
   const base      = baseScore / 100
-  const rBonus  = prod.rating === 'r' ? 0.5 : prod.rating === 'pg' ? -0.2 : 0
+  const ratingFit = getRatingFit(prod.genre, prod.rating)
+  const rBonus  = ratingFit.fanBonus
   const expectations = GENRE_DETAILS[prod.genre]?.criticExpectations ?? 1
   const expectationPenalty = (expectations - 1) * 0.1
   // Recalibrated: base quality + visual appeal + chemistry balanced nicely
@@ -248,8 +249,9 @@ function scoreBLFan(prod, castActors, chemValue, baseScore) {
 
 /** SOCIAL CRITIC — LGBTQ+ representation & respect */
 function scoreSocial(prod, castActors, chemValue, baseScore) {
-  const rMod      = prod.rating === 'pg' ? 0.8 : prod.rating === 'r' ? -0.5 : 0
-  const srPenalty = (prod.genre === 'School' && prod.rating === 'r') ? -1.5 : 0
+  const ratingFit = getRatingFit(prod.genre, prod.rating)
+  const rMod      = prod.rating === 'pg' && ['School', 'Comedy', 'Slice of Life'].includes(prod.genre) ? 0.55 : 0
+  const srPenalty = ratingFit.socialBonus
   const base      = baseScore / 100
   const expectations = GENRE_DETAILS[prod.genre]?.criticExpectations ?? 1
   const expectationPenalty = (expectations - 1) * 0.1
@@ -291,7 +293,7 @@ export function runAllCritics(production, castActors, chemValue, baseScore, tier
   const finalScore = Math.round((avgStars / 5) * 100)
 
   // Rep delta per spec: (avg - 3) × 8 × rating modifier
-  const ratingMod = production.rating === 'pg' ? 1.1 : production.rating === 'r' ? 0.85 : 1.0
+  const ratingMod = production.rating === 'pg' ? 1.15 : production.rating === 'r' ? 0.95 : 1.0
   const rawRepDelta = Math.round((avgStars - 3) * 8 * ratingMod)
   // Prompt 8: cap rep loss per review at the tier value (negative cap)
   const repLossCap = tier?.repLossCap ?? -20

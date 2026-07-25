@@ -6,9 +6,9 @@ import { getThemeComboResult, getTypeThemeBonus } from './themes.js'
 
 // ─── Production types ─────────────────────────────────────────────────────────
 export const PROD_TYPES = {
-  mini_series: { label: 'Mini Series', icon: '📺', episodes: 8,  baseCost: 5000  },
-  series:      { label: 'Series',      icon: '🎭', episodes: 12, baseCost: 9000  },
-  movie:       { label: 'Movie',       icon: '🎬', episodes: 1,  baseCost: 18000 },
+  mini_series: { label: 'Mini Series', icon: '📺', episodes: 8,  baseCost: 4300,  xpMult: 1.25, chemistryMult: 1.25 },
+  series:      { label: 'Series',      icon: '🎭', episodes: 12, baseCost: 9000,  xpMult: 1.00, chemistryMult: 1.00 },
+  movie:       { label: 'Movie',       icon: '🎬', episodes: 1,  baseCost: 19000, xpMult: 0.90, chemistryMult: 0.90 },
 }
 
 // ─── Schedules (production duration & quality multiplier) ─────────────────────
@@ -21,16 +21,28 @@ export const SCHEDULES = [
 
 // ─── Platforms ────────────────────────────────────────────────────────────────
 export const PLATFORMS = [
-  { id: 'tv',        label: 'TV',        icon: '📡', reachMult: 1.3, revMult: 0.8, blocksR: true  },
-  { id: 'streaming', label: 'Streaming', icon: '📱', reachMult: 0.8, revMult: 1.3, blocksR: false },
+  { id: 'tv',        label: 'TV',        icon: '📡', reachMult: 1.15, revMult: 0.82, costMult: 0.85, repMult: 1.12, popMult: 0.95, revenueVariance: 0.05, blocksR: true  },
+  { id: 'streaming', label: 'Streaming', icon: '📱', reachMult: 0.95, revMult: 1.38, costMult: 1.20, repMult: 0.96, popMult: 1.05, revenueVariance: 0.22, blocksR: false },
 ]
 
 // ─── Ratings ─────────────────────────────────────────────────────────────────
 export const RATINGS = [
-  { id: 'pg',   label: 'PG',    popMult: 1.1 },
-  { id: 'pg13', label: 'PG-13', popMult: 1.0 },
-  { id: 'r',    label: 'R',     popMult: 0.8 },   // TV blocks R
+  { id: 'pg',   label: 'PG',    popMult: 1.05 },
+  { id: 'pg13', label: 'PG-13', popMult: 1.00 },
+  { id: 'r',    label: 'R',     popMult: 0.98 },   // TV blocks R
 ]
+
+const PG_FRIENDLY_GENRES = new Set(['School', 'Comedy', 'Slice of Life'])
+const MATURE_GENRES = new Set(['Psychological', 'Thriller', 'Horror', 'Crime', 'Omegaverse', 'Post-Apocalyptic'])
+
+export function getRatingFit(genre, rating) {
+  if (rating === 'pg') return { audienceBonus: PG_FRIENDLY_GENRES.has(genre) ? 5 : 0, fanBonus: 0, socialBonus: 0, isMatureFit: false }
+  if (rating === 'r') {
+    const isMatureFit = MATURE_GENRES.has(genre)
+    return { audienceBonus: isMatureFit ? 8 : genre === 'School' ? -8 : 0, fanBonus: isMatureFit ? 0.65 : 0, socialBonus: genre === 'School' ? -1.5 : 0, isMatureFit }
+  }
+  return { audienceBonus: 0, fanBonus: 0, socialBonus: 0, isMatureFit: false }
+}
 
 // ─── Genres (22 total) ────────────────────────────────────────────────────────
 export const GENRES = [
@@ -286,10 +298,10 @@ export const GENRE_EMOJI = {
 }
 
 // ─── Story origin ─────────────────────────────────────────────────────────────
-// Rebalanced: Original has higher creative potential (+5), Adaptation has +2.
+// Original projects offer greater creative upside; adaptations trade that ceiling for consistency.
 export const STORY_TYPES = [
-  { id: 'original',    label: 'Original',    scoreMod: +5 },
-  { id: 'adaptation',  label: 'Adaptation',  scoreMod: +2 },
+  { id: 'original',   label: 'Original',   scoreMod: +6, revenueVariance: 0.10 },
+  { id: 'adaptation', label: 'Adaptation', scoreMod: +1, revenueVariance: 0.04 },
 ]
 
 // ─── Title suggestion pool ────────────────────────────────────────────────────
@@ -398,34 +410,40 @@ export const BUDGET_TIERS = [
 
 // ─── Cost formula ─────────────────────────────────────────────────────────────
 // costMod: tier-based production cost modifier (default 1.0 = no change)
-export function calcCost(type, budgetMult, scheduleId, castSize, costMod = 1.0, genre = 'Romance') {
+export function calcCost(type, budgetMult, scheduleId, castSize, costMod = 1.0, genre = 'Romance', platform = 'tv') {
   const t = PROD_TYPES[type]
   const s = SCHEDULES.find(sc => sc.id === scheduleId)
   if (!t || !s) return 0
   const genreCostMult = GENRE_DETAILS[genre]?.costMult ?? 1.0
+  const platformCostMult = PLATFORMS.find(p => p.id === platform)?.costMult ?? 1.0
   const base     = t.baseCost * budgetMult * genreCostMult
   const weekCost = base * 0.055 * s.weeks
   const castCost = castSize * 1500 * budgetMult * genreCostMult
-  return Math.round((base + weekCost + castCost) * costMod)
+  return Math.round((base + weekCost + castCost) * costMod * platformCostMult)
 }
 
 // ─── Revenue formula ──────────────────────────────────────────────────────────
 // revenueMod: tier-based revenue modifier (default 1.0 = no change)
-export function calcRevenue(audienceScore, budgetMult, type, platform, revenueMod = 1.0) {
+export function calcRevenue(audienceScore, budgetMult, type, platform, revenueMod = 1.0, story) {
   let realPlatform = platform
   let realMod = revenueMod
-  if (arguments.length >= 6) {
+  let realStory = story
+  if (typeof platform !== 'string') {
     // legacy call support: calcRevenue(score, budgetMult, type, reputation, platform, comboMult, revenueMod)
     realPlatform = arguments[4]
     realMod = arguments[6] ?? 1.0
+    realStory = undefined
   }
   const t  = PROD_TYPES[type]
   const pf = PLATFORMS.find(p => p.id === realPlatform)
   if (!t) return 0
   const baseRevenue = t.baseCost * budgetMult * 3.5
   const scoreMult   = Math.pow(audienceScore / 100, 1.3)
+  const storyVariance = STORY_TYPES.find(st => st.id === realStory)?.revenueVariance ?? 0
+  const variance = Math.min(0.35, (pf?.revenueVariance ?? 0) + storyVariance)
+  const performanceMult = 1 + (Math.random() * 2 - 1) * variance
   const platMult    = pf?.revMult ?? 1.0
-  return Math.round(baseRevenue * scoreMult * platMult * realMod)
+  return Math.round(baseRevenue * scoreMult * platMult * performanceMult * realMod)
 }
 
 // ─── Studio quality multiplier (production experience curve) ─────────────────
