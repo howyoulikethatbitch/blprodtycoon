@@ -428,7 +428,7 @@ export function calcRevenue(audienceScore, budgetMult, type, platform, revenueMo
   let realPlatform = platform
   let realMod = revenueMod
   let realStory = story
-  if (arguments.length >= 7) {
+  if (typeof platform !== 'string') {
     // legacy call support: calcRevenue(score, budgetMult, type, reputation, platform, comboMult, revenueMod)
     realPlatform = arguments[4]
     realMod = arguments[6] ?? 1.0
@@ -440,7 +440,7 @@ export function calcRevenue(audienceScore, budgetMult, type, platform, revenueMo
   const baseRevenue = t.baseCost * budgetMult * 3.5
   const scoreMult   = Math.pow(audienceScore / 100, 1.3)
   const storyVariance = STORY_TYPES.find(st => st.id === realStory)?.revenueVariance ?? 0
-  const variance = Math.max(pf?.revenueVariance ?? 0, storyVariance)
+  const variance = Math.min(0.35, (pf?.revenueVariance ?? 0) + storyVariance)
   const performanceMult = 1 + (Math.random() * 2 - 1) * variance
   const platMult    = pf?.revMult ?? 1.0
   return Math.round(baseRevenue * scoreMult * platMult * performanceMult * realMod)
