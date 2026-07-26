@@ -13,7 +13,7 @@ export const INITIAL_STATE = {
   startYear:     2024,
   week:          1,
   money:         50000,
-  reputation:    10,
+  reputation:    0,
   popularity:    0,
   rank:          'INDIE',
   numericRank:   101,

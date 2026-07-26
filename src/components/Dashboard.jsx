@@ -31,25 +31,25 @@ function buildRosterAlerts(actors) {
     const loyLvl = loyaltyLabel(l)
     let severity = 0, message = '', color = 'var(--gold)'
 
-    // Emergency warning at ≤10 Loyalty — preserved exactly
+    // Emergency warning at ≤10 Loyalty — always shown for available actors
     if (l <= 10) {
       severity = 4
       message  = `‼️ FINAL WARNING‼️: ${name} is walking out! 🤬 (Loyalty: ${loyLvl}) ⚠️`
       color    = 'var(--red)'
-    } else if (h < 25) {
-      // Angry (0–24): loyalty is declining fast — act now
+    } else if (idle >= 1 && h < 25) {
+      // Angry (0–24) AND actually been idle at least 1 week
       severity = 3
-      message  = `❗ROSTER IDLE❗ ${name} is angry after ${idle} weeks with no work! 😢 Cast them before they quit! (Loyalty: ${loyLvl}) 📢`
+      message  = `❗ROSTER IDLE❗ ${name} is angry after ${idle} week${idle !== 1 ? 's' : ''} with no work! 😢 Cast them before they quit! (Loyalty: ${loyLvl}) 📢`
       color    = '#FF5470'
-    } else if (h < 50) {
-      // Sad (25–49): loyalty has begun to decline
+    } else if (idle >= 1 && h < 50) {
+      // Sad (25–49) AND actually been idle at least 1 week
       severity = 2
-      message  = `${name} feels forgotten after ${idle} weeks! 😠 Keep them acting or loyalty will drop! (Loyalty: ${loyLvl}) 📉`
+      message  = `${name} feels forgotten after ${idle} week${idle !== 1 ? 's' : ''}! 😠 Keep them acting or loyalty will drop! (Loyalty: ${loyLvl}) 📉`
       color    = '#FF9F68'
-    } else if (h < 75) {
-      // Neutral (50–74): early visible warning
+    } else if (idle >= 1 && h < 75) {
+      // Neutral (50–74) AND actually been idle at least 1 week
       severity = 1
-      message  = `Roster idle: Keep ${name} acting! 😐 It has been ${idle} weeks. (Loyalty: ${loyLvl}) ⏳`
+      message  = `Roster idle: Keep ${name} acting! 😐 It has been ${idle} week${idle !== 1 ? 's' : ''}. (Loyalty: ${loyLvl}) ⏳`
       color    = 'var(--gold)'
     }
 

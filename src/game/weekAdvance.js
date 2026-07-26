@@ -525,14 +525,10 @@ export function useWeekAdvance() {
                         `💔 ${displayName} left the studio (loyalty=0) → Free Agents Pool (returns Wk ${returnWk})`,
                         'red', week)
 
-                      // ── Quit notice modal + burn letter ──────────────────────
+                      // ── Quit notice modal ────────────────────────────────────
                       d({ type: A.PUSH_MODAL, modal: {
                         type: 'actorQuitNotice',
                         data: { actorId: actor.id, actorName: displayName, returnWeek: returnWk, idleWeeks: idleWks },
-                      } })
-                      d({ type: A.PUSH_MODAL, modal: {
-                        type: 'actorBurnLetter',
-                        data: { actorName: displayName, letterText },
                       } })
 
                       // ── Studio Reputation Crisis on 3rd quit ────────────────
